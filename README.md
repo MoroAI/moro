@@ -69,11 +69,13 @@ Use `moro COMMAND --help` for options. Recipe suggestions do not update `moro.ya
 
 ```bash
 python -m pip install -e '.[train]'
+# For CUDA quantization, additionally install:
+python -m pip install -e '.[cuda]'
 ```
 
-The current backend targets the Hugging Face / PEFT / TRL stack. Its dependency compatibility and actual CUDA training still need integration testing. Checkpoint resume is explicitly unsupported. Failed and interrupted runs record their terminal status in SQLite, with configuration and training-data checksum snapshots in the run directory.
+The backend uses a pinned Hugging Face / PEFT / TRL reference stack with an optional real CPU integration test. Actual CUDA training still needs hardware validation. See [training validation](docs/training-validation.md) for the environment and test scope. Checkpoint resume is explicitly unsupported. Failed and interrupted runs record their terminal status in SQLite, with configuration and training-data checksum snapshots in the run directory.
 
-Data preparation and dry-run work locally. Model loading may access model registries to download weights; strict offline enforcement of `privacy_mode` remains unfinished. Pre-download and use local model paths in an offline environment when required. Raw and processed datasets, credentials, and model weights should remain outside source control.
+Data preparation and dry-run work locally. In `local_only` mode, training and evaluation resolve local directories or cached model snapshots and fail if weights are missing. `allow_external` permits downloads. Pre-download the selected model revision or use local model paths. Raw and processed datasets, credentials, and model weights should remain outside source control.
 
 ## Development
 

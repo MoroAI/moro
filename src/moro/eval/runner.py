@@ -1,60 +1,56 @@
-"""
-Eval runner — runs an eval suite against a model, scores each case, stores results.
-
-For MVP, runs against an ALREADY LOADED adapter (or base model) using the HF pipeline.
-Falls back to a mock/stub runner when torch is not available.
-"""
+"""Evaluate a model or adapter using one explicitly loaded local pipeline."""
 
 from __future__ import annotations
 
 from datetime import datetime, timezone
 from pathlib import Path
 
-from moro.core.errors import DependencyError
+from moro.core.errors import DependencyError, EvalError
 from moro.eval.loader import load_suite
 from moro.eval.models import CaseScore, EvalResult
 from moro.eval.scorers import score_case
 
 
-def _generate_response(
-    model_path: str,
-    messages: list[dict],
-    max_new_tokens: int = 256,
-) -> str:
-    """
-    Generate a response for a list of messages using a local model.
-    Requires torch + transformers.
-    """
+def _load_generator(model_path: str, *, local_only: bool, revision: str | None = None):
     try:
-        import torch
-        from transformers import pipeline
+        from transformers import AutoModelForCausalLM, AutoTokenizer, pipeline
     except ImportError as exc:
-        raise DependencyError(
-            "torch and transformers are required for eval.\n"
-            "Install with: pip install 'moroai[train]'"
-        ) from exc
+        raise DependencyError("Install moroai[train] for model-backed evaluation.") from exc
+    from moro.models.loading import model_load_options, resolve_model_reference
 
-    pipe = pipeline(
-        "text-generation",
-        model=model_path,
-        device_map="auto",
-        torch_dtype=torch.bfloat16 if torch.cuda.is_bf16_supported() else torch.float32,
-        max_new_tokens=max_new_tokens,
-    )
+    reference = resolve_model_reference(model_path, local_only=local_only, revision=revision)
+    options = model_load_options(local_only=local_only)
+    # Resolve remote IDs explicitly as well so adapter detection uses the selected revision.
+    if not Path(reference).is_dir():
+        from huggingface_hub import snapshot_download
 
-    # Format messages as a simple prompt
-    prompt = (
-        "\n".join(f"{m['role'].capitalize()}: {m['content']}" for m in messages) + "\nAssistant:"
-    )
+        reference = snapshot_download(reference, revision=revision)
+    adapter_config = Path(reference) / "adapter_config.json"
+    if adapter_config.exists():
+        from peft import PeftConfig, PeftModel
 
-    outputs = pipe(prompt, do_sample=False)
-    text: str = outputs[0]["generated_text"]
+        adapter = PeftConfig.from_pretrained(reference, local_files_only=local_only)
+        base_reference = resolve_model_reference(
+            adapter.base_model_name_or_path, local_only=local_only, revision=adapter.revision
+        )
+        model = AutoModelForCausalLM.from_pretrained(
+            base_reference, revision=adapter.revision, **options
+        )
+        model = PeftModel.from_pretrained(model, reference, local_files_only=local_only)
+    else:
+        model = AutoModelForCausalLM.from_pretrained(reference, **options)
+    tokenizer = AutoTokenizer.from_pretrained(reference, **options)
+    if not tokenizer.chat_template:
+        raise EvalError("Evaluation requires a tokenizer chat template.")
+    return pipeline("text-generation", model=model, tokenizer=tokenizer, device_map="auto")
 
-    # Strip the prompt prefix
-    if text.startswith(prompt):
-        text = text[len(prompt) :].strip()
 
-    return text
+def _generate_response(generator, messages: list[dict], max_new_tokens: int = 256) -> str:
+    outputs = generator(messages, do_sample=False, max_new_tokens=max_new_tokens)
+    generated = outputs[0]["generated_text"]
+    if not isinstance(generated, list) or not generated or generated[-1]["role"] != "assistant":
+        raise EvalError("Model generation did not return an assistant message.")
+    return generated[-1]["content"]
 
 
 def run_suite(
@@ -63,6 +59,8 @@ def run_suite(
     run_id: str | None = None,
     max_samples: int | None = None,
     stub_responses: dict[str, str] | None = None,
+    local_only: bool = True,
+    revision: str | None = None,
 ) -> EvalResult:
     """
     Run an eval suite against a model.
@@ -77,11 +75,18 @@ def run_suite(
     Returns:
         EvalResult with per-case scores.
     """
+    if max_samples is not None and max_samples < 1:
+        raise EvalError("max_samples must be positive.")
     suite = load_suite(suite_path)
     cases = suite.cases
     if max_samples:
         cases = cases[:max_samples]
 
+    if not cases:
+        raise EvalError("Evaluation suite has no cases.")
+    generator = None
+    if stub_responses is None:
+        generator = _load_generator(model_path, local_only=local_only, revision=revision)
     case_scores: list[CaseScore] = []
 
     for case in cases:
@@ -90,18 +95,11 @@ def run_suite(
         else:
             messages = [m.model_dump() for m in case.messages]
             try:
-                response = _generate_response(model_path, messages)
+                response = _generate_response(generator, messages)
             except Exception as exc:
-                case_scores.append(
-                    CaseScore(
-                        case_id=case.id,
-                        passed=False,
-                        score=0.0,
-                        response="",
-                        details={"error": str(exc)},
-                    )
-                )
-                continue
+                raise EvalError(
+                    f"Generation failed for case {case.id}; no quality result saved."
+                ) from exc
 
         case_scores.append(score_case(case, response))
 

@@ -61,15 +61,17 @@ def eval_run_command(
             if run_row and run_row["status"] == "completed":
                 model_path = str(Path(run_row["output_dir"]) / "adapter")
                 run_id = run_row["id"]
-                console.print(f"[dim]Using latest completed run: {run_id}[/dim]")
+                if not json_output:
+                    console.print(f"[dim]Using latest completed run: {run_id}[/dim]")
             else:
                 raise EvalError(
                     "No completed run found. Specify --run-id or --base-model, "
                     "or run `moro train` first."
                 )
 
-        console.print(f"[cyan]→[/cyan]  Evaluating: [bold]{model_path}[/bold]")
-        console.print(f"[cyan]→[/cyan]  Suite: [bold]{suite_path}[/bold]")
+        if not json_output:
+            console.print(f"[cyan]→[/cyan]  Evaluating: [bold]{model_path}[/bold]")
+            console.print(f"[cyan]→[/cyan]  Suite: [bold]{suite_path}[/bold]")
 
         with console.status("[cyan]Running eval suite…[/cyan]"):
             result = run_suite(
@@ -77,6 +79,8 @@ def eval_run_command(
                 model_path=model_path,
                 run_id=run_id,
                 max_samples=max_samples,
+                local_only=cfg.project.privacy_mode == "local_only",
+                revision=cfg.model.revision if not run_id else None,
             )
 
         # Persist to DB

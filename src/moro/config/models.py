@@ -59,7 +59,7 @@ class TrainingConfig(BaseModel):
     gradient_checkpointing: bool = True
     precision: Literal["auto", "bf16", "fp16", "fp32"] = "auto"
     epochs: float = Field(default=1.0, gt=0)
-    max_steps: int | None = None
+    max_steps: int | None = Field(default=None, ge=1)
     warmup_ratio: float = Field(default=0.03, ge=0.0, le=1.0)
     logging_steps: int = Field(default=10, ge=1)
     save_steps: int = Field(default=100, ge=1)

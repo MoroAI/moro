@@ -12,12 +12,12 @@
 - Training failures and interrupts are persisted, with config and dataset checksum snapshots.
 - Unit tests for configuration, storage, normalization, quality, scoring, and diagnostics.
 
-The local suite passes 83 tests on Python 3.14. Lint and formatting checks pass. Wheel and source distribution builds pass. No real model training or model-backed evaluation was performed. CI is configured but has not run remotely.
+The local suite passes 89 tests on Python 3.14, with one optional real-training test skipped. Lint and formatting checks pass. Wheel and source distribution builds pass. Core CI passed on Python 3.10–3.12 for the foundation. A dedicated Linux CPU training job now exercises one-step training and adapter reload with generated local weights; see [training validation](training-validation.md). CUDA remains unverified.
 
 ## Next milestones
 
-1. Establish a tested training dependency range and CUDA smoke run. Verify trainer API compatibility, k-bit preparation, chat formatting, validation loss, and checkpoint semantics.
-2. Enforce local-only model loading when requested; make cache/download behavior explicit.
+1. Validate the pinned training stack on CUDA. Modern trainer API wiring, k-bit preparation, chat formatting, validation loss, and an offline CPU integration test are implemented. Checkpoint resume remains unsupported.
+2. Local-only model resolution is implemented for training and evaluation, including adapter base models. Extend coverage to supported real model families and custom tokenizer cases.
 3. Persist immutable dataset versions and bind each run to its actual inputs. Current versions point to files that can be rebuilt in place.
 4. Implement baseline-versus-adapter evaluation and enforce release gates. Verify adapters are loaded correctly and errors cannot be mistaken for model quality evidence.
 5. Validate export artifacts, supported model formats, and an actual Ollama import. Merged/GGUF paths and automatic release approval remain incomplete.
