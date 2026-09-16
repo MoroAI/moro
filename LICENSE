@@ -173,6 +173,30 @@
       incurred by, or claims asserted against, such Contributor by reason
       of your accepting any such warranty or additional liability.
 
+
+
+10. `CODE_OF_CONDUCT.md`
+
+You do not need a giant custom one at first.
+
+Use the standard **Contributor Covenant** if GitHub offers it, or add a short version:
+
+
+We are committed to providing a friendly, safe, and welcoming environment for everyone.
+
+Examples of unacceptable behavior include:
+
+- harassment
+- personal attacks
+- abusive language
+- trolling
+- publishing private information without consent
+- other unprofessional conduct
+
+Maintainers may remove, edit, or reject contributions that do not align with this Code of Conduct.
+
+This project follows the spirit of the Contributor Covenant.
+
    END OF TERMS AND CONDITIONS
 
    APPENDIX: How to apply the Apache License to your work.
