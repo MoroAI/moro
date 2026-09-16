@@ -12,7 +12,7 @@
 - Training failures and interrupts are persisted, with config and dataset checksum snapshots.
 - Unit tests for configuration, storage, normalization, quality, scoring, and diagnostics.
 
-The local suite passes 89 tests on Python 3.14, with one optional real-training test skipped. Lint and formatting checks pass. Wheel and source distribution builds pass. Core CI passed on Python 3.10–3.12 for the foundation. A dedicated Linux CPU training job now exercises one-step training and adapter reload with generated local weights; see [training validation](training-validation.md). CUDA remains unverified.
+The local suite passes 91 tests on Python 3.14, with one optional real-training test skipped. Lint and formatting checks pass. Wheel and source distribution builds pass. Core CI passed on Python 3.10–3.12 for the foundation. The dedicated Linux CPU training job passed one-step training and adapter reload with generated local weights; see [training validation](training-validation.md). CUDA remains unverified.
 
 ## Next milestones
 

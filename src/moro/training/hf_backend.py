@@ -30,7 +30,7 @@ def _require_imports(config: MoroConfig) -> None:
     if missing:
         raise DependencyError(
             f"Missing training dependencies: {', '.join(missing)}\n"
-            "Install with: pip install 'moroai[train]'"
+            "Install moroai[train]; add moroai[cuda] for quantization or 8-bit optimizers."
         )
 
 

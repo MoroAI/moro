@@ -32,6 +32,8 @@ Evaluation loads a pipeline once per suite, loads adapters explicitly over their
 
 ## Evidence and limits
 
+[GitHub run 35114132444](https://github.com/MoroAI/moro/actions/runs/35114132444) passed the CPU training test and core checks on Python 3.10–3.12. Local core validation on Python 3.14 passes 91 tests, with the optional integration test skipped on that environment.
+
 The optional CPU integration test creates a tiny random GPT-2 model and tokenizer on disk, trains a LoRA adapter for one optimizer step, checks validation loss and a checkpoint, then reloads the adapter and generates a response. Socket connections are rejected during training and evaluation. No pretrained weights or datasets are downloaded by the test.
 
 This exercises real trainer APIs and adapter serialization, not model quality, CUDA quantization, VRAM estimates, deployment, or release approval. Those require separate acceptance runs.

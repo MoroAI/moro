@@ -8,7 +8,7 @@ Moro is for engineers and small teams building private support assistants, domai
 
 ## Status
 
-Early development. The core CLI, dataset workflow, recipe heuristics, and training dry-run have automated coverage without downloading models. Training, model-backed evaluation, and deployment integrations are experimental and have **not yet been validated end to end on a GPU**. This is not a production release.
+Early development. The core CLI, dataset workflow, recipe heuristics, and training dry-run have automated coverage without downloading models. A real offline CPU smoke test validates one-step LoRA training, validation loss, checkpoint creation, and adapter reload for generation. Training, model-backed evaluation, and deployment integrations remain experimental and have **not yet been validated end to end on a GPU**. This is not a production release.
 
 ## Install from source
 
