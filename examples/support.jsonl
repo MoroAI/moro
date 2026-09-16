@@ -1,0 +1,10 @@
+{"messages": [{"role": "user", "content": "How do I reset my password?"}, {"role": "assistant", "content": "Open Settings, then Security, and select Reset Password."}]}
+{"messages": [{"role": "user", "content": "What is the refund window?"}, {"role": "assistant", "content": "Refunds are available within 14 days of purchase."}]}
+{"messages": [{"role": "user", "content": "How can I contact support?"}, {"role": "assistant", "content": "Use the support chat inside the application."}]}
+{"messages": [{"role": "user", "content": "Where can I download an invoice?"}, {"role": "assistant", "content": "Open Billing and select the invoice download button."}]}
+{"messages": [{"role": "user", "content": "Can I change the interface language?"}, {"role": "assistant", "content": "Choose your preferred language in Settings under Language."}]}
+{"messages": [{"role": "user", "content": "How do I sign out?"}, {"role": "assistant", "content": "Open the profile menu and select Sign out."}]}
+{"messages": [{"role": "user", "content": "Where do I update my display name?"}, {"role": "assistant", "content": "Edit the display name in your profile settings."}]}
+{"messages": [{"role": "user", "content": "Can I disable notifications?"}, {"role": "assistant", "content": "Turn off notifications in Settings under Notifications."}]}
+{"messages": [{"role": "user", "content": "How do I view the app version?"}, {"role": "assistant", "content": "Open Help and choose About to see the version number."}]}
+{"messages": [{"role": "user", "content": "Where is the user guide?"}, {"role": "assistant", "content": "Select Documentation from the Help menu."}]}

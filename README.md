@@ -1,86 +1,90 @@
-# MoroAI
+# Moro
 
-**MoroAI** is a local-first model adaptation foundry.
+**MoroAI** is a local-first CLI for adapting open language models to private data.
 
-> Build, evaluate, and deploy private local language models — without cloud dependencies.
+Turn private data into reliable local models: import → clean → choose a recipe → train → evaluate → deploy.
 
-## What it is
+Moro is for engineers and small teams building private support assistants, domain Q&A, and structured extraction workflows. The current focus is a repeatable local workflow on consumer hardware.
 
-MoroAI manages the full lifecycle of turning messy private data into a reliable, deployable local model:
+## Status
 
-```
-raw data → clean dataset → hardware-safe recipe → QLoRA training → eval → export → Ollama deploy
-```
+Early development. The core CLI, dataset workflow, recipe heuristics, and training dry-run have automated coverage without downloading models. Training, model-backed evaluation, and deployment integrations are experimental and have **not yet been validated end to end on a GPU**. This is not a production release.
 
-## Quickstart
+## Install from source
+
+Python 3.10 or newer:
 
 ```bash
-pip install moroai
+git clone git@github.com:MoroAI/moro.git
+cd moro
+python -m venv .venv
+source .venv/bin/activate
+python -m pip install -e '.[dev]'
+```
 
-moro init my-project
-cd my-project
+Use the source checkout for now; package publication is not part of this setup.
 
-# add your data
-cp your-data.jsonl data/raw/
+## Try the local workflow
 
-moro import ./data/raw/your-data.jsonl --name my-data
+From the repository root:
+
+```bash
+moro init /tmp/moro-demo
+cp examples/support.jsonl /tmp/moro-demo/data/raw/support.jsonl
+cd /tmp/moro-demo
+moro import data/raw/support.jsonl --name support
 moro data build
 moro data report
-
+moro status
 moro doctor
 moro recipe suggest
-
-moro train
-moro eval run eval/support-golden-v1.yaml
-
-moro export --format adapter
-moro deploy --target ollama
+moro train --dry-run
 ```
 
-## Core commands
+The sample data is synthetic and only demonstrates the workflow. Dry-run validates the normalized training rows and prints a rough memory estimate; it does not check installed training dependencies or prove a model will fit in memory.
 
-| Command | Description |
-|---------|-------------|
-| `moro init` | Create a new MoroAI project |
-| `moro status` | Show current project status |
-| `moro doctor` | Check environment and hardware readiness |
-| `moro import` | Import raw dataset files |
-| `moro data build` | Normalize, clean, and split dataset |
-| `moro data report` | Show dataset quality report |
-| `moro recipe suggest` | Suggest hardware-safe training recipe |
-| `moro train` | Run fine-tuning |
-| `moro eval run` | Run evaluation suite |
-| `moro export` | Export run artifacts |
-| `moro deploy` | Prepare local deployment |
-| `moro diagnose` | Diagnose failures and suggest fixes |
+The default config reads `data/raw/support.jsonl`. For another filename, update `dataset.source` in `moro.yaml`. Import registers a source but does not change that setting. Existing import destinations are protected against overwriting.
 
-## Design principles
+## Commands
 
-- **Local-first by default** — works without cloud services
-- **Recipes over raw config** — hardware-aware safe defaults
-- **Trust is first-class** — eval, safety checks, and model cards built in
-- **Reproducible by design** — every run is fully auditable
-- **Small models are first-class** — optimized for 0.5B–8B models on consumer hardware
+| Command | Current behavior |
+| --- | --- |
+| `moro init PATH` | Create project configuration and folders |
+| `moro import SOURCE` | Copy, link, or register raw input |
+| `moro data build` | Normalize, clean, deduplicate, score, and split data |
+| `moro data report` | Show dataset statistics; supports JSON |
+| `moro status` | Inspect project state; supports JSON |
+| `moro doctor` | Inspect hardware and dependencies |
+| `moro recipe suggest` | Suggest heuristic settings; supports JSON |
+| `moro train --dry-run` | Validate data and estimate memory without ML dependencies |
+| `moro train` | Experimental Hugging Face adapter training |
+| `moro eval run SUITE` | Experimental model evaluation |
+| `moro export` | Experimental artifact export |
+| `moro deploy --target ollama` | Prepare deployment files; does not launch Ollama |
+| `moro diagnose` | Inspect recorded training failures |
 
-## Installation
+Use `moro COMMAND --help` for options. Recipe suggestions do not update `moro.yaml`; apply the settings manually before training. Estimates are heuristics, especially for custom models and sequence lengths. CPU and Apple hardware receive conservative unquantized suggestions; MPS training is unverified.
+
+## Experimental training
 
 ```bash
-# Core CLI only
-pip install moroai
-
-# With training support
-pip install "moroai[train]"
-
-# Development
-pip install -e ".[dev]"
+python -m pip install -e '.[train]'
 ```
 
-## Requirements
+The current backend targets the Hugging Face / PEFT / TRL stack. Its dependency compatibility and actual CUDA training still need integration testing. Checkpoint resume is explicitly unsupported. Failed and interrupted runs record their terminal status in SQLite, with configuration and training-data checksum snapshots in the run directory.
 
-- Python 3.10+
-- For training: CUDA-capable GPU or Apple Silicon (MPS)
-- Disk space for model weights and checkpoints
+Data preparation and dry-run work locally. Model loading may access model registries to download weights; strict offline enforcement of `privacy_mode` remains unfinished. Pre-download and use local model paths in an offline environment when required. Raw and processed datasets, credentials, and model weights should remain outside source control.
+
+## Development
+
+```bash
+python -m pytest -q
+ruff check .
+ruff format --check .
+```
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) and the [engineering status](docs/engineering-status.md) for the next milestones. CI runs core tests, lint, formatting, and package build checks on Python 3.10–3.12 without training dependencies.
 
 ## License
 
-Apache 2.0
+[Apache License 2.0](LICENSE).

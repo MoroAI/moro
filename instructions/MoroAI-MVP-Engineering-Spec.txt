@@ -1,0 +1,2015 @@
+MoroAI MVP Engineering Spec**.
+
+This is written as a practical spec you could hand to an engineer and start building immediately.
+
+---
+
+# MoroAI MVP Engineering Spec
+
+## Spec Status
+**Version:** v0.1
+**Scope:** MVP only
+**Target:** local-first CLI
+**Primary language:** Python 3.10+
+**CLI name:** `moro`
+**Fallback CLI name:** `moroai`
+
+---
+
+# 1. MVP Objective
+
+Build the smallest version of MoroAI that allows a user to:
+
+```text
+create a project
+→ import data
+→ build a clean dataset
+→ detect hardware
+→ suggest a safe training recipe
+→ fine-tune a small open model locally
+→ evaluate it
+→ export it
+→ deploy it to Ollama/GGUF-style artifact output
+```
+
+This MVP should be:
+- local-first
+- reproducible
+- config-driven
+- simple to install
+- safe for low-VRAM hardware
+- easy to extend later
+
+---
+
+# 2. MVP Non-Goals
+
+For this MVP, we are **not** building:
+
+- web dashboard
+- multi-user server
+- cloud sync
+- custom training engine
+- layer streaming
+- distributed training
+- plugin marketplace
+- DPO/ORPO
+- advanced synthetic data generation
+
+Those come later.
+
+---
+
+# 3. Exact Repository Folder Structure
+
+This is the exact repo structure I recommend.
+
+```text
+moro/
+  pyproject.toml
+  README.md
+  LICENSE
+  .gitignore
+  Makefile
+  moro.yaml.example
+  templates/
+    project/
+      moro.yaml
+      README.md
+      .gitignore
+      data/
+        raw/
+          .gitkeep
+      eval/
+        support-golden-v1.yaml
+  src/
+    moro/
+      __init__.py
+      main.py
+      cli/
+        __init__.py
+        init.py
+        status.py
+        doctor.py
+        import_data.py
+        data.py
+        recipe.py
+        train.py
+        eval.py
+        export.py
+        deploy.py
+        diagnose.py
+      core/
+        __init__.py
+        paths.py
+        project.py
+        context.py
+        errors.py
+        logging.py
+        hashing.py
+        ids.py
+      config/
+        __init__.py
+        models.py
+        loader.py
+        validators.py
+      storage/
+        __init__.py
+        db.py
+        queries.py
+      data/
+        __init__.py
+        ingest.py
+        normalize.py
+        clean.py
+        dedupe.py
+        quality.py
+        privacy.py
+        splitter.py
+        report.py
+      hardware/
+        __init__.py
+        detector.py
+        profile.py
+      recipes/
+        __init__.py
+        engine.py
+        rules.py
+        presets.py
+      training/
+        __init__.py
+        backend.py
+        hf_backend.py
+        run.py
+        checkpoints.py
+        metrics.py
+      eval/
+        __init__.py
+        models.py
+        loader.py
+        runner.py
+        scorers.py
+        report.py
+      export/
+        __init__.py
+        manifest.py
+        adapter.py
+        gguf.py
+        ollama.py
+        model_card.py
+      diagnose/
+        __init__.py
+        analyzer.py
+        recommendations.py
+      utils/
+        __init__.py
+        yaml.py
+        json.py
+        text.py
+        system.py
+  tests/
+    __init__.py
+    conftest.py
+    test_config.py
+    test_paths.py
+    test_data_normalize.py
+    test_data_clean.py
+    test_data_quality.py
+    test_recipe_engine.py
+    test_cli_init.py
+    test_cli_doctor.py
+    test_eval_scorers.py
+    test_export_manifest.py
+```
+
+---
+
+# 4. Exact Runtime Project Layout
+
+When a user runs `moro init`, the created project should look like this:
+
+```text
+my-project/
+  moro.yaml
+  README.md
+  .gitignore
+  .moro/
+    db.sqlite
+    artifacts/
+    logs/
+    reports/
+  data/
+    raw/
+    normalized/
+    splits/
+      train.jsonl
+      validation.jsonl
+      eval.jsonl
+  eval/
+    support-golden-v1.yaml
+  runs/
+  releases/
+```
+
+---
+
+# 5. Exact CLI Command Specification
+
+Below is the exact MVP CLI surface.
+
+---
+
+## 5.1 `moro init`
+
+### Purpose
+Create a new MoroAI project.
+
+### Command
+```bash
+moro init [PATH]
+```
+
+### Options
+```text
+--template [minimal|support|chat]   Default: minimal
+--force                             Overwrite if project exists
+```
+
+### Behavior
+Creates:
+- `moro.yaml`
+- `README.md`
+- `.gitignore`
+- `data/raw/`
+- `eval/support-golden-v1.yaml`
+- `.moro/`
+
+### Exit codes
+- `0`: success
+- `1`: project already exists without `--force`
+
+---
+
+## 5.2 `moro status`
+
+### Purpose
+Show current project status.
+
+### Command
+```bash
+moro status
+```
+
+### Options
+```text
+--json
+```
+
+### Output
+Shows:
+- project name
+- config validity
+- dataset source present or not
+- latest dataset version
+- latest run
+- latest release
+
+---
+
+## 5.3 `moro doctor`
+
+### Purpose
+Check environment and hardware readiness.
+
+### Command
+```bash
+moro doctor
+```
+
+### Options
+```text
+--json
+```
+
+### Checks
+- Python version
+- MoroAI installed
+- PyTorch installed
+- CUDA available
+- GPU name
+- VRAM
+- CPU RAM
+- disk space
+- recommended model sizes
+- missing optional dependencies
+
+### Exit codes
+- `0`: usable environment
+- `3`: missing critical dependency
+
+---
+
+## 5.4 `moro import`
+
+### Purpose
+Import raw dataset files into the project.
+
+### Command
+```bash
+moro import SOURCE
+```
+
+### Options
+```text
+--name TEXT                 Dataset source name
+--format [auto|jsonl|csv|txt|markdown]   Default: auto
+--copy / --link             Default: copy
+```
+
+### Behavior
+- copies or links source into `data/raw/`
+- registers dataset source in SQLite
+- computes source hash
+
+---
+
+## 5.5 `moro data build`
+
+### Purpose
+Normalize, clean, score, split, and version the dataset.
+
+### Command
+```bash
+moro data build
+```
+
+### Options
+```text
+--config PATH       Default: moro.yaml
+--force             Rebuild even if up to date
+--limit INTEGER     Optional sample limit for debugging
+```
+
+### Output artifacts
+- `data/normalized/dataset.jsonl`
+- `data/splits/train.jsonl`
+- `data/splits/validation.jsonl`
+- `data/splits/eval.jsonl`
+- `.moro/reports/dataset_report.json`
+
+---
+
+## 5.6 `moro data report`
+
+### Purpose
+Show dataset quality report.
+
+### Command
+```bash
+moro data report
+```
+
+### Options
+```text
+--format [table|json]    Default: table
+```
+
+### Report fields
+- total rows
+- valid rows
+- invalid rows
+- duplicates removed
+- near-duplicates flagged
+- average token count
+- p50 token count
+- p95 token count
+- max token count
+- average quality score
+- privacy warnings
+
+---
+
+## 5.7 `moro recipe suggest`
+
+### Purpose
+Suggest a safe training recipe based on hardware and config.
+
+### Command
+```bash
+moro recipe suggest
+```
+
+### Options
+```text
+--model TEXT
+--target-vram FLOAT
+--max-seq-length INTEGER
+--json
+```
+
+### Output
+- recommended model
+- quantization
+- adapter rank
+- target modules
+- batch size
+- gradient accumulation
+- optimizer
+- estimated VRAM
+- confidence
+- warnings
+
+---
+
+## 5.8 `moro train`
+
+### Purpose
+Run training using the current config.
+
+### Command
+```bash
+moro train
+```
+
+### Options
+```text
+--config PATH        Default: moro.yaml
+--run-name TEXT
+--dry-run
+--resume RUN_ID
+```
+
+### Behavior
+- validates config
+- validates dataset version
+- creates run record
+- executes training backend
+- saves metrics
+- saves adapter/checkpoints
+- stores run report
+
+### Exit codes
+- `0`: success
+- `2`: validation error
+- `4`: training failure
+- `5`: dataset error
+
+---
+
+## 5.9 `moro runs list`
+
+### Purpose
+List previous runs.
+
+### Command
+```bash
+moro runs list
+```
+
+### Options
+```text
+--limit INTEGER    Default: 20
+--json
+```
+
+---
+
+## 5.10 `moro eval run`
+
+### Purpose
+Evaluate a trained run against an eval suite.
+
+### Command
+```bash
+moro eval run SUITE_PATH
+```
+
+### Options
+```text
+--run-id TEXT
+--base-model TEXT
+--max-samples INTEGER
+--json
+```
+
+### Behavior
+- loads eval suite
+- runs base and tuned model if requested
+- scores outputs
+- stores eval result
+
+---
+
+## 5.11 `moro eval report`
+
+### Purpose
+Show evaluation result.
+
+### Command
+```bash
+moro eval report EVAL_ID
+```
+
+### Options
+```text
+--json
+```
+
+---
+
+## 5.12 `moro export`
+
+### Purpose
+Export artifacts from a run.
+
+### Command
+```bash
+moro export
+```
+
+### Options
+```text
+--run-id TEXT
+--format [adapter|merged|gguf|ollama]
+--out PATH
+```
+
+### MVP behavior
+Must support:
+- `adapter`
+- `ollama` package generation
+
+May support:
+- `gguf` if external converter available
+
+---
+
+## 5.13 `moro deploy`
+
+### Purpose
+Prepare local deployment artifacts.
+
+### Command
+```bash
+moro deploy
+```
+
+### Options
+```text
+--target [ollama|gguf|docker]
+--run-id TEXT
+--tag TEXT
+```
+
+### MVP behavior
+Must support:
+- `ollama`
+
+May stub:
+- `docker`
+
+---
+
+## 5.14 `moro diagnose`
+
+### Purpose
+Diagnose the latest failure or risk.
+
+### Command
+```bash
+moro diagnose
+```
+
+### Options
+```text
+--run-id TEXT
+--last
+--json
+```
+
+### Output
+- likely issue
+- probable cause
+- recommended actions
+- config changes to try
+
+---
+
+# 6. Exact Pydantic Schemas
+
+Below are the exact Pydantic models for MVP.
+
+These should live primarily in:
+
+```text
+src/moro/config/models.py
+```
+
+and runtime models in:
+
+```text
+src/moro/eval/models.py
+src/moro/training/run.py
+src/moro/hardware/profile.py
+```
+
+---
+
+## 6.1 Config Models
+
+```python
+from __future__ import annotations
+
+from pathlib import Path
+from typing import Any, Literal, Union
+
+from pydantic import BaseModel, Field, field_validator
+
+
+class ProjectConfig(BaseModel):
+    name: str = Field(..., min_length=1, max_length=128)
+    privacy_mode: Literal["local_only", "allow_external"] = "local_only"
+    seed: int = Field(default=42, ge=0)
+
+
+class DatasetConfig(BaseModel):
+    source: Path
+    format: Literal["auto", "jsonl", "csv", "txt", "markdown"] = "auto"
+    deduplicate: bool = True
+    pii_scan: bool = False
+    max_seq_length: int = Field(default=1024, ge=16, le=32768)
+    min_quality_score: float = Field(default=0.0, ge=0.0, le=1.0)
+    validation_ratio: float = Field(default=0.1, ge=0.0, le=0.5)
+    eval_ratio: float = Field(default=0.1, ge=0.0, le=0.5)
+
+    @field_validator("source")
+    @classmethod
+    def validate_source(cls, v: Path) -> Path:
+        if not v:
+            raise ValueError("dataset.source is required")
+        return v
+
+
+class ModelConfig(BaseModel):
+    name: str
+    revision: str | None = None
+    quantization: Literal["none", "int8", "nf4"] = "nf4"
+    trust_remote_code: bool = False
+
+
+class AdapterConfig(BaseModel):
+    type: Literal["lora"] = "lora"
+    r: int = Field(default=16, ge=1, le=256)
+    alpha: int = Field(default=32, ge=1, le=512)
+    dropout: float = Field(default=0.05, ge=0.0, le=1.0)
+    target_modules: Union[Literal["auto"], list[str]] = "auto"
+    bias: Literal["none", "all", "lora_only"] = "none"
+
+
+class TrainingConfig(BaseModel):
+    output_dir: Path = Path("runs")
+    batch_size: int = Field(default=1, ge=1)
+    gradient_accumulation_steps: int = Field(default=16, ge=1)
+    learning_rate: float = Field(default=2e-4, gt=0)
+    optimizer: Literal[
+        "adamw_torch",
+        "adamw_8bit",
+        "paged_adamw_8bit",
+    ] = "paged_adamw_8bit"
+    gradient_checkpointing: bool = True
+    precision: Literal["auto", "bf16", "fp16", "fp32"] = "auto"
+    epochs: float = Field(default=1.0, gt=0)
+    max_steps: int | None = None
+    warmup_ratio: float = Field(default=0.03, ge=0.0, le=1.0)
+    logging_steps: int = Field(default=10, ge=1)
+    save_steps: int = Field(default=100, ge=1)
+
+    @field_validator("output_dir")
+    @classmethod
+    def validate_output_dir(cls, v: Path) -> Path:
+        return Path(v)
+
+
+class EvalSuiteRef(BaseModel):
+    path: Path
+    name: str | None = None
+
+
+class EvalConfig(BaseModel):
+    suites: list[EvalSuiteRef] = Field(default_factory=list)
+    base_model: str | None = None
+    max_samples: int | None = Field(default=None, ge=1)
+
+
+class ReleaseRequirements(BaseModel):
+    eval_suite: str | None = None
+    min_improvement: float | None = None
+    max_regression: float | None = None
+    safety_pass: bool = True
+
+
+class ReleaseConfig(BaseModel):
+    export: list[Literal["adapter", "merged", "gguf", "ollama"]] = Field(
+        default_factory=lambda: ["adapter", "ollama"]
+    )
+    require: ReleaseRequirements | None = None
+
+
+class MoroConfig(BaseModel):
+    project: ProjectConfig
+    dataset: DatasetConfig
+    model: ModelConfig
+    adapter: AdapterConfig = Field(default_factory=AdapterConfig)
+    training: TrainingConfig = Field(default_factory=TrainingConfig)
+    eval: EvalConfig = Field(default_factory=EvalConfig)
+    release: ReleaseConfig = Field(default_factory=ReleaseConfig)
+
+    @field_validator("project", "dataset", "model")
+    @classmethod
+    def required_sections(cls, v: Any) -> Any:
+        if v is None:
+            raise ValueError("required config section missing")
+        return v
+```
+
+---
+
+## 6.2 Hardware Models
+
+```python
+from __future__ import annotations
+
+from pydantic import BaseModel, Field
+
+
+class HardwareProfile(BaseModel):
+    gpu_available: bool
+    gpu_vendor: Literal["nvidia", "amd", "apple", "cpu", "unknown"]
+    gpu_name: str | None = None
+    vram_gb: float | None = None
+    cpu_ram_gb: float
+    disk_free_gb: float
+    python_version: str
+    torch_version: str | None = None
+    cuda_available: bool = False
+    recommended_max_seq_length: int = 1024
+    recommended_models: list[str] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=list)
+```
+
+---
+
+## 6.3 Dataset Runtime Models
+
+```python
+from __future__ import annotations
+
+from pathlib import Path
+from typing import Literal
+
+from pydantic import BaseModel, Field
+
+
+class DatasetMessage(BaseModel):
+    role: Literal["system", "user", "assistant"]
+    content: str
+
+
+class DatasetRow(BaseModel):
+    id: str
+    source: str
+    messages: list[DatasetMessage]
+    metadata: dict = Field(default_factory=dict)
+
+
+class DatasetStats(BaseModel):
+    rows_total: int = 0
+    rows_valid: int = 0
+    rows_invalid: int = 0
+    rows_deduplicated: int = 0
+    rows_near_duplicate: int = 0
+    train_rows: int = 0
+    validation_rows: int = 0
+    eval_rows: int = 0
+    avg_tokens: float = 0.0
+    p50_tokens: float = 0.0
+    p95_tokens: float = 0.0
+    max_tokens: int = 0
+    avg_quality_score: float = 0.0
+    min_quality_score: float = 0.0
+    quality_score_p50: float = 0.0
+    warnings: list[str] = Field(default_factory=list)
+
+
+class DatasetReport(BaseModel):
+    dataset_version_id: str
+    source_id: str
+    normalized_path: Path
+    split_paths: dict[str, Path]
+    stats: DatasetStats
+```
+
+---
+
+## 6.4 Recipe Models
+
+```python
+from __future__ import annotations
+
+from typing import Literal
+
+from pydantic import BaseModel, Field
+
+
+class RecipeSuggestion(BaseModel):
+    model: str
+    quantization: Literal["none", "int8", "nf4"]
+    adapter_r: int
+    adapter_alpha: int
+    target_modules: list[str]
+    max_seq_length: int
+    batch_size: int
+    gradient_accumulation_steps: int
+    optimizer: Literal["adamw_torch", "adamw_8bit", "paged_adamw_8bit"]
+    gradient_checkpointing: bool
+    precision: Literal["auto", "bf16", "fp16", "fp32"]
+    estimated_vram_gb: float
+    confidence: Literal["low", "medium", "high"]
+    warnings: list[str] = Field(default_factory=list)
+```
+
+---
+
+## 6.5 Training Run Models
+
+```python
+from __future__ import annotations
+
+from datetime import datetime
+from enum import Enum
+from pathlib import Path
+
+from pydantic import BaseModel, Field
+
+
+class RunStatus(str, Enum):
+    pending = "pending"
+    running = "running"
+    completed = "completed"
+    failed = "failed"
+    cancelled = "cancelled"
+
+
+class RunRecord(BaseModel):
+    id: str
+    project_name: str
+    created_at: datetime
+    status: RunStatus = RunStatus.pending
+    dataset_version_id: str | None = None
+    config_hash: str
+    model_name: str
+    quantization: str
+    run_name: str | None = None
+    peak_vram_gb: float | None = None
+    tokens_per_sec: float | None = None
+    train_loss: float | None = None
+    validation_loss: float | None = None
+    output_dir: Path
+    error: str | None = None
+```
+
+---
+
+## 6.6 Evaluation Models
+
+```python
+from __future__ import annotations
+
+from datetime import datetime
+from typing import Any, Literal
+
+from pydantic import BaseModel, Field
+
+
+class EvalMessage(BaseModel):
+    role: Literal["system", "user", "assistant"]
+    content: str
+
+
+class EvalExpect(BaseModel):
+    contains: list[str] = Field(default_factory=list)
+    any_of_contains: list[str] = Field(default_factory=list)
+    regex: list[str] = Field(default_factory=list)
+    json_schema: dict[str, Any] | None = None
+
+
+class EvalCase(BaseModel):
+    id: str
+    messages: list[EvalMessage]
+    expect: EvalExpect | None = None
+    tags: list[str] = Field(default_factory=list)
+
+
+class EvalSuite(BaseModel):
+    name: str
+    version: str = "1"
+    description: str | None = None
+    cases: list[EvalCase] = Field(default_factory=list)
+
+
+class CaseScore(BaseModel):
+    case_id: str
+    passed: bool
+    score: float
+    details: dict[str, Any] = Field(default_factory=dict)
+
+
+class EvalResult(BaseModel):
+    id: str
+    suite_name: str
+    run_id: str | None = None
+    model: str
+    created_at: datetime
+    total_cases: int
+    pass_rate: float
+    avg_score: float
+    metrics: dict[str, float] = Field(default_factory=dict)
+    cases: list[CaseScore] = Field(default_factory=list)
+```
+
+---
+
+## 6.7 Export / Release Models
+
+```python
+from __future__ import annotations
+
+from datetime import datetime
+from enum import Enum
+from pathlib import Path
+
+from pydantic import BaseModel, Field
+
+
+class ExportFormat(str, Enum):
+    adapter = "adapter"
+    merged = "merged"
+    gguf = "gguf"
+    ollama = "ollama"
+
+
+class ExportRequest(BaseModel):
+    run_id: str
+    format: ExportFormat
+    out_dir: Path | None = None
+
+
+class ArtifactInfo(BaseModel):
+    type: str
+    path: Path
+    sha256: str | None = None
+    size_bytes: int | None = None
+
+
+class ReleaseManifest(BaseModel):
+    release_id: str
+    project_name: str
+    run_id: str
+    created_at: datetime
+    base_model: str
+    dataset_version_id: str | None = None
+    eval_summary: dict[str, float] = Field(default_factory=dict)
+    artifacts: list[ArtifactInfo] = Field(default_factory=list)
+    model_card_path: Path | None = None
+```
+
+---
+
+# 7. Exact Sample `moro.yaml`
+
+This is the MVP project config file.
+
+```yaml
+project:
+  name: support-assistant
+  privacy_mode: local_only
+  seed: 42
+
+dataset:
+  source: ./data/raw/support.jsonl
+  format: auto
+  deduplicate: true
+  pii_scan: false
+  max_seq_length: 1024
+  min_quality_score: 0.0
+  validation_ratio: 0.1
+  eval_ratio: 0.1
+
+model:
+  name: Qwen/Qwen2.5-1.5B-Instruct
+  revision: main
+  quantization: nf4
+  trust_remote_code: false
+
+adapter:
+  type: lora
+  r: 16
+  alpha: 32
+  dropout: 0.05
+  target_modules: auto
+  bias: none
+
+training:
+  output_dir: ./runs
+  batch_size: 1
+  gradient_accumulation_steps: 16
+  learning_rate: 0.0002
+  optimizer: paged_adamw_8bit
+  gradient_checkpointing: true
+  precision: auto
+  epochs: 1.0
+  warmup_ratio: 0.03
+  logging_steps: 10
+  save_steps: 100
+
+eval:
+  suites:
+    - path: ./eval/support-golden-v1.yaml
+  max_samples: null
+
+release:
+  export:
+    - adapter
+    - ollama
+  require:
+    safety_pass: true
+```
+
+---
+
+# 8. Exact Sample Eval Suite
+
+Path:
+
+```text
+eval/support-golden-v1.yaml
+```
+
+```yaml
+name: support-golden-v1
+version: "1"
+description: Basic support assistant golden questions
+cases:
+  - id: reset_password
+    messages:
+      - role: user
+        content: "How do I reset my password?"
+    expect:
+      contains:
+        - "Settings"
+        - "Security"
+    tags:
+      - account
+
+  - id: refund_policy
+    messages:
+      - role: user
+        content: "What is your refund policy?"
+    expect:
+      any_of_contains:
+        - "refund"
+        - "14 days"
+    tags:
+      - billing
+```
+
+---
+
+# 9. Exact Storage Schema
+
+Use SQLite for MVP state.
+
+## Tables
+
+### `projects`
+```sql
+CREATE TABLE IF NOT EXISTS projects (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  privacy_mode TEXT NOT NULL,
+  created_at TEXT NOT NULL
+);
+```
+
+### `dataset_sources`
+```sql
+CREATE TABLE IF NOT EXISTS dataset_sources (
+  id TEXT PRIMARY KEY,
+  project_id TEXT NOT NULL,
+  name TEXT NOT NULL,
+  source_type TEXT NOT NULL,
+  path TEXT NOT NULL,
+  sha256 TEXT NOT NULL,
+  imported_at TEXT NOT NULL
+);
+```
+
+### `dataset_versions`
+```sql
+CREATE TABLE IF NOT EXISTS dataset_versions (
+  id TEXT PRIMARY KEY,
+  project_id TEXT NOT NULL,
+  source_id TEXT NOT NULL,
+  version TEXT NOT NULL,
+  normalized_path TEXT NOT NULL,
+  stats_json TEXT NOT NULL,
+  created_at TEXT NOT NULL
+);
+```
+
+### `runs`
+```sql
+CREATE TABLE IF NOT EXISTS runs (
+  id TEXT PRIMARY KEY,
+  project_id TEXT NOT NULL,
+  dataset_version_id TEXT,
+  run_name TEXT,
+  status TEXT NOT NULL,
+  config_hash TEXT NOT NULL,
+  model_name TEXT NOT NULL,
+  quantization TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  finished_at TEXT,
+  peak_vram_gb REAL,
+  tokens_per_sec REAL,
+  train_loss REAL,
+  validation_loss REAL,
+  output_dir TEXT NOT NULL,
+  error TEXT
+);
+```
+
+### `eval_runs`
+```sql
+CREATE TABLE IF NOT EXISTS eval_runs (
+  id TEXT PRIMARY KEY,
+  run_id TEXT,
+  suite_name TEXT NOT NULL,
+  model TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  total_cases INTEGER NOT NULL,
+  pass_rate REAL NOT NULL,
+  avg_score REAL NOT NULL,
+  result_json TEXT NOT NULL
+);
+```
+
+### `artifacts`
+```sql
+CREATE TABLE IF NOT EXISTS artifacts (
+  id TEXT PRIMARY KEY,
+  run_id TEXT NOT NULL,
+  type TEXT NOT NULL,
+  path TEXT NOT NULL,
+  sha256 TEXT,
+  size_bytes INTEGER,
+  created_at TEXT NOT NULL
+);
+```
+
+---
+
+# 10. Exact CLI Standards
+
+## Exit codes
+- `0` = success
+- `1` = generic error
+- `2` = config/validation error
+- `3` = missing dependency
+- `4` = training failure
+- `5` = dataset error
+
+## Output conventions
+- Human-readable table by default
+- `--json` for machine-readable output
+- Errors go to stderr
+- Warnings do not fail command unless critical
+
+## IDs
+Use these formats:
+
+- project: `proj_YYYYMMDDHHMMSS_4hex`
+- dataset source: `src_YYYYMMDDHHMMSS_4hex`
+- dataset version: `ds_YYYYMMDDHHMMSS_4hex`
+- run: `run_YYYYMMDDHHMMSS_4hex`
+- eval run: `eval_YYYYMMDDHHMMSS_4hex`
+- release: `rel_YYYYMMDDHHMMSS_4hex`
+
+---
+
+# 11. Exact First 25 Coding Tasks
+
+Below are the exact first 25 engineering tasks.
+
+Each task is intentionally small enough to implement and test.
+
+---
+
+## Task 1 — Create repo scaffold
+### Objective
+Initialize the repository and installable package.
+
+### Files
+- `pyproject.toml`
+- `README.md`
+- `src/moro/__init__.py`
+- `src/moro/main.py`
+
+### Requirements
+- package name: `moroai`
+- console script: `moro = moro.main:app`
+- dependencies:
+  - `typer`
+  - `rich`
+  - `pydantic>=2`
+  - `pyyaml`
+  - `psutil`
+
+### Acceptance criteria
+- `pip install -e .` works
+- `moro --help` runs
+
+---
+
+## Task 2 — Core errors, logging, paths
+### Objective
+Create shared foundation utilities.
+
+### Files
+- `src/moro/core/errors.py`
+- `src/moro/core/logging.py`
+- `src/moro/core/paths.py`
+
+### Requirements
+- define:
+  - `MoroError`
+  - `ConfigError`
+  - `DatasetError`
+  - `TrainingError`
+  - `DependencyError`
+- create path helpers for:
+  - `.moro/`
+  - `data/raw`
+  - `data/normalized`
+  - `data/splits`
+  - `runs/`
+  - `releases/`
+
+### Acceptance criteria
+- all CLI commands can import shared error types
+- path helpers create directories safely
+
+---
+
+## Task 3 — Config Pydantic models
+### Objective
+Implement exact config schema.
+
+### Files
+- `src/moro/config/models.py`
+
+### Requirements
+- implement:
+  - `ProjectConfig`
+  - `DatasetConfig`
+  - `ModelConfig`
+  - `AdapterConfig`
+  - `TrainingConfig`
+  - `EvalConfig`
+  - `ReleaseConfig`
+  - `MoroConfig`
+
+### Acceptance criteria
+- invalid configs raise `ConfigError`
+- defaults work correctly
+- unit tests pass
+
+---
+
+## Task 4 — YAML config loader and validator
+### Objective
+Load `moro.yaml` into typed config.
+
+### Files
+- `src/moro/config/loader.py`
+- `src/moro/config/validators.py`
+
+### Requirements
+- load YAML
+- parse into `MoroConfig`
+- validate file existence for dataset source when required
+- produce useful validation errors
+
+### Acceptance criteria
+- `load_config(Path("moro.yaml")) -> MoroConfig`
+- malformed YAML raises `ConfigError`
+
+---
+
+## Task 5 — Implement `moro init`
+### Objective
+Create project initialization.
+
+### Files
+- `src/moro/cli/init.py`
+- templates in `templates/project/`
+
+### Requirements
+- create project structure
+- write starter `moro.yaml`
+- create sample eval suite
+- support `--force`
+
+### Acceptance criteria
+- running `moro init demo` creates valid project
+- generated config passes validation
+
+---
+
+## Task 6 — Implement `moro status`
+### Objective
+Show project state.
+
+### Files
+- `src/moro/cli/status.py`
+- `src/moro/core/project.py`
+
+### Requirements
+- detect current project root
+- show:
+  - project name
+  - config valid or invalid
+  - latest dataset version
+  - latest run
+
+### Acceptance criteria
+- works inside project directory
+- returns clear error outside project directory
+
+---
+
+## Task 7 — SQLite storage layer
+### Objective
+Create local metadata persistence.
+
+### Files
+- `src/moro/storage/db.py`
+- `src/moro/storage/queries.py`
+
+### Requirements
+- initialize `.moro/db.sqlite`
+- create tables:
+  - projects
+  - dataset_sources
+  - dataset_versions
+  - runs
+  - eval_runs
+  - artifacts
+- provide CRUD helpers
+
+### Acceptance criteria
+- repeated commands do not recreate tables destructively
+- tests can create/read records
+
+---
+
+## Task 8 — Hardware detection and `moro doctor`
+### Objective
+Detect local hardware and environment.
+
+### Files
+- `src/moro/hardware/detector.py`
+- `src/moro/hardware/profile.py`
+- `src/moro/cli/doctor.py`
+
+### Requirements
+- detect:
+  - CPU RAM
+  - disk free
+  - Python version
+  - torch installed?
+  - CUDA available?
+  - GPU name/VRAM if possible
+- output human-readable and JSON formats
+
+### Acceptance criteria
+- `moro doctor` returns useful report
+- `moro doctor --json` returns valid JSON
+
+---
+
+## Task 9 — Implement `moro import`
+### Objective
+Import raw data sources.
+
+### Files
+- `src/moro/cli/import_data.py`
+- `src/moro/data/ingest.py`
+
+### Requirements
+- support file or directory input
+- copy into `data/raw/`
+- register source in DB
+- compute SHA256
+
+### Acceptance criteria
+- importing same file twice is detectable
+- supports `--name`
+
+---
+
+## Task 10 — JSONL/CSV ingestion
+### Objective
+Parse common dataset formats.
+
+### Files
+- `src/moro/data/ingest.py`
+
+### Requirements
+- support:
+  - JSONL chat format
+  - JSONL instruction format
+  - CSV with prompt/response columns
+- return raw rows with source metadata
+
+### Acceptance criteria
+- invalid rows are captured, not silently dropped
+- format auto-detection works
+
+---
+
+## Task 11 — Normalization engine
+### Objective
+Convert all rows into unified message schema.
+
+### Files
+- `src/moro/data/normalize.py`
+
+### Requirements
+Support input styles:
+- `messages`
+- `prompt/completion`
+- `instruction/input/output`
+
+Normalize to:
+```python
+DatasetRow
+```
+
+### Acceptance criteria
+- all supported formats produce valid `DatasetRow`
+- unsupported rows marked invalid with reason
+
+---
+
+## Task 12 — Cleaning engine
+### Objective
+Remove obviously bad rows.
+
+### Files
+- `src/moro/data/clean.py`
+
+### Requirements
+Remove or flag:
+- empty messages
+- empty content strings
+- malformed roles
+- rows exceeding max token limit
+- repeated system/user/assistant inconsistencies
+
+### Acceptance criteria
+- cleaning report includes invalid row counts and reasons
+- output remains deterministic
+
+---
+
+## Task 13 — Deduplication engine
+### Objective
+Detect duplicate and near-duplicate rows.
+
+### Files
+- `src/moro/data/dedupe.py`
+
+### Requirements
+- exact duplicate removal
+- near-duplicate detection using:
+  - normalized text hash
+  - simple minhash or shingling approach
+- keep first occurrence by default
+
+### Acceptance criteria
+- duplicates removed count is reported
+- near-duplicates flagged in stats
+
+---
+
+## Task 14 — Quality scoring and privacy flags
+### Objective
+Assign quality scores and basic privacy warnings.
+
+### Files
+- `src/moro/data/quality.py`
+- `src/moro/data/privacy.py`
+
+### Requirements
+Quality score based on:
+- completeness
+- length sanity
+- repetition
+- formatting quality
+
+Privacy scan MVP:
+- email regex
+- phone regex
+- API key patterns
+- generic secret patterns
+
+### Acceptance criteria
+- each row gets `quality_score`
+- privacy flags stored in metadata
+- report includes warnings
+
+---
+
+## Task 15 — Splitting and `moro data build`
+### Objective
+Build versioned dataset splits.
+
+### Files
+- `src/moro/data/splitter.py`
+- `src/moro/cli/data.py`
+
+### Requirements
+- create train/validation/eval splits
+- write:
+  - `data/normalized/dataset.jsonl`
+  - `data/splits/train.jsonl`
+  - `data/splits/validation.jsonl`
+  - `data/splits/eval.jsonl`
+- save dataset version record
+
+### Acceptance criteria
+- split ratios follow config
+- `moro data build` succeeds end-to-end
+- repeated builds respect `--force`
+
+---
+
+## Task 16 — Dataset report command
+### Objective
+Show dataset quality stats.
+
+### Files
+- `src/moro/data/report.py`
+- `src/moro/cli/data.py`
+
+### Requirements
+- compute:
+  - row counts
+  - token stats
+  - quality stats
+  - warnings
+- output table and JSON
+
+### Acceptance criteria
+- `moro data report` works after `moro data build`
+- JSON output matches `DatasetReport` schema
+
+---
+
+## Task 17 — Recipe engine rules
+### Objective
+Create hardware-aware recipe logic.
+
+### Files
+- `src/moro/recipes/engine.py`
+- `src/moro/recipes/rules.py`
+- `src/moro/recipes/presets.py`
+
+### Requirements
+- use hardware profile + config
+- suggest:
+  - model class
+  - quantization
+  - sequence length
+  - batch size
+  - adapter rank
+  - optimizer
+- return `RecipeSuggestion`
+
+### Acceptance criteria
+- low VRAM returns conservative settings
+- high VRAM returns stronger settings
+- unit tests validate rule behavior
+
+---
+
+## Task 18 — `moro recipe suggest` CLI
+### Objective
+Expose recipe engine to users.
+
+### Files
+- `src/moro/cli/recipe.py`
+
+### Requirements
+- support:
+  - `--model`
+  - `--target-vram`
+  - `--max-seq-length`
+  - `--json`
+
+### Acceptance criteria
+- command outputs clear recommendation
+- JSON conforms to `RecipeSuggestion`
+
+---
+
+## Task 19 — Training backend interface and run lifecycle
+### Objective
+Abstract training execution.
+
+### Files
+- `src/moro/training/backend.py`
+- `src/moro/training/run.py`
+
+### Requirements
+- define backend interface:
+  - `validate`
+  - `estimate_memory`
+  - `train`
+- create run record lifecycle:
+  - pending
+  - running
+  - completed
+  - failed
+
+### Acceptance criteria
+- run records persist in SQLite
+- failed runs store error message
+
+---
+
+## Task 20 — Hugging Face QLoRA backend
+### Objective
+Implement the real training backend.
+
+### Files
+- `src/moro/training/hf_backend.py`
+- `src/moro/training/checkpoints.py`
+- `src/moro/training/metrics.py`
+
+### Requirements
+- support:
+  - 4-bit QLoRA
+  - LoRA adapter
+  - gradient checkpointing
+  - paged optimizer
+  - local saving
+- capture:
+  - train loss
+  - validation loss
+  - peak VRAM if available
+
+### Acceptance criteria
+- can train tiny model in test mode
+- saves adapter output under `runs/{run_id}/adapter`
+
+---
+
+## Task 21 — Implement `moro train`
+### Objective
+Expose training via CLI.
+
+### Files
+- `src/moro/cli/train.py`
+
+### Requirements
+- validate config
+- ensure dataset version exists
+- create run record
+- invoke backend
+- support `--dry-run`
+
+### Acceptance criteria
+- successful training produces run record + adapter
+- config validation errors return exit code `2`
+- training failures return exit code `4`
+
+---
+
+## Task 22 — Eval suite loader and schema
+### Objective
+Load eval suites from YAML.
+
+### Files
+- `src/moro/eval/models.py`
+- `src/moro/eval/loader.py`
+
+### Requirements
+- parse YAML into `EvalSuite`
+- validate case structure
+- ensure unique case IDs
+
+### Acceptance criteria
+- invalid suite files raise clear errors
+- sample suite loads successfully
+
+---
+
+## Task 23 — Eval runner and scorers
+### Objective
+Run evaluations and score outputs.
+
+### Files
+- `src/moro/eval/scorers.py`
+- `src/moro/eval/runner.py`
+- `src/moro/cli/eval.py`
+
+### Requirements
+Implement scorers:
+- contains
+- any_of_contains
+- regex
+- json_schema if applicable
+
+Implement:
+- run suite against model outputs
+- save `EvalResult`
+- support `--json`
+
+### Acceptance criteria
+- `moro eval run eval/support-golden-v1.yaml` works
+- eval results persist in DB
+
+---
+
+## Task 24 — Export and release manifest
+### Objective
+Export run artifacts and create manifests.
+
+### Files
+- `src/moro/export/adapter.py`
+- `src/moro/export/manifest.py`
+- `src/moro/export/model_card.py`
+- `src/moro/cli/export.py`
+
+### Requirements
+- export adapter
+- generate `manifest.json`
+- generate simple `model_card.md`
+- record artifact in DB
+
+### Acceptance criteria
+- `moro export --run-id ... --format adapter` works
+- release artifact directory contains manifest and model card
+
+---
+
+## Task 25 — Ollama deploy + basic diagnostics
+### Objective
+Finish MVP loop with deployment and diagnostics.
+
+### Files
+- `src/moro/export/ollama.py`
+- `src/moro/cli/deploy.py`
+- `src/moro/diagnose/analyzer.py`
+- `src/moro/diagnose/recommendations.py`
+- `src/moro/cli/diagnose.py`
+
+### Requirements
+Deploy:
+- generate Ollama Modelfile or packaging folder
+- point to exported model artifacts
+
+Diagnostics:
+- inspect latest failed run
+- detect common OOM causes
+- suggest config changes
+
+### Acceptance criteria
+- `moro deploy --target ollama` creates deployable folder
+- `moro diagnose --last` returns actionable recommendations
+- end-to-end MVP flow works from init to deploy
+
+---
+
+# 12. Exact MVP Definition of Done
+
+The MVP is complete when all of the following are true:
+
+1. A user can run:
+   ```bash
+   moro init demo
+   cd demo
+   ```
+
+2. A user can import data:
+   ```bash
+   moro import ./data/raw/support.jsonl --name support
+   ```
+
+3. A user can build a dataset:
+   ```bash
+   moro data build
+   ```
+
+4. A user can inspect dataset quality:
+   ```bash
+   moro data report
+   ```
+
+5. A user can check environment:
+   ```bash
+   moro doctor
+   ```
+
+6. A user can get a recipe:
+   ```bash
+   moro recipe suggest
+   ```
+
+7. A user can train:
+   ```bash
+   moro train
+   ```
+
+8. A user can evaluate:
+   ```bash
+   moro eval run eval/support-golden-v1.yaml
+   ```
+
+9. A user can export:
+   ```bash
+   moro export --format adapter
+   ```
+
+10. A user can prepare local deployment:
+   ```bash
+   moro deploy --target ollama
+   ```
+
+11. All state is stored locally.
+12. All important failures produce understandable errors.
+13. All core schemas are validated by tests.
+14. The MVP works on at least one small open model.
+15. The codebase is installable via `pip install -e .`
+
+---
+
+# 13. Recommended Dependencies
+
+## Core dependencies
+```text
+typer
+rich
+pydantic>=2
+pyyaml
+psutil
+```
+
+## Optional training dependencies
+```text
+torch
+transformers
+datasets
+peft
+trl
+accelerate
+bitsandbytes
+```
+
+## Optional data/analytics dependencies
+```text
+pandas
+duckdb
+```
+
+## Suggested packaging extras
+
+```toml
+[project.optional-dependencies]
+train = [
+  "torch",
+  "transformers",
+  "datasets",
+  "peft",
+  "trl",
+  "accelerate",
+  "bitsandbytes",
+]
+```
+
+---
+
+# 14. Exact MVP Testing Requirements
+
+At minimum, include tests for:
+
+## Config
+- valid config parses
+- invalid config fails cleanly
+- defaults are applied
+
+## Data
+- normalization from prompt/completion
+- normalization from messages
+- invalid row handling
+- dedupe behavior
+- quality scoring sanity
+
+## Recipe
+- low VRAM conservative preset
+- high VRAM stronger preset
+
+## CLI
+- `moro init`
+- `moro doctor`
+- `moro data build`
+- `moro train --dry-run`
+
+## Eval
+- contains scorer
+- any_of_contains scorer
+- regex scorer
+
+## Export
+- manifest generation
+- model card generation
+
+---
+
+# 15. Exact MVP Sequence I Would Follow
+
+If I were building this with Claude and myself, I would execute in this exact order:
+
+1. Task 1 — repo scaffold
+2. Task 2 — core utilities
+3. Task 3 — config models
+4. Task 4 — config loader
+5. Task 5 — `moro init`
+6. Task 6 — `moro status`
+7. Task 7 — SQLite storage
+8. Task 8 — `moro doctor`
+9. Task 9 — `moro import`
+10. Task 10 — ingestion
+11. Task 11 — normalization
+12. Task 12 — cleaning
+13. Task 13 — deduplication
+14. Task 14 — quality scoring
+15. Task 15 — `moro data build`
+16. Task 16 — `moro data report`
+17. Task 17 — recipe engine
+18. Task 18 — `moro recipe suggest`
+19. Task 19 — training backend interface
+20. Task 20 — HF QLoRA backend
+21. Task 21 — `moro train`
+22. Task 22 — eval loader
+23. Task 23 — eval runner
+24. Task 24 — export/manifest
+25. Task 25 — deploy + diagnostics
+
+That is the cleanest build order.
+
+---
+
+# 16. Final Recommendation
+
+This spec gives you a very strong MVP because it focuses on the parts that make MoroAI feel real:
+
+- clean project model
+- typed configuration
+- dataset pipeline
+- hardware-aware recipes
+- training execution
+- evaluation
+- export/deploy
+- diagnostics
+
+That is enough to make MoroAI meaningfully better than a simple wrapper.
+
+---
+
+If you want, the next step I can produce is one of these:
+
+## B. **MoroAI starter code skeleton**
+I can generate the actual initial Python files:
+- `pyproject.toml`
+- `main.py`
+- config models
+- CLI entrypoints
+- project init logic
+
+or
+
+## C. **Claude prompt pack for building MoroAI**
+A set of exact prompts for Claude to implement Tasks 1 through 25 in order.

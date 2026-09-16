@@ -1,0 +1,1048 @@
+MoroAI starter code skeleton**.
+
+This gives you a real, installable Python CLI foundation for:
+- `moro init`
+- `moro status`
+- `moro doctor`
+- typed config loading
+- project layout creation
+- clean folder structure
+- Pydantic config models
+
+This is enough to start executing the MVP engineering spec.
+
+---
+
+# 1. Skeleton file tree
+
+Create this structure:
+
+```text
+moro/
+  pyproject.toml
+  src/
+    moro/
+      __init__.py
+      main.py
+      core/
+        __init__.py
+        errors.py
+        paths.py
+        project.py
+      config/
+        __init__.py
+        models.py
+        loader.py
+      cli/
+        __init__.py
+        init.py
+        status.py
+        doctor.py
+      templates/
+        __init__.py
+        project.py
+```
+
+---
+
+# 2. `pyproject.toml`
+
+```toml
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "moroai"
+version = "0.1.0"
+description = "MoroAI: local-first model adaptation foundry"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Apache-2.0" }
+authors = [
+  { name = "MoroAI Team" }
+]
+keywords = [
+  "llm",
+  "fine-tuning",
+  "local-ai",
+  "cli",
+  "evals",
+  "deployment",
+]
+
+dependencies = [
+  "typer>=0.12",
+  "rich>=13.7",
+  "pydantic>=2.7",
+  "PyYAML>=6.0",
+]
+
+[project.optional-dependencies]
+train = [
+  "torch",
+  "transformers",
+  "datasets",
+  "peft",
+  "trl",
+  "accelerate",
+  "bitsandbytes",
+]
+
+dev = [
+  "pytest",
+  "ruff",
+]
+
+[project.scripts]
+moro = "moro.main:app"
+
+[tool.setuptools]
+package-dir = { "" = "src" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+```
+
+---
+
+# 3. `src/moro/__init__.py`
+
+```python
+__version__ = "0.1.0"
+```
+
+---
+
+# 4. `src/moro/main.py`
+
+```python
+import typer
+
+from moro import __version__
+from moro.cli.init import init_command
+from moro.cli.status import status_command
+from moro.cli.doctor import doctor_command
+
+app = typer.Typer(
+    name="moro",
+    help="MoroAI: local-first model adaptation foundry.",
+    no_args_is_help=True,
+    add_completion=False,
+)
+
+
+@app.callback()
+def main() -> None:
+    """
+    MoroAI CLI.
+
+    Build, evaluate, and deploy local models from private data.
+    """
+    pass
+
+
+app.command(name="init", help="Initialize a new MoroAI project")(init_command)
+app.command(name="status", help="Show current project status")(status_command)
+app.command(name="doctor", help="Check environment and hardware readiness")(doctor_command)
+
+
+@app.command(name="version", help="Show MoroAI version")
+def version_command() -> None:
+    typer.echo(__version__)
+
+
+if __name__ == "__main__":
+    app()
+```
+
+---
+
+# 5. Core error types
+
+## `src/moro/core/__init__.py`
+
+```python
+```
+
+## `src/moro/core/errors.py`
+
+```python
+class MoroError(Exception):
+    """Base exception for all MoroAI errors."""
+
+
+class ProjectError(MoroError):
+    """Raised when a project is missing, invalid, or not found."""
+
+
+class ConfigError(MoroError):
+    """Raised when moro.yaml is missing or invalid."""
+
+
+class DatasetError(MoroError):
+    """Raised for dataset ingestion, normalization, or splitting problems."""
+
+
+class DependencyError(MoroError):
+    """Raised when an optional dependency is missing."""
+
+
+class TrainingError(MoroError):
+    """Raised when training fails."""
+
+
+class ExportError(MoroError):
+    """Raised when export or deployment fails."""
+```
+
+---
+
+# 6. Core path helpers
+
+## `src/moro/core/paths.py`
+
+```python
+from pathlib import Path
+
+MORO_DIR = ".moro"
+CONFIG_FILE = "moro.yaml"
+
+PROJECT_DIRS = [
+    ".moro",
+    ".moro/artifacts",
+    ".moro/logs",
+    ".moro/reports",
+    "data",
+    "data/raw",
+    "data/normalized",
+    "data/splits",
+    "eval",
+    "runs",
+    "releases",
+]
+
+
+def find_project_root(start: Path | None = None) -> Path | None:
+    """
+    Search upward from start path until a moro.yaml file is found.
+    """
+    current = Path(start or Path.cwd()).expanduser().resolve()
+
+    for candidate in [current, *current.parents]:
+        if (candidate / CONFIG_FILE).exists():
+            return candidate
+
+    return None
+
+
+def project_dirs(root: Path) -> dict[str, Path]:
+    """
+    Return canonical project directories as a dictionary.
+    """
+    return {
+        "root": root,
+        "moro": root / MORO_DIR,
+        "artifacts": root / MORO_DIR / "artifacts",
+        "logs": root / MORO_DIR / "logs",
+        "reports": root / MORO_DIR / "reports",
+        "data": root / "data",
+        "raw": root / "data/raw",
+        "normalized": root / "data/normalized",
+        "splits": root / "data/splits",
+        "eval": root / "eval",
+        "runs": root / "runs",
+        "releases": root / "releases",
+    }
+
+
+def ensure_project_dirs(root: Path) -> dict[str, Path]:
+    """
+    Create all expected project directories if they do not exist.
+    """
+    dirs = project_dirs(root)
+
+    for path in dirs.values():
+        path.mkdir(parents=True, exist_ok=True)
+
+    return dirs
+```
+
+---
+
+# 7. Project context helper
+
+## `src/moro/core/project.py`
+
+```python
+from pathlib import Path
+
+from moro.config.loader import load_config
+from moro.config.models import MoroConfig
+from moro.core.errors import ProjectError
+from moro.core.paths import CONFIG_FILE, find_project_root
+
+
+def require_project_root(start: Path | None = None) -> Path:
+    root = find_project_root(start)
+
+    if root is None:
+        raise ProjectError(
+            "Not inside a MoroAI project. "
+            "Run `moro init` to create one."
+        )
+
+    return root
+
+
+def load_project_config(start: Path | None = None) -> MoroConfig:
+    root = require_project_root(start)
+    return load_config(root / CONFIG_FILE)
+```
+
+---
+
+# 8. Pydantic config models
+
+## `src/moro/config/__init__.py`
+
+```python
+```
+
+## `src/moro/config/models.py`
+
+```python
+from __future__ import annotations
+
+from pathlib import Path
+from typing import Any, Literal, Union
+
+from pydantic import BaseModel, Field, field_validator
+
+
+class ProjectConfig(BaseModel):
+    name: str = Field(..., min_length=1, max_length=128)
+    privacy_mode: Literal["local_only", "allow_external"] = "local_only"
+    seed: int = Field(default=42, ge=0)
+
+
+class DatasetConfig(BaseModel):
+    source: Path
+    format: Literal["auto", "jsonl", "csv", "txt", "markdown"] = "auto"
+    deduplicate: bool = True
+    pii_scan: bool = False
+    max_seq_length: int = Field(default=1024, ge=16, le=32768)
+    min_quality_score: float = Field(default=0.0, ge=0.0, le=1.0)
+    validation_ratio: float = Field(default=0.1, ge=0.0, le=0.5)
+    eval_ratio: float = Field(default=0.1, ge=0.0, le=0.5)
+
+    @field_validator("source")
+    @classmethod
+    def validate_source(cls, v: Path) -> Path:
+        if v is None:
+            raise ValueError("dataset.source is required")
+        return v
+
+
+class ModelConfig(BaseModel):
+    name: str
+    revision: str | None = None
+    quantization: Literal["none", "int8", "nf4"] = "nf4"
+    trust_remote_code: bool = False
+
+
+class AdapterConfig(BaseModel):
+    type: Literal["lora"] = "lora"
+    r: int = Field(default=16, ge=1, le=256)
+    alpha: int = Field(default=32, ge=1, le=512)
+    dropout: float = Field(default=0.05, ge=0.0, le=1.0)
+    target_modules: Union[Literal["auto"], list[str]] = "auto"
+    bias: Literal["none", "all", "lora_only"] = "none"
+
+
+class TrainingConfig(BaseModel):
+    output_dir: Path = Path("runs")
+    batch_size: int = Field(default=1, ge=1)
+    gradient_accumulation_steps: int = Field(default=16, ge=1)
+    learning_rate: float = Field(default=2e-4, gt=0)
+    optimizer: Literal[
+        "adamw_torch",
+        "adamw_8bit",
+        "paged_adamw_8bit",
+    ] = "paged_adamw_8bit"
+    gradient_checkpointing: bool = True
+    precision: Literal["auto", "bf16", "fp16", "fp32"] = "auto"
+    epochs: float = Field(default=1.0, gt=0)
+    max_steps: int | None = None
+    warmup_ratio: float = Field(default=0.03, ge=0.0, le=1.0)
+    logging_steps: int = Field(default=10, ge=1)
+    save_steps: int = Field(default=100, ge=1)
+
+    @field_validator("output_dir")
+    @classmethod
+    def validate_output_dir(cls, v: Path) -> Path:
+        return Path(v)
+
+
+class EvalSuiteRef(BaseModel):
+    path: Path
+    name: str | None = None
+
+
+class EvalConfig(BaseModel):
+    suites: list[EvalSuiteRef] = Field(default_factory=list)
+    base_model: str | None = None
+    max_samples: int | None = Field(default=None, ge=1)
+
+
+class ReleaseRequirements(BaseModel):
+    eval_suite: str | None = None
+    min_improvement: float | None = None
+    max_regression: float | None = None
+    safety_pass: bool = True
+
+
+class ReleaseConfig(BaseModel):
+    export: list[Literal["adapter", "merged", "gguf", "ollama"]] = Field(
+        default_factory=lambda: ["adapter", "ollama"]
+    )
+    require: ReleaseRequirements | None = None
+
+
+class MoroConfig(BaseModel):
+    project: ProjectConfig
+    dataset: DatasetConfig
+    model: ModelConfig
+    adapter: AdapterConfig = Field(default_factory=AdapterConfig)
+    training: TrainingConfig = Field(default_factory=TrainingConfig)
+    eval: EvalConfig = Field(default_factory=EvalConfig)
+    release: ReleaseConfig = Field(default_factory=ReleaseConfig)
+
+    @field_validator("project", "dataset", "model")
+    @classmethod
+    def required_sections(cls, v: Any) -> Any:
+        if v is None:
+            raise ValueError("required config section missing")
+        return v
+```
+
+---
+
+# 9. Config loader
+
+## `src/moro/config/loader.py`
+
+```python
+from pathlib import Path
+
+import yaml
+from pydantic import ValidationError
+
+from moro.core.errors import ConfigError
+from moro.config.models import MoroConfig
+
+
+def load_config(path: Path) -> MoroConfig:
+    """
+    Load and validate moro.yaml.
+    """
+    path = Path(path).expanduser().resolve()
+
+    if not path.exists():
+        raise ConfigError(f"Config file not found: {path}")
+
+    try:
+        raw_text = path.read_text(encoding="utf-8")
+    except OSError as exc:
+        raise ConfigError(f"Could not read config file: {path}") from exc
+
+    try:
+        data = yaml.safe_load(raw_text) or {}
+    except yaml.YAMLError as exc:
+        raise ConfigError(f"Invalid YAML in config file: {path}") from exc
+
+    if not isinstance(data, dict):
+        raise ConfigError(f"Top-level YAML must be a mapping: {path}")
+
+    try:
+        return MoroConfig.model_validate(data)
+    except ValidationError as exc:
+        raise ConfigError(f"Invalid MoroAI config: {path}\n{exc}") from exc
+```
+
+---
+
+# 10. Project templates
+
+## `src/moro/templates/__init__.py`
+
+```python
+```
+
+## `src/moro/templates/project.py`
+
+```python
+DEFAULT_GITIGNORE = """# MoroAI local state
+.moro/
+
+# Generated data and outputs
+data/normalized/
+data/splits/
+runs/
+releases/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.venv/
+venv/
+.env
+"""
+
+
+def readme_template(project_name: str) -> str:
+    return f"""# {project_name}
+
+This is a MoroAI project.
+
+## Getting started
+
+1. Add raw data to `data/raw/`
+2. Update `moro.yaml`
+3. Run:
+
+```bash
+moro status
+moro doctor
+moro data build
+moro recipe suggest
+moro train
+```
+
+## Layout
+
+- `moro.yaml` — project configuration
+- `data/raw/` — raw input data
+- `data/normalized/` — normalized dataset output
+- `data/splits/` — train/validation/eval splits
+- `eval/` — evaluation suites
+- `runs/` — training runs
+- `releases/` — packaged releases
+"""
+
+
+def default_moro_yaml(project_name: str) -> str:
+    return f"""project:
+  name: {project_name}
+  privacy_mode: local_only
+  seed: 42
+
+dataset:
+  source: ./data/raw/support.jsonl
+  format: auto
+  deduplicate: true
+  pii_scan: false
+  max_seq_length: 1024
+  min_quality_score: 0.0
+  validation_ratio: 0.1
+  eval_ratio: 0.1
+
+model:
+  name: Qwen/Qwen2.5-1.5B-Instruct
+  revision: main
+  quantization: nf4
+  trust_remote_code: false
+
+adapter:
+  type: lora
+  r: 16
+  alpha: 32
+  dropout: 0.05
+  target_modules: auto
+  bias: none
+
+training:
+  output_dir: ./runs
+  batch_size: 1
+  gradient_accumulation_steps: 16
+  learning_rate: 0.0002
+  optimizer: paged_adamw_8bit
+  gradient_checkpointing: true
+  precision: auto
+  epochs: 1.0
+  warmup_ratio: 0.03
+  logging_steps: 10
+  save_steps: 100
+
+eval:
+  suites:
+    - path: ./eval/support-golden-v1.yaml
+  max_samples: null
+
+release:
+  export:
+    - adapter
+    - ollama
+  require:
+    safety_pass: true
+"""
+
+
+SAMPLE_EVAL_YAML = """name: support-golden-v1
+version: "1"
+description: Basic support assistant golden questions
+cases:
+  - id: reset_password
+    messages:
+      - role: user
+        content: "How do I reset my password?"
+    expect:
+      contains:
+        - "Settings"
+        - "Security"
+    tags:
+      - account
+
+  - id: refund_policy
+    messages:
+      - role: user
+        content: "What is your refund policy?"
+    expect:
+      any_of_contains:
+        - "refund"
+        - "14 days"
+    tags:
+      - billing
+"""
+```
+
+---
+
+# 11. CLI package init
+
+## `src/moro/cli/__init__.py`
+
+```python
+```
+
+---
+
+# 12. `moro init` implementation
+
+## `src/moro/cli/init.py`
+
+```python
+from pathlib import Path
+
+import typer
+from rich.console import Console
+
+from moro.core.errors import ProjectError
+from moro.core.paths import CONFIG_FILE, ensure_project_dirs
+from moro.templates.project import (
+    DEFAULT_GITIGNORE,
+    SAMPLE_EVAL_YAML,
+    default_moro_yaml,
+    readme_template,
+)
+
+console = Console()
+
+
+def sanitize_project_name(name: str) -> str:
+    cleaned = name.strip().lower().replace(" ", "-")
+    cleaned = "".join(ch for ch in cleaned if ch.isalnum() or ch in {"-", "_"})
+    return cleaned or "moro-project"
+
+
+def init_command(
+    path: Path = typer.Argument(
+        default=Path("."),
+        help="Directory where the MoroAI project will be created.",
+        exists=False,
+        file_okay=False,
+        dir_okay=True,
+        writable=True,
+        resolve_path=True,
+    ),
+    template: str = typer.Option(
+        default="minimal",
+        help="Project template to use.",
+    ),
+    force: bool = typer.Option(
+        default=False,
+        "--force",
+        help="Overwrite existing project files.",
+    ),
+) -> None:
+    """
+    Initialize a new MoroAI project.
+    """
+    try:
+        if template not in {"minimal"}:
+            console.print(
+                f"[yellow]Warning:[/yellow] template '{template}' is not implemented yet. "
+                "Falling back to 'minimal'."
+            )
+
+        root = path.expanduser().resolve()
+        config_path = root / CONFIG_FILE
+
+        if config_path.exists() and not force:
+            raise ProjectError(
+                f"A MoroAI project already exists at {root}. "
+                "Use --force to overwrite."
+            )
+
+        root.mkdir(parents=True, exist_ok=True)
+
+        dirs = ensure_project_dirs(root)
+
+        project_name = sanitize_project_name(root.name)
+
+        files = {
+            root / "moro.yaml": default_moro_yaml(project_name),
+            root / "README.md": readme_template(project_name),
+            root / ".gitignore": DEFAULT_GITIGNORE,
+            dirs["eval"] / "support-golden-v1.yaml": SAMPLE_EVAL_YAML,
+            dirs["raw"] / ".gitkeep": "",
+            dirs["moro"] / ".gitkeep": "",
+        }
+
+        for file_path, content in files.items():
+            if file_path.exists() and not force:
+                console.print(f"[dim]Skipping existing file:[/dim] {file_path}")
+                continue
+
+            file_path.parent.mkdir(parents=True, exist_ok=True)
+            file_path.write_text(content, encoding="utf-8")
+            console.print(f"[green]Created:[/green] {file_path}")
+
+        console.print(f"\n[bold green]MoroAI project initialized at:[/bold green] {root}")
+        console.print("\nNext steps:")
+        console.print("  1. Add your raw dataset to data/raw/")
+        console.print("  2. Update moro.yaml")
+        console.print("  3. Run: moro status")
+        console.print("  4. Run: moro doctor")
+
+    except ProjectError as exc:
+        console.print(f"[bold red]Error:[/bold red] {exc}")
+        raise typer.Exit(code=1)
+    except Exception as exc:
+        console.print(f"[bold red]Unexpected error:[/bold red] {exc}")
+        raise typer.Exit(code=1)
+```
+
+---
+
+# 13. `moro status` implementation
+
+## `src/moro/cli/status.py`
+
+```python
+import json
+from pathlib import Path
+
+import typer
+from rich.console import Console
+from rich.table import Table
+
+from moro.core.errors import ConfigError, ProjectError
+from moro.core.project import load_project_config, require_project_root
+
+console = Console()
+
+
+def status_command(
+    json_output: bool = typer.Option(
+        default=False,
+        "--json",
+        help="Output status in JSON format.",
+    ),
+) -> None:
+    """
+    Show current MoroAI project status.
+    """
+    try:
+        root = require_project_root()
+        config = load_project_config()
+
+        dataset_source = config.dataset.source.expanduser()
+        if not dataset_source.is_absolute():
+            dataset_source = root / dataset_source
+
+        dataset_source_exists = dataset_source.exists()
+
+        payload = {
+            "project_root": str(root),
+            "project": config.project.model_dump(),
+            "config_file": str(root / "moro.yaml"),
+            "dataset_source": str(dataset_source),
+            "dataset_source_exists": dataset_source_exists,
+            "model": config.model.model_dump(),
+            "training": config.training.model_dump(mode="json"),
+            "eval_suites": [suite.model_dump(mode="json") for suite in config.eval.suites],
+        }
+
+        if json_output:
+            typer.echo(json.dumps(payload, indent=2))
+            return
+
+        table = Table(title="MoroAI Project Status")
+        table.add_column("Field", style="cyan")
+        table.add_column("Value", style="white")
+
+        table.add_row("Project root", str(root))
+        table.add_row("Project name", config.project.name)
+        table.add_row("Privacy mode", config.project.privacy_mode)
+        table.add_row("Config file", str(root / "moro.yaml"))
+        table.add_row("Dataset source", str(dataset_source))
+        table.add_row("Dataset exists", "Yes" if dataset_source_exists else "No")
+        table.add_row("Model", config.model.name)
+        table.add_row("Quantization", config.model.quantization)
+        table.add_row("Adapter type", config.adapter.type)
+        table.add_row("LoRA r", str(config.adapter.r))
+        table.add_row("Batch size", str(config.training.batch_size))
+        table.add_row("Gradient accumulation", str(config.training.gradient_accumulation_steps))
+        table.add_row("Eval suites", str(len(config.eval.suites)))
+
+        console.print(table)
+
+        if not dataset_source_exists:
+            console.print(
+                "\n[yellow]Warning:[/yellow] dataset source does not exist yet. "
+                "Add data to data/raw/ and update moro.yaml."
+            )
+
+    except ProjectError as exc:
+        console.print(f"[bold red]Error:[/bold red] {exc}")
+        raise typer.Exit(code=2)
+    except ConfigError as exc:
+        console.print(f"[bold red]Config error:[/bold red] {exc}")
+        raise typer.Exit(code=2)
+    except Exception as exc:
+        console.print(f"[bold red]Unexpected error:[/bold red] {exc}")
+        raise typer.Exit(code=1)
+```
+
+---
+
+# 14. `moro doctor` implementation
+
+## `src/moro/cli/doctor.py`
+
+```python
+import importlib.util
+import json
+import platform
+import shutil
+import sys
+from pathlib import Path
+
+import typer
+from rich.console import Console
+from rich.table import Table
+
+console = Console()
+
+
+def doctor_command(
+    json_output: bool = typer.Option(
+        default=False,
+        "--json",
+        help="Output diagnostics in JSON format.",
+    ),
+) -> None:
+    """
+    Check environment and hardware readiness.
+    """
+    try:
+        disk = shutil.disk_usage(Path.cwd())
+
+        info = {
+            "python_version": sys.version.split()[0],
+            "platform": platform.platform(),
+            "current_directory": str(Path.cwd()),
+            "disk_free_gb": round(disk.free / (1024**3), 2),
+            "torch_installed": importlib.util.find_spec("torch") is not None,
+            "transformers_installed": importlib.util.find_spec("transformers") is not None,
+            "peft_installed": importlib.util.find_spec("peft") is not None,
+            "bitsandbytes_installed": importlib.util.find_spec("bitsandbytes") is not None,
+            "cuda_available": False,
+            "torch_version": None,
+            "gpu_name": None,
+            "warnings": [],
+        }
+
+        if info["torch_installed"]:
+            try:
+                import torch
+
+                info["torch_version"] = torch.__version__
+                info["cuda_available"] = torch.cuda.is_available()
+
+                if info["cuda_available"]:
+                    info["gpu_name"] = torch.cuda.get_device_name(0)
+            except Exception as exc:
+                info["warnings"].append(f"Torch installed but could not be loaded: {exc}")
+        else:
+            info["warnings"].append(
+                "PyTorch is not installed. Training will not work until `torch` is installed."
+            )
+
+        if not info["transformers_installed"]:
+            info["warnings"].append("Transformers is not installed.")
+
+        if not info["peft_installed"]:
+            info["warnings"].append("PEFT is not installed.")
+
+        if not info["bitsandbytes_installed"]:
+            info["warnings"].append("bitsandbytes is not installed.")
+
+        if json_output:
+            typer.echo(json.dumps(info, indent=2))
+            return
+
+        table = Table(title="MoroAI Doctor")
+        table.add_column("Check", style="cyan")
+        table.add_column("Value", style="white")
+
+        table.add_row("Python version", info["python_version"])
+        table.add_row("Platform", info["platform"])
+        table.add_row("Current directory", info["current_directory"])
+        table.add_row("Disk free (GB)", str(info["disk_free_gb"]))
+        table.add_row("Torch installed", "Yes" if info["torch_installed"] else "No")
+        table.add_row("Torch version", info["torch_version"] or "-")
+        table.add_row("Transformers installed", "Yes" if info["transformers_installed"] else "No")
+        table.add_row("PEFT installed", "Yes" if info["peft_installed"] else "No")
+        table.add_row("bitsandbytes installed", "Yes" if info["bitsandbytes_installed"] else "No")
+        table.add_row("CUDA available", "Yes" if info["cuda_available"] else "No")
+        table.add_row("GPU name", info["gpu_name"] or "-")
+
+        console.print(table)
+
+        if info["warnings"]:
+            console.print("\n[bold yellow]Warnings:[/bold yellow]")
+            for warning in info["warnings"]:
+                console.print(f"- {warning}")
+        else:
+            console.print("\n[bold green]Environment looks good.[/bold green]")
+
+    except Exception as exc:
+        console.print(f"[bold red]Unexpected error:[/bold red] {exc}")
+        raise typer.Exit(code=1)
+```
+
+---
+
+# 15. How to install and run this skeleton
+
+From the repo root:
+
+```bash
+python -m venv .venv
+source .venv/bin/activate
+pip install -e .
+```
+
+Then test:
+
+```bash
+moro --help
+moro version
+```
+
+Create a project:
+
+```bash
+moro init demo
+cd demo
+moro status
+moro doctor
+```
+
+Expected result:
+- `demo/moro.yaml` is created
+- `demo/data/raw/` exists
+- `demo/eval/support-golden-v1.yaml` exists
+- `moro status` reads the config
+- `moro doctor` checks environment
+
+---
+
+# 16. What this skeleton already gives you
+
+This starter code implements the foundation for:
+
+## Completed
+- installable CLI package
+- Typer app
+- `moro init`
+- `moro status`
+- `moro doctor`
+- typed config model
+- YAML loader
+- project root discovery
+- project directory creation
+- clean error model
+- template system
+
+## Ready for next implementation tasks
+The next modules you should add are:
+- `moro import`
+- `moro data build`
+- `moro data report`
+- `moro recipe suggest`
+- `moro train`
+- `moro eval run`
+- `moro export`
+- `moro deploy`
+
+---
+
+# 17. Recommended next file to build
+
+The next best file to implement is:
+
+```text
+src/moro/data/ingest.py
+```
+
+because the data pipeline is the backbone of the MVP.
+
+After that:
+```text
+src/moro/data/normalize.py
+src/moro/data/clean.py
+src/moro/data/splitter.py
+```
+
+Then you can implement:
+
+```bash
+moro data build
+```
+
+---
+
+If you want, I can now generate the **next starter modules** for the data pipeline:
+
+- `src/moro/data/ingest.py`
+- `src/moro/data/normalize.py`
+- `src/moro/data/clean.py`
+- `src/moro/data/splitter.py`
+- `src/moro/cli/data.py`
+
+That would give you the working beginning of:
+
+```bash
+moro import
+moro data build
+moro data report
+```

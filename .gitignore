@@ -216,3 +216,46 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# MoroAI project-specific additions
+# MoroAI local state
+.moro/
+
+# Generated data
+data/normalized/
+data/splits/
+runs/
+releases/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.venv/
+venv/
+.env
+*.egg-info/
+dist/
+build/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# Test/tool output and local secrets
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.DS_Store
+.env.*
+!.env.example
+*.safetensors
+*.gguf
+*.pt
+*.pth
+
+# Private datasets (synthetic examples belong in examples/)
+data/raw/

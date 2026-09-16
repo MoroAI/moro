@@ -1,0 +1,1866 @@
+# MoroAI: Full Architecture Blueprint
+
+## Version
+**v0.1 — Architectural Foundation**
+
+## Working Name
+- **Brand:** MoroAI
+- **Product:** Moro
+- **Platform concept:** Moro Foundry
+- **CLI command:** `moro` or fallback `moroai`
+
+---
+
+# 1. Executive Summary
+
+MoroAI is a **local-first model adaptation foundry**.
+
+Its purpose is to help engineers and teams turn **private, messy, domain-specific data** into **reliable, deployable local language models** under real-world constraints such as:
+
+- limited GPU memory
+- privacy requirements
+- noisy datasets
+- lack of ML expertise
+- weak evaluation practices
+- deployment friction
+- reproducibility problems
+
+MoroAI is not just a fine-tuning script generator.
+
+It is a system that manages the full lifecycle:
+
+```text
+raw data
+→ normalized dataset
+→ memory-safe training recipe
+→ trained model
+→ evaluated model
+→ approved release
+→ local deployment
+→ feedback loop
+→ improved model
+```
+
+The core product should feel like this:
+
+```bash
+moro init
+moro import ./raw/support_docs
+moro data build
+moro doctor
+moro recipe suggest
+moro train
+moro eval run
+moro release create v0.1.0
+moro deploy --target ollama
+```
+
+That is the experience MoroAI should optimize for.
+
+---
+
+# 2. The Wicked Problem MoroAI Solves
+
+The real problem is not simply:
+
+> “How do I fine-tune a model with low VRAM?”
+
+The deeper problem is:
+
+> **How can a team safely, reproducibly, and affordably convert private data into a trustworthy local model that can be evaluated, released, and improved over time?**
+
+This is wicked because:
+
+1. Data is messy and private.
+2. Hardware is constrained.
+3. Model quality is hard to measure.
+4. Training configurations are fragile.
+5. Deployment is still manual.
+6. Teams need auditability.
+7. Model behavior can regress.
+8. Feedback loops are usually missing.
+
+MoroAI should solve the whole loop, not just one stage.
+
+---
+
+# 3. Product Vision
+
+## Vision
+> MoroAI makes it possible to build private, domain-specific local models with confidence.
+
+## Product Thesis
+> Teams do not need another training script. They need a repeatable system for adapting local models to their private domain.
+
+## Core Promise
+> From raw private data to evaluated, deployable local model — with privacy, reproducibility, and low hardware requirements.
+
+---
+
+# 4. Target Users
+
+## Primary users
+
+### 1. AI engineers
+They want:
+- fast iteration
+- reproducible runs
+- low-VRAM support
+- clean configs
+- export and deployment
+
+### 2. Product/platform engineers
+They want:
+- local privacy
+- predictable workflows
+- easy deployment
+- model versioning
+
+### 3. Researchers
+They want:
+- experiment tracking
+- comparisons
+- eval suites
+- reproducible recipes
+
+### 4. Regulated or privacy-sensitive teams
+They want:
+- local-only processing
+- dataset governance
+- audit trails
+- safety checks
+
+---
+
+# 5. Core Design Principles
+
+These principles should guide every implementation decision.
+
+---
+
+## Principle 1: Local-first by default
+MoroAI should work without requiring cloud services.
+
+Cloud may be optional later, but the core product must work locally.
+
+---
+
+## Principle 2: Recipes over raw configuration
+Users should not need to become ML experts.
+
+MoroAI should provide safe, hardware-aware recipes.
+
+---
+
+## Principle 3: Trust is a first-class feature
+Evaluation, safety checks, provenance, and model cards are not optional extras.
+
+They are part of the core platform.
+
+---
+
+## Principle 4: Reproducibility by design
+Every run should be reproducible from:
+- config
+- dataset version
+- code version
+- dependency versions
+- hardware profile
+
+---
+
+## Principle 5: Small models are first-class citizens
+MoroAI should specialize in:
+- 0.5B
+- 1B
+- 1.5B
+- 3B
+- 7B
+- 8B class models
+
+with strong support for consumer and workstation hardware.
+
+---
+
+## Principle 6: The CLI is the product surface
+Start with a beautiful CLI.
+
+GUI can come later.
+
+---
+
+## Principle 7: Wrap proven engines first
+Do not start by building a custom training engine.
+
+Wrap:
+- Hugging Face Transformers
+- PEFT
+- TRL
+- bitsandbytes
+- Accelerate
+- optionally Unsloth
+
+Then innovate later.
+
+---
+
+# 6. Product Scope
+
+## In scope
+
+### Core
+- project initialization
+- dataset ingestion and normalization
+- dataset quality checks
+- hardware detection
+- recipe recommendation
+- QLoRA/LoRA training
+- evaluation
+- run comparison
+- model export
+- Ollama/GGUF deployment
+- diagnostics
+- model cards
+- release packaging
+
+### Later
+- DPO/ORPO alignment
+- synthetic data generation
+- local web dashboard
+- team registry
+- plugin marketplace
+- experimental layer streaming
+- cloud sync
+- edge deployment bundles
+
+---
+
+## Out of scope for early versions
+- distributed multi-node training
+- custom CUDA kernels
+- full GUI IDE
+- proprietary cloud lock-in
+- massive enterprise workflow engine
+- general-purpose AutoML platform
+
+---
+
+# 7. High-Level Architecture
+
+MoroAI should be built as a **modular local-first orchestrator** with pluggable backends.
+
+```text
++-------------------------------------------------------+
+|                        CLI                            |
+| moro init / doctor / data / train / eval / deploy     |
++-------------------------------------------------------+
+              |
++-------------------------------------------------------+
+|                  Control Plane                        |
+| Projects / Datasets / Recipes / Runs / Releases       |
++-------------------------------------------------------+
+              |
++-------------------------------------------------------+
+|                 Execution Plane                       |
+| Data Compiler | Trainer | Eval Runner | Exporter      |
++-------------------------------------------------------+
+              |
++-------------------------------------------------------+
+|                Intelligence Plane                     |
+| Recipe Engine | Memory Governor | Diagnostics         |
++-------------------------------------------------------+
+              |
++-------------------------------------------------------+
+|                  Backend Adapters                     |
+| HF / PEFT / TRL / bitsandbytes / Unsloth / Ollama     |
++-------------------------------------------------------+
+              |
++-------------------------------------------------------+
+|                    Storage Layer                      |
+| SQLite / DuckDB / Filesystem Artifacts                |
++-------------------------------------------------------+
+```
+
+---
+
+# 8. Architectural Planes
+
+## A. Control Plane
+This is the state and coordination layer.
+
+### Responsibilities
+- manage projects
+- register datasets
+- version dataset snapshots
+- store recipes
+- track runs
+- store eval results
+- manage artifacts
+- manage releases
+
+### Components
+- Project Manager
+- Dataset Registry
+- Recipe Registry
+- Run Tracker
+- Eval Registry
+- Artifact Registry
+- Release Manager
+
+---
+
+## B. Execution Plane
+This is where work happens.
+
+### Components
+1. **Data Compiler**
+   - ingestion
+   - normalization
+   - cleaning
+   - deduplication
+   - quality scoring
+   - splitting
+
+2. **Training Runner**
+   - loads model
+   - applies adapter/quantization
+   - executes training
+   - saves checkpoints
+
+3. **Evaluation Runner**
+   - runs eval suites
+   - scores outputs
+   - compares base vs tuned
+
+4. **Export/Release Runner**
+   - exports adapters
+   - merges weights
+   - builds GGUF/Ollama packages
+   - writes model cards
+
+---
+
+## C. Intelligence Plane
+This makes MoroAI feel smart.
+
+### Components
+1. **Recipe Engine**
+   - suggests hardware-safe training configs
+
+2. **Memory Governor**
+   - estimates VRAM
+   - tunes settings
+   - handles OOM recovery
+
+3. **Diagnostics Engine**
+   - explains failures
+   - suggests fixes
+   - identifies dataset issues
+
+---
+
+## D. Backend Adapter Plane
+This isolates external dependencies.
+
+### Training adapters
+- Hugging Face backend
+- PEFT backend
+- optional Unsloth backend
+- experimental streaming backend later
+
+### Deployment adapters
+- Ollama
+- llama.cpp/GGUF
+- vLLM
+- Docker
+
+---
+
+# 9. Core Product Modules
+
+MoroAI should be organized into these major modules.
+
+---
+
+## 9.1 Moro Core
+The foundational runtime.
+
+### Responsibilities
+- project lifecycle
+- config loading
+- local storage
+- CLI command dispatch
+- plugin loading
+- logging
+
+---
+
+## 9.2 Moro Data
+The dataset engine.
+
+### Responsibilities
+- ingest raw sources
+- normalize schema
+- clean and filter
+- deduplicate
+- score quality
+- detect privacy risks
+- split into train/val/eval
+
+---
+
+## 9.3 Moro Recipe
+The configuration intelligence engine.
+
+### Responsibilities
+- detect hardware
+- estimate memory
+- choose model size
+- choose quantization
+- choose adapter settings
+- choose sequence length
+- choose batch/accumulation
+
+---
+
+## 9.4 Moro Train
+The training execution engine.
+
+### Responsibilities
+- run training backend
+- monitor metrics
+- checkpoint models
+- save run metadata
+- recover from OOM when possible
+
+---
+
+## 9.5 Moro Eval
+The evaluation engine.
+
+### Responsibilities
+- manage eval suites
+- run deterministic and model-based scoring
+- compare runs
+- generate reports
+- gate releases
+
+---
+
+## 9.6 Moro Guard
+The trust and safety layer.
+
+### Responsibilities
+- PII detection
+- secret scanning
+- toxicity checks
+- license checks
+- prompt-injection risk checks
+- dataset quality warnings
+
+---
+
+## 9.7 Moro Release
+The release packaging engine.
+
+### Responsibilities
+- create release artifacts
+- generate model cards
+- export deployable formats
+- store eval reports
+- version releases
+
+---
+
+## 9.8 Moro Deploy
+The deployment layer.
+
+### Responsibilities
+- export to GGUF
+- package Ollama models
+- prepare vLLM serving config
+- optionally generate Dockerfile
+
+---
+
+## 9.9 Moro Diagnose
+The intelligence and repair layer.
+
+### Responsibilities
+- analyze logs
+- analyze memory errors
+- analyze eval failures
+- suggest next actions
+- auto-generate issue reports
+
+---
+
+# 10. Data Model
+
+MoroAI should use a strong object model.
+
+---
+
+## 10.1 Project
+Top-level workspace.
+
+Fields:
+- id
+- name
+- path
+- created_at
+- privacy_mode
+- default_model_family
+- default_target_hardware
+
+---
+
+## 10.2 DatasetSource
+Raw imported dataset.
+
+Fields:
+- id
+- project_id
+- name
+- source_type
+- path
+- hash
+- imported_at
+- license_note
+- status
+
+---
+
+## 10.3 DatasetVersion
+Normalized and versioned dataset.
+
+Fields:
+- id
+- project_id
+- source_id
+- version
+- schema_type
+- row_count
+- token_stats
+- quality_summary
+- privacy_summary
+- created_at
+- split_manifest
+
+---
+
+## 10.4 Recipe
+Training configuration template.
+
+Fields:
+- id
+- name
+- model_name
+- quantization
+- adapter_type
+- lora_r
+- lora_alpha
+- target_modules
+- max_seq_length
+- batch_size
+- gradient_accumulation_steps
+- optimizer
+- gradient_checkpointing
+- hardware_profile
+
+---
+
+## 10.5 Run
+One training attempt.
+
+Fields:
+- id
+- project_id
+- dataset_version_id
+- recipe_id
+- backend
+- status
+- started_at
+- finished_at
+- peak_vram_gb
+- tokens_per_sec
+- final_loss
+- checkpoint_path
+- config_snapshot
+- hardware_profile
+- error_log
+
+---
+
+## 10.6 EvalSuite
+A set of evaluation cases and scorers.
+
+Fields:
+- id
+- name
+- version
+- domain
+- case_count
+- scorers
+- thresholds
+
+---
+
+## 10.7 EvalRun
+One evaluation execution.
+
+Fields:
+- id
+- run_id
+- suite_id
+- base_score
+- tuned_score
+- delta
+- metrics_json
+- report_path
+- created_at
+
+---
+
+## 10.8 Artifact
+Any generated file.
+
+Fields:
+- id
+- run_id
+- type
+- path
+- hash
+- size_bytes
+- created_at
+
+Artifact types:
+- adapter
+- merged_model
+- gguf
+- ollama_package
+- metrics
+- logs
+- model_card
+
+---
+
+## 10.9 Release
+Approved deployable version.
+
+Fields:
+- id
+- project_id
+- run_id
+- version
+- status
+- eval_summary
+- artifact_manifest
+- model_card_path
+- created_at
+
+---
+
+## 10.10 Feedback
+User corrections and failure cases.
+
+Fields:
+- id
+- project_id
+- source
+- prompt
+- bad_response
+- corrected_response
+- severity
+- converted_to_dataset_row
+
+---
+
+# 11. Storage Architecture
+
+MoroAI should use simple, local, reliable storage.
+
+---
+
+## Metadata
+### SQLite
+Used for:
+- projects
+- datasets
+- recipes
+- runs
+- eval results
+- releases
+- feedback
+
+Why:
+- zero setup
+- portable
+- transactional
+- easy to inspect
+
+---
+
+## Analytics and profiling
+### DuckDB
+Used for:
+- dataset profiling
+- token distribution analysis
+- quality scoring aggregation
+- run comparison queries
+
+Why:
+- fast local analytical queries
+- excellent for structured reporting
+
+---
+
+## Artifacts
+### Filesystem
+Used for:
+- checkpoints
+- adapters
+- merged models
+- GGUF files
+- reports
+- logs
+
+---
+
+## Suggested local project layout
+
+```text
+my-project/
+  moro.yaml
+  .moro/
+    db.sqlite
+    analytics.duckdb
+    artifacts/
+    logs/
+    reports/
+  data/
+    raw/
+    normalized/
+    splits/
+  runs/
+  eval/
+  releases/
+```
+
+---
+
+# 12. CLI Architecture
+
+The CLI should be the primary interface.
+
+---
+
+## Command groups
+
+### Project
+```bash
+moro init
+moro status
+moro config show
+```
+
+### Environment
+```bash
+moro doctor
+moro hardware
+```
+
+### Data
+```bash
+moro import
+moro data build
+moro data report
+moro data guard
+```
+
+### Recipe
+```bash
+moro recipe suggest
+moro recipe list
+moro recipe show
+```
+
+### Training
+```bash
+moro train
+moro resume
+moro runs list
+moro runs compare
+```
+
+### Evaluation
+```bash
+moro eval list
+moro eval run
+moro eval compare
+```
+
+### Release
+```bash
+moro release create
+moro release list
+moro release show
+```
+
+### Deployment
+```bash
+moro export
+moro deploy
+```
+
+### Intelligence
+```bash
+moro diagnose
+```
+
+---
+
+# 13. Configuration System
+
+MoroAI should support simple early config, then modular config later.
+
+---
+
+## MVP config: single `moro.yaml`
+
+```yaml
+project:
+  name: support-assistant
+  privacy_mode: local_only
+
+dataset:
+  source: ./data/raw/support
+  format: auto
+  deduplicate: true
+  pii_scan: true
+  max_seq_length: 1024
+
+model:
+  name: Qwen/Qwen2.5-1.5B-Instruct
+  quantization: nf4
+
+adapter:
+  type: lora
+  r: 16
+  alpha: 32
+  dropout: 0.05
+  target_modules: auto
+
+training:
+  output_dir: ./runs
+  batch_size: 1
+  gradient_accumulation_steps: 16
+  learning_rate: 2e-4
+  optimizer: paged_adamw_8bit
+  gradient_checkpointing: true
+  bf16: true
+
+eval:
+  suites:
+    - support-golden-v1
+    - safety-basic-v1
+
+release:
+  export:
+    - gguf
+    - ollama
+```
+
+---
+
+## Later: modular configs
+
+```text
+moro.project.yaml
+moro.dataset.yaml
+moro.recipe.yaml
+moro.eval.yaml
+moro.release.yaml
+```
+
+---
+
+# 14. Data Engine Architecture
+
+This is one of the most important subsystems.
+
+---
+
+## Pipeline stages
+
+```text
+raw sources
+→ ingestion
+→ schema detection
+→ normalization
+→ cleaning
+→ deduplication
+→ quality scoring
+→ privacy scanning
+→ splitting
+→ dataset version
+```
+
+---
+
+## Supported input formats
+
+Initial:
+- JSONL
+- CSV
+- TXT
+- Markdown
+
+Later:
+- PDF text
+- HTML
+- Notion export
+- Confluence export
+- SQLite exports
+- support ticket dumps
+
+---
+
+## Normalized schema
+
+Every dataset row should become a standard object:
+
+```json
+{
+  "id": "row_0001",
+  "source": "support_docs",
+  "messages": [
+    {"role": "system", "content": "You are a support assistant."},
+    {"role": "user", "content": "How do I reset my password?"},
+    {"role": "assistant", "content": "Go to Settings > Security > Reset."}
+  ],
+  "metadata": {
+    "domain": "support",
+    "language": "en",
+    "token_count": 118,
+    "quality_score": 0.91,
+    "pii_detected": false,
+    "duplicate_group": null
+  }
+}
+```
+
+---
+
+## Data quality checks
+
+MoroAI should detect:
+- malformed JSON
+- missing roles
+- empty content
+- excessive repetition
+- very short examples
+- overly long examples
+- duplicated rows
+- near-duplicate clusters
+- mixed languages
+- prompt-injection-like patterns
+
+---
+
+## Quality scoring dimensions
+
+Example score components:
+- completeness
+- role clarity
+- length sanity
+- repetition penalty
+- formatting quality
+- domain relevance
+- uniqueness
+
+A simple MVP score:
+
+```text
+quality_score =
+  0.25 * completeness
++ 0.20 * clarity
++ 0.20 * uniqueness
++ 0.15 * length_sanity
++ 0.10 * low_repetition
++ 0.10 * formatting_quality
+```
+
+---
+
+## Privacy layer
+
+Moro Guard should scan for:
+- emails
+- phone numbers
+- names
+- addresses
+- IDs
+- API keys
+- secrets
+- medical/legal sensitive patterns
+
+Actions:
+- flag
+- redact
+- exclude
+- require manual review
+
+---
+
+# 15. Recipe Engine Architecture
+
+The Recipe Engine turns constraints into safe training settings.
+
+---
+
+## Inputs
+- GPU vendor
+- VRAM
+- CPU RAM
+- disk space
+- target model
+- dataset size
+- max sequence length desired
+- quality target
+- latency target
+
+## Outputs
+- recommended model
+- quantization mode
+- adapter settings
+- batch size
+- gradient accumulation
+- optimizer
+- sequence length
+- gradient checkpointing
+- offload strategy
+
+---
+
+## Example recommendation output
+
+```text
+Recommended recipe:
+- model: Qwen/Qwen2.5-1.5B-Instruct
+- quantization: nf4
+- adapter: lora
+- lora_r: 16
+- target_modules: q_proj,k_proj,v_proj,o_proj
+- max_seq_length: 1024
+- batch_size: 1
+- gradient_accumulation_steps: 16
+- optimizer: paged_adamw_8bit
+- gradient_checkpointing: true
+Estimated peak VRAM: 5.1 GB
+Confidence: high
+```
+
+---
+
+## Recipe engine levels
+
+### Level 1: Rule-based presets
+Best for MVP.
+
+Examples:
+- `<4GB`: 0.5B–1B, 4-bit, seq 512
+- `6GB`: 1B–1.5B, 4-bit, seq 1024
+- `8GB`: 1.5B–3B, 4-bit, seq 1024
+- `12GB`: 3B, 4-bit, seq 2048
+- `24GB`: 7B–8B, 4-bit, stronger settings
+
+### Level 2: Profiler-assisted tuning
+Run a tiny profiling step and measure memory.
+
+### Level 3: Auto-recovery
+If OOM occurs:
+1. reduce max sequence length
+2. reduce batch size
+3. reduce adapter targets
+4. enable stronger offload
+5. retry
+
+---
+
+# 16. Memory Governor Architecture
+
+This is a dedicated subsystem.
+
+---
+
+## Responsibilities
+- estimate memory footprint
+- choose safe settings
+- monitor runtime memory
+- detect OOM risk
+- trigger fallback settings
+
+---
+
+## Memory components to estimate
+
+1. model weights
+2. quantization overhead
+3. optimizer states
+4. LoRA parameters
+5. activations
+6. gradient buffers
+7. temporary CUDA allocations
+8. eval/inference KV cache
+
+---
+
+## MVP strategy
+
+Use:
+- 4-bit quantization
+- LoRA only
+- gradient checkpointing
+- paged optimizer
+- small micro-batch
+- conservative sequence length
+
+---
+
+## Advanced strategy later
+
+- memory profiling mini-run
+- per-layer activation estimates
+- sequence bucketing
+- packing strategy selection
+- experimental layer streaming backend
+
+---
+
+# 17. Training Engine Architecture
+
+The training engine should be pluggable.
+
+---
+
+## Training backend interface
+
+```python
+class TrainingBackend:
+    def validate(config): ...
+    def estimate_memory(config): ...
+    def train(config): ...
+    def resume(run_id): ...
+    def export_adapter(run_id): ...
+```
+
+---
+
+## Default backend stack
+
+- Transformers
+- PEFT
+- TRL
+- Accelerate
+- bitsandbytes
+
+---
+
+## MVP training features
+
+Must support:
+- QLoRA 4-bit
+- LoRA adapters
+- gradient checkpointing
+- bf16/fp16 where appropriate
+- paged AdamW 8-bit
+- checkpoint saving
+- validation loss tracking
+- sample generation after training
+
+---
+
+## Later training features
+
+- DPO/ORPO
+- KTO
+- reward modeling
+- preference datasets
+- multi-dataset mixing
+- curriculum training
+- sequence packing
+- experimental layer streaming
+
+---
+
+# 18. Evaluation Engine Architecture
+
+This is what makes MoroAI trustworthy.
+
+---
+
+## Core idea
+Every tuned model should be evaluated against:
+- a base model
+- previous tuned versions
+- domain-specific golden cases
+
+---
+
+## Eval suite structure
+
+```yaml
+name: support-golden-v1
+domain: support
+cases:
+  - id: case_001
+    input:
+      messages:
+        - role: user
+          content: "How do I reset my password?"
+    expect:
+      contains:
+        - "Settings"
+        - "Security"
+    scorers:
+      - contains
+      - tone
+      - helpfulness
+```
+
+---
+
+## Scorer types
+
+### Deterministic scorers
+- exact match
+- contains
+- regex
+- JSON schema validity
+- field extraction accuracy
+
+### Model-based scorers
+- helpfulness
+- tone
+- faithfulness
+- safety
+- pairwise comparison
+
+### Performance scorers
+- latency
+- peak memory
+- tokens/sec
+
+---
+
+## Evaluation reports
+
+Each eval run should produce:
+
+```text
+Base score: 58.3
+Tuned score: 76.9
+Improvement: +18.6
+
+Category breakdown:
+- correctness: +21%
+- tone: +9%
+- hallucination: -7%
+- safety: pass
+```
+
+---
+
+## Release gates
+
+Example:
+
+```yaml
+release:
+  require:
+    eval_suite: support-golden-v1
+    min_improvement: 5.0
+    max_regression: 1.0
+    safety_pass: true
+```
+
+This is a major professional feature.
+
+---
+
+# 19. Release and Deployment Architecture
+
+MoroAI should make shipping models easy.
+
+---
+
+## Release artifact structure
+
+```text
+releases/
+  support-assistant-v0.1.0/
+    manifest.json
+    model_card.md
+    eval_report.json
+    config_snapshot.yaml
+    adapter/
+    merged/
+    gguf/
+    ollama/
+      Modelfile
+```
+
+---
+
+## Model card contents
+
+Automatically generate:
+- model name
+- base model
+- dataset summary
+- training recipe
+- eval results
+- intended use
+- limitations
+- privacy notes
+- license information
+
+---
+
+## Deployment targets
+
+### Phase 1
+- Ollama
+- GGUF
+
+### Phase 2
+- vLLM
+- Docker
+
+### Phase 3
+- edge bundles
+- offline device packaging
+
+---
+
+# 20. Diagnostics Architecture
+
+MoroAI should feel like an expert assistant.
+
+---
+
+## Diagnostic sources
+- training logs
+- OOM traces
+- dataset reports
+- eval failures
+- hardware profile
+- config diff
+
+---
+
+## Diagnostic outputs
+
+Example:
+
+```text
+Issue detected:
+- CUDA out of memory during training
+
+Likely causes:
+- max_seq_length too high
+- adapter target modules too broad
+
+Recommended actions:
+1. Reduce max_seq_length from 2048 to 1024
+2. Remove MLP target modules temporarily
+3. Enable paged optimizer
+
+Expected effect:
+- ~25% lower peak VRAM
+```
+
+---
+
+# 21. Observability and Reproducibility
+
+Every run should be reproducible.
+
+---
+
+## Run snapshot should include
+- config hash
+- dataset version id
+- code version
+- dependency versions
+- hardware profile
+- recipe used
+- backend used
+- random seeds
+- command invoked
+
+---
+
+## Reports to generate
+- training report
+- memory report
+- eval report
+- release report
+- diagnostic report
+
+---
+
+# 22. Security, Privacy, and Governance
+
+This is essential for real-world adoption.
+
+---
+
+## Local-only mode
+Default should be:
+- no telemetry
+- no external calls
+- all data stays local
+
+---
+
+## Dataset governance
+MoroAI should track:
+- source
+- license
+- consent notes
+- PII scan result
+- retention policy
+
+---
+
+## Release governance
+Each release should include:
+- eval summary
+- model card
+- config snapshot
+- artifact hashes
+- approval status
+
+---
+
+# 23. Extensibility and Plugin Architecture
+
+MoroAI should be plugin-friendly.
+
+---
+
+## Plugin types
+
+1. dataset connectors
+2. training backends
+3. eval scorers
+4. export targets
+5. deployment targets
+6. diagnostics rules
+
+---
+
+## Example plugin interfaces
+
+### Dataset connector
+```python
+class DatasetConnector:
+    def discover(path): ...
+    def load(path): ...
+    def normalize(raw_rows): ...
+```
+
+### Eval scorer
+```python
+class Scorer:
+    def score(input, output, expected): ...
+```
+
+### Exporter
+```python
+class Exporter:
+    def export(run_id, output_dir): ...
+```
+
+This keeps the core clean.
+
+---
+
+# 24. Recommended Repository Structure
+
+```text
+moro/
+  pyproject.toml
+  README.md
+  docs/
+  templates/
+    recipes/
+    eval/
+    datasets/
+  src/
+    moro/
+      __init__.py
+      cli/
+        init.py
+        doctor.py
+        data.py
+        recipe.py
+        train.py
+        eval.py
+        release.py
+        deploy.py
+        diagnose.py
+      core/
+        project.py
+        config.py
+        registry.py
+        artifacts.py
+        runs.py
+        releases.py
+      data/
+        ingest.py
+        normalize.py
+        clean.py
+        dedupe.py
+        quality.py
+        privacy.py
+        splitter.py
+      training/
+        backend.py
+        hf_backend.py
+        peft_backend.py
+        recipe_engine.py
+        memory_governor.py
+        trainer.py
+      eval/
+        suite.py
+        scorers.py
+        judge.py
+        compare.py
+      export/
+        gguf.py
+        ollama.py
+        vllm.py
+        model_card.py
+      storage/
+        sqlite.py
+        duckdb.py
+        fs.py
+      plugins/
+        base.py
+        loader.py
+      utils/
+        logging.py
+        hardware.py
+        system.py
+  tests/
+```
+
+---
+
+# 25. Suggested Technology Stack
+
+## Core
+- Python 3.10+
+- Typer
+- Rich
+- Pydantic
+- PyYAML
+
+## Storage
+- SQLite
+- DuckDB
+
+## ML
+- Transformers
+- PEFT
+- TRL
+- Accelerate
+- bitsandbytes
+- optionally Unsloth
+
+## Data processing
+- polars or pandas
+- datasketch for near-duplicate detection
+
+## Export/serving
+- llama.cpp
+- Ollama
+- vLLM optional
+
+---
+
+# 26. Key Architectural Decisions
+
+## ADR 1: Build a modular local CLI first
+Not a web app.
+
+Reason:
+- fastest path to real utility
+- easier to test
+- better for engineers
+
+---
+
+## ADR 2: Use Python for the core
+Reason:
+- ML ecosystem alignment
+- faster integration with HF/PEFT
+
+---
+
+## ADR 3: Wrap existing training libraries before building custom engine
+Reason:
+- reduces risk
+- speeds delivery
+- leverages proven code
+
+---
+
+## ADR 4: Make evaluation first-class early
+Reason:
+- quality proof is a major differentiator
+
+---
+
+## ADR 5: Store all state locally in SQLite/DuckDB
+Reason:
+- simple, portable, robust
+
+---
+
+## ADR 6: Keep experimental memory innovations isolated
+Reason:
+- protects core reliability
+
+---
+
+# 27. MVP Definition
+
+## Product
+# Moro Foundry v0.1
+
+## Goal
+Enable a user to go from raw dataset to deployed local model with minimal friction.
+
+---
+
+## MVP commands
+
+```bash
+moro init
+moro doctor
+moro import
+moro data build
+moro recipe suggest
+moro train
+moro eval run
+moro export
+moro deploy
+```
+
+---
+
+## MVP features
+
+### Must have
+- project scaffolding
+- config validation
+- JSONL/CSV ingestion
+- dataset normalization
+- basic quality report
+- hardware detection
+- QLoRA training
+- basic eval suite
+- GGUF/Ollama export
+- simple diagnostics
+
+### Nice to have
+- PII scanning
+- model cards
+- run comparison
+- auto OOM recovery
+
+### Not in MVP
+- GUI
+- distributed training
+- layer streaming
+- cloud registry
+- plugin marketplace
+
+---
+
+# 28. 12-Week Implementation Roadmap
+
+## Week 1 — Foundation
+- finalize naming
+- repo setup
+- CLI skeleton
+- product spec
+
+## Week 2 — Project/config/storage
+- project model
+- SQLite storage
+- config loader
+
+## Week 3 — Doctor/hardware
+- hardware detection
+- dependency checks
+- recommended settings
+
+## Week 4 — Data ingestion
+- JSONL/CSV import
+- normalization
+- validation
+
+## Week 5 — Data quality
+- dedupe
+- token stats
+- quality scoring
+
+## Week 6 — Training backend
+- HF/PEFT/bitsandbytes integration
+- QLoRA support
+
+## Week 7 — Recipe engine
+- memory-safe presets
+- recipe suggestion
+
+## Week 8 — Evaluation
+- eval suite runner
+- base vs tuned comparison
+
+## Week 9 — Export/deploy
+- adapter export
+- GGUF path
+- Ollama packaging
+
+## Week 10 — Diagnostics
+- OOM analysis
+- dataset issue detection
+- run comparison
+
+## Week 11 — Release/model card
+- release packaging
+- model card generation
+
+## Week 12 — Beta polish
+- docs
+- examples
+- benchmark report
+- public release
+
+---
+
+# 29. Success Metrics
+
+## Developer experience metrics
+- time from install to first successful run
+- percentage of users completing first training run
+- number of OOM failures recovered automatically
+
+## Product metrics
+- GitHub stars
+- repeat usage
+- number of releases created
+- community recipes/eval suites
+
+## Technical metrics
+- peak VRAM reduction
+- tokens/sec
+- eval improvement over base model
+- reproducibility success rate
+
+---
+
+# 30. Major Risks and Mitigations
+
+## Risk 1: Name conflicts
+Mitigation:
+- check GitHub/PyPI/domain/trademark early
+- use MoroAI as brand, Moro as product
+
+## Risk 2: Training fragility across hardware
+Mitigation:
+- conservative defaults
+- doctor checks
+- auto-recovery recipes
+
+## Risk 3: Eval quality is hard
+Mitigation:
+- start with simple golden suites
+- add deterministic checks first
+- use model-based judging carefully
+
+## Risk 4: Data privacy issues
+Mitigation:
+- local-only default
+- PII scanning
+- no telemetry by default
+
+## Risk 5: Scope creep
+Mitigation:
+- ship CLI MVP first
+- delay GUI and custom engines
+
+---
+
+# 31. What Makes This Blueprint Strong
+
+This architecture is strong because it does not treat MoroAI as a thin wrapper.
+
+It treats MoroAI as a **system for trustworthy local model adaptation**.
+
+The key differentiators are:
+
+1. **Data engine**
+2. **Memory governor**
+3. **Recipe intelligence**
+4. **Evaluation harness**
+5. **Release pipeline**
+6. **Diagnostics**
+7. **Local-first privacy**
+8. **Reproducibility**
+9. **Deployment readiness**
+10. **Feedback loop**
+
+That is how MoroAI becomes meaningfully better than a basic fine-tuning tool.
+
+---
+
+# 32. Final Recommended Architecture Summary
+
+If we compress the blueprint into one sentence:
+
+> **MoroAI should be built as a local-first, plugin-driven model adaptation foundry with a CLI-first experience, built around data quality, memory-aware training, rigorous evaluation, reproducible releases, and simple local deployment.**
+
+That is the architecture I would recommend.
+
+---
+
+If you want, the next step can be even more concrete.
+
+I can now produce either:
+
+## A. **MoroAI MVP engineering spec**
+with:
+- exact folder structure
+- exact CLI commands
+- exact Pydantic schemas
+- exact first 25 coding tasks
+
+or
+
+## B. **MoroAI code skeleton**
+with:
+- Python package layout
+- starter CLI commands
+- config models
+- placeholder modules
+
+or
+
+## C. **MoroAI visual architecture diagram**
+with a clearer block diagram and data-flow sequence diagrams.

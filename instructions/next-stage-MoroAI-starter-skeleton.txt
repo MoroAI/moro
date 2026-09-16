@@ -1,0 +1,1646 @@
+next-stage MoroAI starter skeleton**, focused on the **data pipeline**.
+
+This gives you working starter code for:
+
+- `moro import`
+- `moro data build`
+- `moro data report`
+
+and adds the core data modules:
+
+- ingestion
+- normalization
+- cleaning
+- quality scoring
+- splitting
+- reporting
+- lightweight SQLite persistence
+
+This is the part that turns MoroAI from “just a CLI skeleton” into a real MVP foundation.
+
+---
+
+# 1. What this stage adds
+
+After this step, your CLI supports:
+
+```bash
+moro init demo
+cd demo
+
+# add some data to data/raw/support.jsonl
+moro import ./data/raw/support.jsonl --name support
+
+moro data build
+moro data report
+```
+
+And it will:
+- ingest JSONL/CSV data
+- normalize it into a unified chat format
+- clean invalid rows
+- deduplicate
+- score quality
+- split into train/validation/eval
+- write dataset reports
+- persist dataset metadata locally in SQLite
+
+---
+
+# 2. New folder structure
+
+Add these new files:
+
+```text
+src/
+  moro/
+    core/
+      hashing.py
+    storage/
+      __init__.py
+      db.py
+    data/
+      __init__.py
+      models.py
+      ingest.py
+      normalize.py
+      clean.py
+      quality.py
+      splitter.py
+      report.py
+    cli/
+      data.py
+```
+
+You will also update:
+
+```text
+src/moro/main.py
+```
+
+---
+
+# 3. Core hashing utility
+
+## `src/moro/core/hashing.py`
+
+```python
+import hashlib
+from pathlib import Path
+
+
+def sha256_file(path: Path, chunk_size: int = 8192) -> str:
+    """
+    Compute SHA256 hash of a file.
+    """
+    hasher = hashlib.sha256()
+    path = Path(path)
+
+    with path.open("rb") as f:
+        while True:
+            chunk = f.read(chunk_size)
+            if not chunk:
+                break
+            hasher.update(chunk)
+
+    return hasher.hexdigest()
+
+
+def sha256_text(text: str) -> str:
+    """
+    Compute SHA256 hash of a string.
+    """
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+```
+
+---
+
+# 4. SQLite storage layer
+
+This is a lightweight local persistence layer for MVP.
+
+## `src/moro/storage/__init__.py`
+
+```python
+```
+
+## `src/moro/storage/db.py`
+
+```python
+import json
+import sqlite3
+import uuid
+from datetime import datetime, timezone
+from pathlib import Path
+
+DB_FILENAME = "db.sqlite"
+
+
+def utcnow() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
+def new_id(prefix: str) -> str:
+    timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+    suffix = uuid.uuid4().hex[:4]
+    return f"{prefix}_{timestamp}_{suffix}"
+
+
+def get_db_path(root: Path) -> Path:
+    return Path(root) / ".moro" / DB_FILENAME
+
+
+def get_connection(root: Path) -> sqlite3.Connection:
+    db_path = get_db_path(root)
+    db_path.parent.mkdir(parents=True, exist_ok=True)
+
+    conn = sqlite3.connect(db_path)
+    conn.row_factory = sqlite3.Row
+    ensure_schema(conn)
+    return conn
+
+
+def ensure_schema(conn: sqlite3.Connection) -> None:
+    conn.executescript(
+        """
+        CREATE TABLE IF NOT EXISTS projects (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL UNIQUE,
+            privacy_mode TEXT NOT NULL,
+            created_at TEXT NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS dataset_sources (
+            id TEXT PRIMARY KEY,
+            project_id TEXT NOT NULL,
+            name TEXT NOT NULL,
+            source_type TEXT NOT NULL,
+            path TEXT NOT NULL,
+            sha256 TEXT NOT NULL,
+            imported_at TEXT NOT NULL,
+            FOREIGN KEY(project_id) REFERENCES projects(id)
+        );
+
+        CREATE TABLE IF NOT EXISTS dataset_versions (
+            id TEXT PRIMARY KEY,
+            project_id TEXT NOT NULL,
+            source_id TEXT NOT NULL,
+            version TEXT NOT NULL,
+            normalized_path TEXT NOT NULL,
+            stats_json TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            FOREIGN KEY(project_id) REFERENCES projects(id),
+            FOREIGN KEY(source_id) REFERENCES dataset_sources(id)
+        );
+        """
+    )
+    conn.commit()
+
+
+def get_or_create_project(
+    conn: sqlite3.Connection,
+    name: str,
+    privacy_mode: str = "local_only",
+) -> str:
+    row = conn.execute(
+        "SELECT id FROM projects WHERE name = ?",
+        (name,),
+    ).fetchone()
+
+    if row:
+        return row["id"]
+
+    project_id = new_id("proj")
+    conn.execute(
+        """
+        INSERT INTO projects (id, name, privacy_mode, created_at)
+        VALUES (?, ?, ?, ?)
+        """,
+        (project_id, name, privacy_mode, utcnow()),
+    )
+    conn.commit()
+    return project_id
+
+
+def get_or_create_dataset_source(
+    conn: sqlite3.Connection,
+    project_id: str,
+    name: str,
+    source_type: str,
+    path: str,
+    sha256: str,
+) -> str:
+    row = conn.execute(
+        """
+        SELECT id
+        FROM dataset_sources
+        WHERE project_id = ? AND path = ?
+        """,
+        (project_id, path),
+    ).fetchone()
+
+    if row:
+        # Update hash if changed
+        conn.execute(
+            """
+            UPDATE dataset_sources
+            SET sha256 = ?, name = ?, source_type = ?
+            WHERE id = ?
+            """,
+            (sha256, name, source_type, row["id"]),
+        )
+        conn.commit()
+        return row["id"]
+
+    source_id = new_id("src")
+    conn.execute(
+        """
+        INSERT INTO dataset_sources (
+            id,
+            project_id,
+            name,
+            source_type,
+            path,
+            sha256,
+            imported_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            source_id,
+            project_id,
+            name,
+            source_type,
+            path,
+            sha256,
+            utcnow(),
+        ),
+    )
+    conn.commit()
+    return source_id
+
+
+def add_dataset_version(
+    conn: sqlite3.Connection,
+    project_id: str,
+    source_id: str,
+    version: str,
+    normalized_path: str,
+    stats: dict,
+) -> str:
+    version_id = new_id("ds")
+    conn.execute(
+        """
+        INSERT INTO dataset_versions (
+            id,
+            project_id,
+            source_id,
+            version,
+            normalized_path,
+            stats_json,
+            created_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            version_id,
+            project_id,
+            source_id,
+            version,
+            normalized_path,
+            json.dumps(stats, ensure_ascii=False),
+            utcnow(),
+        ),
+    )
+    conn.commit()
+    return version_id
+```
+
+---
+
+# 5. Data models
+
+## `src/moro/data/__init__.py`
+
+```python
+```
+
+## `src/moro/data/models.py`
+
+```python
+from __future__ import annotations
+
+from typing import Any, Literal
+
+from pydantic import BaseModel, Field
+
+
+class DatasetMessage(BaseModel):
+    role: Literal["system", "user", "assistant"]
+    content: str
+
+
+class DatasetRow(BaseModel):
+    id: str
+    source: str
+    messages: list[DatasetMessage]
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class InvalidRow(BaseModel):
+    source: str
+    line_number: int | None = None
+    reason: str
+    raw: dict[str, Any] | None = None
+```
+
+---
+
+# 6. Ingestion module
+
+## `src/moro/data/ingest.py`
+
+```python
+import csv
+import json
+from pathlib import Path
+
+from moro.core.errors import DatasetError
+
+SUPPORTED_EXTENSIONS = {
+    ".jsonl",
+    ".json",
+    ".csv",
+    ".txt",
+    ".md",
+    ".markdown",
+}
+
+
+def detect_format(path: Path, requested: str = "auto") -> str:
+    path = Path(path)
+    suffix = path.suffix.lower()
+
+    if requested != "auto":
+        return requested
+
+    if suffix in {".jsonl", ".json"}:
+        return "jsonl"
+    if suffix == ".csv":
+        return "csv"
+    if suffix == ".txt":
+        return "txt"
+    if suffix in {".md", ".markdown"}:
+        return "markdown"
+
+    return "auto"
+
+
+def read_raw_rows(path: Path, format: str = "auto") -> list[dict]:
+    path = Path(path)
+
+    if not path.exists():
+        raise DatasetError(f"Dataset source does not exist: {path}")
+
+    if path.is_dir():
+        raise DatasetError(
+            "Directory ingestion is not supported yet in this MVP skeleton. "
+            "Please provide a single file."
+        )
+
+    fmt = detect_format(path, format)
+
+    if fmt in {"jsonl", "json"}:
+        return _read_jsonl(path)
+    if fmt == "csv":
+        return _read_csv(path)
+    if fmt in {"txt", "markdown"}:
+        return _read_text(path)
+
+    raise DatasetError(f"Unsupported dataset format for file: {path}")
+
+
+def _add_metadata(obj: dict, path: Path, line_number: int, fmt: str) -> dict:
+    obj = dict(obj)
+    obj["_source_file"] = str(path)
+    obj["_line_number"] = line_number
+    obj["_format"] = fmt
+    return obj
+
+
+def _read_jsonl(path: Path) -> list[dict]:
+    rows: list[dict] = []
+
+    if path.suffix.lower() == ".json":
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError as exc:
+            raise DatasetError(f"Invalid JSON file: {path}") from exc
+
+        if isinstance(data, list):
+            for i, item in enumerate(data):
+                if isinstance(item, dict):
+                    rows.append(_add_metadata(item, path, i + 1, "json"))
+            return rows
+
+        if isinstance(data, dict):
+            rows.append(_add_metadata(data, path, 1, "json"))
+            return rows
+
+        raise DatasetError(f"Unsupported JSON structure in file: {path}")
+
+    with path.open("r", encoding="utf-8") as f:
+        for line_number, line in enumerate(f, start=1):
+            line = line.strip()
+            if not line:
+                continue
+
+            try:
+                obj = json.loads(line)
+            except json.JSONDecodeError as exc:
+                raise DatasetError(
+                    f"Invalid JSONL at {path}:{line_number}"
+                ) from exc
+
+            if not isinstance(obj, dict):
+                raise DatasetError(
+                    f"JSONL row must be an object at {path}:{line_number}"
+                )
+
+            rows.append(_add_metadata(obj, path, line_number, "jsonl"))
+
+    return rows
+
+
+def _read_csv(path: Path) -> list[dict]:
+    rows: list[dict] = []
+
+    with path.open("r", encoding="utf-8") as f:
+        reader = csv.DictReader(f)
+
+        for line_number, row in enumerate(reader, start=2):
+            rows.append(_add_metadata(dict(row), path, line_number, "csv"))
+
+    return rows
+
+
+def _read_text(path: Path) -> list[dict]:
+    rows: list[dict] = []
+
+    with path.open("r", encoding="utf-8") as f:
+        for line_number, line in enumerate(f, start=1):
+            text = line.strip()
+            if not text:
+                continue
+
+            rows.append(
+                _add_metadata(
+                    {"text": text},
+                    path,
+                    line_number,
+                    "text",
+                )
+            )
+
+    return rows
+```
+
+---
+
+# 7. Normalization module
+
+## `src/moro/data/normalize.py`
+
+```python
+import json
+from typing import Any
+
+from moro.core.hashing import sha256_text
+from moro.data.models import DatasetMessage, DatasetRow, InvalidRow
+
+VALID_ROLES = {"system", "user", "assistant"}
+
+
+def normalize_rows(
+    raw_rows: list[dict],
+    source_name: str,
+) -> tuple[list[DatasetRow], list[InvalidRow]]:
+    valid_rows: list[DatasetRow] = []
+    invalid_rows: list[InvalidRow] = []
+
+    for raw in raw_rows:
+        source_file = raw.get("_source_file", source_name)
+        line_number = raw.get("_line_number")
+
+        try:
+            messages = _normalize_single_row(raw)
+
+            if not messages:
+                invalid_rows.append(
+                    InvalidRow(
+                        source=str(source_file),
+                        line_number=line_number,
+                        reason="No valid messages could be extracted",
+                        raw=_safe_raw(raw),
+                    )
+                )
+                continue
+
+            row_id = _make_row_id(messages)
+
+            valid_rows.append(
+                DatasetRow(
+                    id=row_id,
+                    source=str(source_file),
+                    messages=messages,
+                    metadata={
+                        "source_file": str(source_file),
+                        "line_number": line_number,
+                        "format": raw.get("_format"),
+                    },
+                )
+            )
+
+        except Exception as exc:
+            invalid_rows.append(
+                InvalidRow(
+                    source=str(source_file),
+                    line_number=line_number,
+                    reason=str(exc),
+                    raw=_safe_raw(raw),
+                )
+            )
+
+    return valid_rows, invalid_rows
+
+
+def _safe_raw(raw: dict[str, Any]) -> dict[str, Any]:
+    cleaned = {
+        k: v
+        for k, v in raw.items()
+        if not k.startswith("_")
+    }
+    return cleaned
+
+
+def _make_row_id(messages: list[DatasetMessage]) -> str:
+    canonical = json.dumps(
+        [message.model_dump() for message in messages],
+        sort_keys=True,
+        ensure_ascii=False,
+    )
+    return f"row_{sha256_text(canonical)[:16]}"
+
+
+def _normalize_single_row(raw: dict[str, Any]) -> list[DatasetMessage]:
+    # 1) Native messages format
+    if "messages" in raw and isinstance(raw["messages"], list):
+        messages = _normalize_messages_field(raw["messages"])
+
+        if "system" in raw and raw["system"] and not _has_system(messages):
+            system_text = str(raw["system"]).strip()
+            if system_text:
+                messages.insert(
+                    0,
+                    DatasetMessage(role="system", content=system_text),
+                )
+
+        return messages
+
+    system_text = str(raw.get("system", "")).strip()
+
+    # 2) Instruction / input / output format
+    instruction = str(raw.get("instruction", "")).strip()
+    instruction_input = str(raw.get("input", "")).strip()
+    completion = _extract_completion(raw)
+
+    if instruction:
+        if not completion:
+            raise ValueError("instruction row is missing output/completion")
+
+        user_content = instruction
+        if instruction_input:
+            user_content = f"{instruction}\n\n{instruction_input}"
+
+        messages: list[DatasetMessage] = []
+        if system_text:
+            messages.append(DatasetMessage(role="system", content=system_text))
+
+        messages.extend(
+            [
+                DatasetMessage(role="user", content=user_content),
+                DatasetMessage(role="assistant", content=completion),
+            ]
+        )
+        return messages
+
+    # 3) Prompt / completion format
+    prompt = _extract_prompt(raw)
+    completion = _extract_completion(raw)
+
+    if prompt and completion:
+        messages = []
+        if system_text:
+            messages.append(DatasetMessage(role="system", content=system_text))
+
+        messages.extend(
+            [
+                DatasetMessage(role="user", content=prompt),
+                DatasetMessage(role="assistant", content=completion),
+            ]
+        )
+        return messages
+
+    # 4) Plain text is not enough for supervised fine-tuning by default
+    if "text" in raw:
+        raise ValueError(
+            "text-only row does not include a completion; "
+            "use prompt/completion, instruction/output, or messages format"
+        )
+
+    raise ValueError("Unrecognized row format")
+
+
+def _normalize_messages_field(messages_raw: list[Any]) -> list[DatasetMessage]:
+    messages: list[DatasetMessage] = []
+
+    for msg in messages_raw:
+        if not isinstance(msg, dict):
+            raise ValueError("each message must be an object")
+
+        role = str(msg.get("role", "")).strip().lower()
+        content = str(msg.get("content", "")).strip()
+
+        if role not in VALID_ROLES:
+            raise ValueError(f"invalid message role: {role!r}")
+
+        if not content:
+            raise ValueError(f"message content is empty for role: {role!r}")
+
+        messages.append(DatasetMessage(role=role, content=content))
+
+    return messages
+
+
+def _has_system(messages: list[DatasetMessage]) -> bool:
+    return any(message.role == "system" for message in messages)
+
+
+def _extract_prompt(raw: dict[str, Any]) -> str:
+    for key in ("prompt", "question", "query"):
+        value = raw.get(key)
+        if value is not None and str(value).strip():
+            return str(value).strip()
+    return ""
+
+
+def _extract_completion(raw: dict[str, Any]) -> str:
+    for key in (
+        "completion",
+        "output",
+        "response",
+        "answer",
+        "completion_text",
+        "target",
+    ):
+        value = raw.get(key)
+        if value is not None and str(value).strip():
+            return str(value).strip()
+    return ""
+```
+
+---
+
+# 8. Quality scoring module
+
+## `src/moro/data/quality.py`
+
+```python
+from moro.data.models import DatasetMessage, DatasetRow
+
+
+def approximate_token_count(messages: list[DatasetMessage]) -> int:
+    """
+    Very rough token approximation for MVP.
+    Replace with tokenizer-based counting later.
+    """
+    total = 0
+    for message in messages:
+        total += len(message.content.split())
+    return total
+
+
+def score_row(row: DatasetRow, token_count: int | None = None) -> float:
+    if token_count is None:
+        token_count = approximate_token_count(row.messages)
+
+    roles = {message.role for message in row.messages}
+
+    # Completeness
+    completeness = 1.0 if {"user", "assistant"}.issubset(roles) else 0.0
+
+    # Length sanity
+    if token_count <= 0:
+        length_sanity = 0.0
+    elif token_count < 8:
+        length_sanity = token_count / 8.0
+    elif token_count <= 4096:
+        length_sanity = 1.0
+    else:
+        length_sanity = max(0.0, 1.0 - ((token_count - 4096) / 4096))
+
+    # Repetition / uniqueness heuristic
+    all_text = " ".join(message.content for message in row.messages).lower()
+    tokens = all_text.split()
+    if tokens:
+        unique_ratio = len(set(tokens)) / len(tokens)
+    else:
+        unique_ratio = 0.0
+    repetition_score = max(0.0, min(1.0, unique_ratio))
+
+    # Formatting sanity
+    formatting = 1.0 if all(message.content.strip() for message in row.messages) else 0.0
+
+    score = (
+        0.30 * completeness
+        + 0.25 * length_sanity
+        + 0.25 * repetition_score
+        + 0.20 * formatting
+    )
+
+    return round(max(0.0, min(1.0, score)), 4)
+```
+
+---
+
+# 9. Cleaning module
+
+## `src/moro/data/clean.py`
+
+```python
+import json
+
+from moro.core.hashing import sha256_text
+from moro.data.models import DatasetRow, InvalidRow
+from moro.data.quality import approximate_token_count, score_row
+
+
+def clean_rows(
+    rows: list[DatasetRow],
+    max_seq_length: int = 1024,
+    min_quality_score: float = 0.0,
+    deduplicate: bool = True,
+) -> tuple[list[DatasetRow], list[InvalidRow]]:
+    valid_rows: list[DatasetRow] = []
+    invalid_rows: list[InvalidRow] = []
+
+    seen_exact: set[str] = set()
+    seen_near: set[str] = set()
+
+    for row in rows:
+        issues: list[str] = []
+
+        if not row.messages:
+            issues.append("row has no messages")
+
+        roles = {message.role for message in row.messages}
+
+        if "user" not in roles:
+            issues.append("row is missing user message")
+
+        if "assistant" not in roles:
+            issues.append("row is missing assistant message")
+
+        token_count = approximate_token_count(row.messages)
+
+        if token_count <= 0:
+            issues.append("row has zero tokens")
+
+        if token_count > max_seq_length:
+            issues.append(
+                f"token count {token_count} exceeds max_seq_length {max_seq_length}"
+            )
+
+        quality_score = score_row(row, token_count=token_count)
+
+        if quality_score < min_quality_score:
+            issues.append(
+                f"quality score {quality_score} below threshold {min_quality_score}"
+            )
+
+        if issues:
+            invalid_rows.append(
+                InvalidRow(
+                    source=row.metadata.get("source_file", row.source),
+                    line_number=row.metadata.get("line_number"),
+                    reason="; ".join(issues),
+                    raw=None,
+                )
+            )
+            continue
+
+        canonical = json.dumps(
+            [message.model_dump() for message in row.messages],
+            sort_keys=True,
+            ensure_ascii=False,
+        )
+        exact_hash = sha256_text(canonical)
+
+        near_text = " ".join(
+            message.content.strip().lower() for message in row.messages
+        )[:1000]
+        near_hash = sha256_text(near_text)
+
+        if deduplicate:
+            if exact_hash in seen_exact:
+                invalid_rows.append(
+                    InvalidRow(
+                        source=row.metadata.get("source_file", row.source),
+                        line_number=row.metadata.get("line_number"),
+                        reason="duplicate row removed",
+                        raw=None,
+                    )
+                )
+                continue
+
+            if near_hash in seen_near:
+                invalid_rows.append(
+                    InvalidRow(
+                        source=row.metadata.get("source_file", row.source),
+                        line_number=row.metadata.get("line_number"),
+                        reason="near-duplicate row removed",
+                        raw=None,
+                    )
+                )
+                continue
+
+            seen_exact.add(exact_hash)
+            seen_near.add(near_hash)
+
+        row.metadata["token_count"] = token_count
+        row.metadata["quality_score"] = quality_score
+
+        valid_rows.append(row)
+
+    return valid_rows, invalid_rows
+```
+
+---
+
+# 10. Splitting module
+
+## `src/moro/data/splitter.py`
+
+```python
+import json
+import random
+from pathlib import Path
+
+from moro.data.models import DatasetRow
+
+
+def split_rows(
+    rows: list[DatasetRow],
+    validation_ratio: float,
+    eval_ratio: float,
+    seed: int = 42,
+) -> tuple[list[DatasetRow], list[DatasetRow], list[DatasetRow]]:
+    if not rows:
+        return [], [], []
+
+    shuffled = list(rows)
+    random.Random(seed).shuffle(shuffled)
+
+    n = len(shuffled)
+
+    if n == 1:
+        return shuffled, [], []
+
+    n_eval = int(n * eval_ratio)
+    n_val = int(n * validation_ratio)
+
+    if eval_ratio > 0:
+        n_eval = max(1, n_eval)
+
+    if validation_ratio > 0:
+        n_val = max(1, n_val)
+
+    # Ensure at least one training row when possible
+    if n_eval + n_val >= n:
+        n_eval = 0
+        n_val = max(0, n - 1)
+
+    eval_rows = shuffled[:n_eval]
+    validation_rows = shuffled[n_eval:n_eval + n_val]
+    train_rows = shuffled[n_eval + n_val:]
+
+    return train_rows, validation_rows, eval_rows
+
+
+def write_jsonl(path: Path, rows: list[DatasetRow]) -> None:
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+
+    with path.open("w", encoding="utf-8") as f:
+        for row in rows:
+            f.write(json.dumps(row.model_dump(mode="json"), ensure_ascii=False))
+            f.write("\n")
+```
+
+---
+
+# 11. Reporting module
+
+## `src/moro/data/report.py`
+
+```python
+from moro.data.models import DatasetRow, InvalidRow
+
+
+def percentile(values: list[float], pct: float) -> float:
+    if not values:
+        return 0.0
+
+    values = sorted(values)
+    if len(values) == 1:
+        return float(values[0])
+
+    k = (len(values) - 1) * pct
+    f = int(k)
+    c = min(f + 1, len(values) - 1)
+
+    if f == c:
+        return float(values[f])
+
+    return float(values[f] + (values[c] - values[f]) * (k - f))
+
+
+def build_stats(
+    valid_rows: list[DatasetRow],
+    invalid_rows: list[InvalidRow],
+    train_rows: list[DatasetRow],
+    validation_rows: list[DatasetRow],
+    eval_rows: list[DatasetRow],
+) -> dict:
+    token_counts = [
+        float(row.metadata.get("token_count", 0.0))
+        for row in valid_rows
+    ]
+
+    quality_scores = [
+        float(row.metadata.get("quality_score", 0.0))
+        for row in valid_rows
+    ]
+
+    duplicate_count = sum(
+        1
+        for row in invalid_rows
+        if row.reason and "duplicate" in row.reason.lower()
+    )
+
+    warnings: list[str] = []
+
+    if not valid_rows:
+        warnings.append("No valid rows were produced.")
+
+    if not train_rows:
+        warnings.append("No training rows were produced.")
+
+    if len(invalid_rows) > len(valid_rows):
+        warnings.append("More rows were invalid than valid.")
+
+    return {
+        "rows_total": len(valid_rows) + len(invalid_rows),
+        "rows_valid": len(valid_rows),
+        "rows_invalid": len(invalid_rows),
+        "rows_deduplicated": duplicate_count,
+        "train_rows": len(train_rows),
+        "validation_rows": len(validation_rows),
+        "eval_rows": len(eval_rows),
+        "avg_tokens": round(sum(token_counts) / len(token_counts), 2) if token_counts else 0.0,
+        "p50_tokens": round(percentile(token_counts, 0.50), 2),
+        "p95_tokens": round(percentile(token_counts, 0.95), 2),
+        "max_tokens": int(max(token_counts)) if token_counts else 0,
+        "avg_quality_score": round(sum(quality_scores) / len(quality_scores), 4)
+        if quality_scores
+        else 0.0,
+        "min_quality_score": round(min(quality_scores), 4) if quality_scores else 0.0,
+        "quality_score_p50": round(percentile(quality_scores, 0.50), 4),
+        "warnings": warnings,
+    }
+```
+
+---
+
+# 12. CLI commands for import/data/report
+
+## `src/moro/cli/data.py`
+
+```python
+import json
+import shutil
+from pathlib import Path
+
+import typer
+from rich.console import Console
+from rich.table import Table
+
+from moro.core.errors import ConfigError, DatasetError, ProjectError
+from moro.core.hashing import sha256_file
+from moro.core.project import load_project_config, require_project_root
+from moro.data.clean import clean_rows
+from moro.data.ingest import read_raw_rows
+from moro.data.normalize import normalize_rows
+from moro.data.report import build_stats
+from moro.data.splitter import split_rows, write_jsonl
+from moro.storage.db import (
+    add_dataset_version,
+    get_connection,
+    get_or_create_dataset_source,
+    get_or_create_project,
+    new_id,
+    utcnow,
+)
+
+console = Console()
+
+data_app = typer.Typer(
+    name="data",
+    help="Dataset commands",
+    no_args_is_help=True,
+)
+
+
+def import_command(
+    source: Path = typer.Argument(
+        ...,
+        help="Path to the raw dataset file to import.",
+        exists=True,
+        file_okay=True,
+        dir_okay=False,
+        resolve_path=True,
+    ),
+    name: str | None = typer.Option(
+        default=None,
+        "--name",
+        help="Optional dataset source name.",
+    ),
+    format: str = typer.Option(
+        default="auto",
+        help="Dataset format: auto, jsonl, csv, txt, markdown.",
+    ),
+    copy: bool = typer.Option(
+        default=True,
+        "--copy/--no-copy",
+        help="Copy the file into data/raw.",
+    ),
+    force: bool = typer.Option(
+        default=False,
+        "--force",
+        help="Overwrite destination file if it already exists.",
+    ),
+) -> None:
+    """
+    Import a raw dataset file into the project.
+    """
+    try:
+        root = require_project_root()
+        config = load_project_config()
+
+        source = source.expanduser().resolve()
+        raw_dir = root / "data" / "raw"
+        raw_dir.mkdir(parents=True, exist_ok=True)
+
+        dest = raw_dir / source.name
+
+        if dest.exists() and not force and source.resolve() != dest.resolve():
+            raise DatasetError(
+                f"Destination already exists: {dest}. Use --force to overwrite."
+            )
+
+        if copy:
+            if source.resolve() != dest.resolve():
+                shutil.copy2(source, dest)
+                console.print(f"[green]Copied:[/green] {source} → {dest}")
+            else:
+                console.print("[dim]Source already inside data/raw; no copy needed.[/dim]")
+
+        final_path = dest if copy else source
+        file_hash = sha256_file(final_path)
+
+        conn = get_connection(root)
+        project_id = get_or_create_project(
+            conn,
+            config.project.name,
+            config.project.privacy_mode,
+        )
+
+        source_id = get_or_create_dataset_source(
+            conn,
+            project_id=project_id,
+            name=name or final_path.stem,
+            source_type=format,
+            path=str(final_path),
+            sha256=file_hash,
+        )
+
+        console.print(f"[bold green]Imported dataset source:[/bold green] {source_id}")
+        console.print(f"Path: {final_path}")
+        console.print(f"SHA256: {file_hash}")
+
+    except ProjectError as exc:
+        console.print(f"[bold red]Project error:[/bold red] {exc}")
+        raise typer.Exit(code=2)
+    except ConfigError as exc:
+        console.print(f"[bold red]Config error:[/bold red] {exc}")
+        raise typer.Exit(code=2)
+    except DatasetError as exc:
+        console.print(f"[bold red]Dataset error:[/bold red] {exc}")
+        raise typer.Exit(code=5)
+    except Exception as exc:
+        console.print(f"[bold red]Unexpected error:[/bold red] {exc}")
+        raise typer.Exit(code=1)
+
+
+@data_app.command("build")
+def data_build_command(
+    limit: int | None = typer.Option(
+        default=None,
+        help="Optional limit for debugging.",
+    ),
+    force: bool = typer.Option(
+        default=False,
+        help="Rebuild even if outputs already exist.",
+    ),
+) -> None:
+    """
+    Normalize, clean, score, split, and version the dataset.
+    """
+    try:
+        root = require_project_root()
+        config = load_project_config()
+
+        source_path = config.dataset.source.expanduser()
+        if not source_path.is_absolute():
+            source_path = root / source_path
+
+        if not source_path.exists():
+            raise DatasetError(
+                f"Dataset source does not exist: {source_path}. "
+                "Add data or update dataset.source in moro.yaml."
+            )
+
+        raw_rows = read_raw_rows(source_path, config.dataset.format)
+
+        if limit is not None:
+            raw_rows = raw_rows[:limit]
+
+        normalized_rows, normalize_invalid = normalize_rows(
+            raw_rows,
+            source_name=source_path.name,
+        )
+
+        cleaned_rows, clean_invalid = clean_rows(
+            normalized_rows,
+            max_seq_length=config.dataset.max_seq_length,
+            min_quality_score=config.dataset.min_quality_score,
+            deduplicate=config.dataset.deduplicate,
+        )
+
+        train_rows, validation_rows, eval_rows = split_rows(
+            cleaned_rows,
+            validation_ratio=config.dataset.validation_ratio,
+            eval_ratio=config.dataset.eval_ratio,
+            seed=config.project.seed,
+        )
+
+        normalized_path = root / "data" / "normalized" / "dataset.jsonl"
+        train_path = root / "data" / "splits" / "train.jsonl"
+        validation_path = root / "data" / "splits" / "validation.jsonl"
+        eval_path = root / "data" / "splits" / "eval.jsonl"
+
+        write_jsonl(normalized_path, cleaned_rows)
+        write_jsonl(train_path, train_rows)
+        write_jsonl(validation_path, validation_rows)
+        write_jsonl(eval_path, eval_rows)
+
+        invalid_rows = normalize_invalid + clean_invalid
+
+        stats = build_stats(
+            valid_rows=cleaned_rows,
+            invalid_rows=invalid_rows,
+            train_rows=train_rows,
+            validation_rows=validation_rows,
+            eval_rows=eval_rows,
+        )
+
+        dataset_version_id = new_id("ds")
+
+        report_payload = {
+            "dataset_version_id": dataset_version_id,
+            "created_at": utcnow(),
+            "source": str(source_path),
+            "normalized_path": str(normalized_path),
+            "split_paths": {
+                "train": str(train_path),
+                "validation": str(validation_path),
+                "eval": str(eval_path),
+            },
+            "stats": stats,
+            "invalid_samples": [
+                row.model_dump(mode="json") for row in invalid_rows[:20]
+            ],
+        }
+
+        report_path = root / ".moro" / "reports" / "dataset_report.json"
+        report_path.parent.mkdir(parents=True, exist_ok=True)
+        report_path.write_text(
+            json.dumps(report_payload, indent=2, ensure_ascii=False),
+            encoding="utf-8",
+        )
+
+        conn = get_connection(root)
+        project_id = get_or_create_project(
+            conn,
+            config.project.name,
+            config.project.privacy_mode,
+        )
+
+        source_hash = sha256_file(source_path) if source_path.is_file() else ""
+
+        source_id = get_or_create_dataset_source(
+            conn,
+            project_id=project_id,
+            name=source_path.stem,
+            source_type=str(config.dataset.format),
+            path=str(source_path),
+            sha256=source_hash,
+        )
+
+        add_dataset_version(
+            conn,
+            project_id=project_id,
+            source_id=source_id,
+            version=dataset_version_id,
+            normalized_path=str(normalized_path),
+            stats=stats,
+        )
+
+        console.print("[bold green]Dataset build complete.[/bold green]")
+        console.print(f"Normalized output: {normalized_path}")
+        console.print(f"Train rows: {stats['train_rows']}")
+        console.print(f"Validation rows: {stats['validation_rows']}")
+        console.print(f"Eval rows: {stats['eval_rows']}")
+        console.print(f"Invalid rows: {stats['rows_invalid']}")
+        console.print(f"Report: {report_path}")
+
+        if stats["warnings"]:
+            console.print("\n[bold yellow]Warnings:[/bold yellow]")
+            for warning in stats["warnings"]:
+                console.print(f"- {warning}")
+
+    except ProjectError as exc:
+        console.print(f"[bold red]Project error:[/bold red] {exc}")
+        raise typer.Exit(code=2)
+    except ConfigError as exc:
+        console.print(f"[bold red]Config error:[/bold red] {exc}")
+        raise typer.Exit(code=2)
+    except DatasetError as exc:
+        console.print(f"[bold red]Dataset error:[/bold red] {exc}")
+        raise typer.Exit(code=5)
+    except Exception as exc:
+        console.print(f"[bold red]Unexpected error:[/bold red] {exc}")
+        raise typer.Exit(code=1)
+
+
+@data_app.command("report")
+def data_report_command(
+    json_output: bool = typer.Option(
+        default=False,
+        "--json",
+        help="Print report as JSON.",
+    ),
+) -> None:
+    """
+    Show the latest dataset build report.
+    """
+    try:
+        root = require_project_root()
+        report_path = root / ".moro" / "reports" / "dataset_report.json"
+
+        if not report_path.exists():
+            raise DatasetError(
+                "No dataset report found. Run `moro data build` first."
+            )
+
+        payload = json.loads(report_path.read_text(encoding="utf-8"))
+
+        if json_output:
+            typer.echo(json.dumps(payload, indent=2, ensure_ascii=False))
+            return
+
+        stats = payload.get("stats", {})
+
+        table = Table(title="MoroAI Dataset Report")
+        table.add_column("Metric", style="cyan")
+        table.add_column("Value", style="white")
+
+        table.add_row("Dataset version", payload.get("dataset_version_id", "-"))
+        table.add_row("Source", payload.get("source", "-"))
+        table.add_row("Normalized output", payload.get("normalized_path", "-"))
+        table.add_row("Total rows", str(stats.get("rows_total", 0)))
+        table.add_row("Valid rows", str(stats.get("rows_valid", 0)))
+        table.add_row("Invalid rows", str(stats.get("rows_invalid", 0)))
+        table.add_row("Deduplicated rows", str(stats.get("rows_deduplicated", 0)))
+        table.add_row("Train rows", str(stats.get("train_rows", 0)))
+        table.add_row("Validation rows", str(stats.get("validation_rows", 0)))
+        table.add_row("Eval rows", str(stats.get("eval_rows", 0)))
+        table.add_row("Avg tokens", str(stats.get("avg_tokens", 0)))
+        table.add_row("P50 tokens", str(stats.get("p50_tokens", 0)))
+        table.add_row("P95 tokens", str(stats.get("p95_tokens", 0)))
+        table.add_row("Max tokens", str(stats.get("max_tokens", 0)))
+        table.add_row("Avg quality", str(stats.get("avg_quality_score", 0)))
+        table.add_row("Min quality", str(stats.get("min_quality_score", 0)))
+
+        console.print(table)
+
+        warnings = stats.get("warnings", [])
+        if warnings:
+            console.print("\n[bold yellow]Warnings:[/bold yellow]")
+            for warning in warnings:
+                console.print(f"- {warning}")
+
+        invalid_samples = payload.get("invalid_samples", [])
+        if invalid_samples:
+            console.print("\n[bold yellow]Sample invalid rows:[/bold yellow]")
+            for item in invalid_samples[:5]:
+                console.print(
+                    f"- {item.get('source')}:{item.get('line_number')} → {item.get('reason')}"
+                )
+
+    except ProjectError as exc:
+        console.print(f"[bold red]Project error:[/bold red] {exc}")
+        raise typer.Exit(code=2)
+    except DatasetError as exc:
+        console.print(f"[bold red]Dataset error:[/bold red] {exc}")
+        raise typer.Exit(code=5)
+    except Exception as exc:
+        console.print(f"[bold red]Unexpected error:[/bold red] {exc}")
+        raise typer.Exit(code=1)
+```
+
+---
+
+# 13. Updated CLI entrypoint
+
+Replace your existing `src/moro/main.py` with this updated version.
+
+## `src/moro/main.py`
+
+```python
+import typer
+
+from moro import __version__
+from moro.cli.init import init_command
+from moro.cli.status import status_command
+from moro.cli.doctor import doctor_command
+from moro.cli.data import data_app, import_command
+
+app = typer.Typer(
+    name="moro",
+    help="MoroAI: local-first model adaptation foundry.",
+    no_args_is_help=True,
+    add_completion=False,
+)
+
+
+@app.callback()
+def main() -> None:
+    """
+    MoroAI CLI.
+
+    Build, evaluate, and deploy local models from private data.
+    """
+    pass
+
+
+app.command(name="init", help="Initialize a new MoroAI project")(init_command)
+app.command(name="status", help="Show current project status")(status_command)
+app.command(name="doctor", help="Check environment and hardware readiness")(doctor_command)
+app.command(name="import", help="Import raw data into the project")(import_command)
+
+app.add_typer(data_app, name="data")
+
+
+@app.command(name="version", help="Show MoroAI version")
+def version_command() -> None:
+    typer.echo(__version__)
+
+
+if __name__ == "__main__":
+    app()
+```
+
+---
+
+# 14. Example test workflow
+
+## Step 1: Initialize a project
+
+```bash
+moro init demo
+cd demo
+```
+
+---
+
+## Step 2: Add a tiny dataset
+
+Create:
+
+```bash
+nano data/raw/support.jsonl
+```
+
+Paste:
+
+```json
+{"prompt": "How do I reset my password?", "completion": "Go to Settings, then Security, then Reset Password."}
+{"prompt": "What is your refund policy?", "completion": "You can request a refund within 14 days."}
+{"prompt": "Where can I download the app?", "completion": "You can download the app from the official website."}
+{"prompt": "How do I contact support?", "completion": "You can contact support from the Help page."}
+{"prompt": "How do I reset my password?", "completion": "Go to Settings, then Security, then Reset Password."}
+```
+
+This includes one duplicate row for testing.
+
+---
+
+## Step 3: Import the dataset
+
+```bash
+moro import ./data/raw/support.jsonl --name support
+```
+
+---
+
+## Step 4: Build the dataset
+
+```bash
+moro data build
+```
+
+---
+
+## Step 5: Inspect the report
+
+```bash
+moro data report
+```
+
+Or:
+
+```bash
+moro data report --json
+```
+
+---
+
+# 15. What this code gives you now
+
+At this point, MoroAI can:
+
+## Data ingestion
+- read JSONL
+- read JSON
+- read CSV
+- read basic text
+- detect format
+- attach source metadata
+
+## Normalization
+Supports:
+- `messages`
+- `prompt/completion`
+- `instruction/input/output`
+- optional `system`
+
+## Cleaning
+- removes empty rows
+- removes rows without user/assistant
+- removes overly long rows
+- removes low-quality rows
+- deduplicates exact duplicates
+- flags near-duplicates
+
+## Quality scoring
+- completeness
+- length sanity
+- repetition heuristic
+- formatting sanity
+
+## Splitting
+- train/validation/eval splits
+- deterministic seed
+- safe behavior for tiny datasets
+
+## Reporting
+- row counts
+- token stats
+- quality stats
+- warnings
+- invalid samples
+
+## Persistence
+- SQLite project record
+- dataset source record
+- dataset version record
+
+---
+
+# 16. What to build immediately after this
+
+The next best modules are:
+
+## A. Recipe engine
+Files:
+```text
+src/moro/recipes/engine.py
+src/moro/recipes/rules.py
+src/moro/recipes/presets.py
+src/moro/cli/recipe.py
+```
+
+This gives you:
+
+```bash
+moro recipe suggest
+```
+
+---
+
+## B. Training backend
+Files:
+```text
+src/moro/training/backend.py
+src/moro/training/run.py
+src/moro/training/hf_backend.py
+src/moro/cli/train.py
+```
+
+This gives you:
+
+```bash
+moro train
+```
+
+---
+
+## C. Evaluation engine
+Files:
+```text
+src/moro/eval/loader.py
+src/moro/eval/scorers.py
+src/moro/eval/runner.py
+src/moro/cli/eval.py
+```
+
+This gives you:
+
+```bash
+moro eval run eval/support-golden-v1.yaml
+```
+
+---
+
+# 17. My recommendation for the very next build step
+
+Build the **recipe engine next**.
+
+Why?
+
+Because it connects:
+- hardware detection
+- dataset stats
+- training configuration
+
+and makes the product feel intelligent before you even implement full training.
+
+The command you want next is:
+
+```bash
+moro recipe suggest
+```
+
+---
+
+If you want, I can now generate the next starter skeleton in full:
+
+# **MoroAI Recipe Engine Starter Code**
+
+including:
+- `src/moro/recipes/engine.py`
+- `src/moro/recipes/rules.py`
+- `src/moro/recipes/presets.py`
+- `src/moro/cli/recipe.py`
+- exact `moro recipe suggest` implementation
