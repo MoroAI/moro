@@ -1,0 +1,575 @@
+**MoroAI has a working engineering foundation, but it does not yet meet its own definition of a reliable end-to-end MVP.** The largest gaps concern data integrity, trustworthy evaluation, reproducibility, and release validation.
+
+The project can execute meaningful pieces of the workflow. However, it can currently lose an adapter during export, change the contents behind an existing dataset version, report success for an ineffective evaluation, and export a failed run without enforcing the configured release requirements.
+
+Those are concrete findings—not hypothetical concerns.
+
+I inspected the implementation against the documents in [instructions](/Users/mac/Dev/MoroAI/moro/instructions), ran the existing checks, and exercised suspected defects using disposable synthetic fixtures. **No project files were changed during this audit.**
+
+**1. What the evidence establishes**
+
+| Check | Result | What it establishes |
+|---|---|---|
+| Local test suite | **107 passed, 1 skipped** | Existing core tests pass, including local recipe-planning changes |
+| Ruff lint | Passed | No violations under the configured rules |
+| Formatting | Passed; 83 files checked | Formatting is consistent |
+| Git diff whitespace check | Passed | Current changes have no reported whitespace errors |
+| GitHub CI at `a9852c1` | Successful | Committed code passes its configured Linux checks |
+| CPU training integration | Successful in CI | A tiny local model can complete the exercised training path |
+| Synthetic defect checks | Multiple defects reproduced | Passing tests currently miss important workflow failures |
+
+The [successful GitHub run](https://github.com/MoroAI/moro/actions/runs/35114354733) applies to committed code. The local recipe-planning changes and additional instruction documents remain uncommitted; they are not covered by that remote result.
+
+The synthetic checks used real normalization, splitting, storage, and packaging code. Where they exercised training or evaluation orchestration, model execution was stubbed. They demonstrate orchestration defects, not real-model quality or GPU behavior.
+
+I did **not** establish CUDA/QLoRA reliability, Apple Silicon training reliability, useful fine-tuning quality, or successful deployment into a real Ollama instance.
+
+**2. Highest-priority defects**
+
+Here, **P1** means fix before trusting valuable training artifacts or release results. **P2** means important correctness or usability work for a dependable MVP.
+
+| Priority | Finding | Evidence and impact |
+|---|---|---|
+| **P1** | Export can delete the source adapter | Exporting into the run directory deletes its `adapter` directory, then fails while copying |
+| **P1** | Dataset versions are mutable | Rebuilding changes the file referenced by an earlier version |
+| **P1** | Dataset lineage can identify the wrong source | Building source A after importing source B records B as the version’s source |
+| **P1** | Failed runs can be exported | A synthetic failed run with an adapter directory exported successfully |
+| **P1** | Release requirements are unenforced | Export does not enforce configured evaluation, improvement, regression, or safety requirements |
+| **P1** | Evaluation can falsely pass | A misspelled expectation was ignored, allowing an empty response to receive a passing score |
+| **P1** | Evaluation evidence can be misattributed | Supplying both a base model and a run ID evaluates the base model while retaining the run association |
+| **P1** | Generated projects leave raw data exposed to ordinary Git staging | Their `.gitignore` does not exclude `data/raw/` |
+| **P2** | Printed evaluation IDs cannot retrieve their reports | The result and database generate different IDs |
+| **P2** | Export manifests lack essential evidence | Observed empty artifacts, empty evaluation summary, and null dataset version |
+| **P2** | Invalid training data can pass the build stage | Incomplete conversations survive default cleaning; tiny datasets can produce an empty training split |
+| **P2** | Training estimates contradict recipe planning | The old estimator treats a 13B name like 3B and does not properly account for larger models |
+| **P2** | JSON-schema scoring has an undeclared dependency | Missing `jsonschema` is recorded as a failed model answer |
+| **P2** | GGUF deployment reports process success without implementation | The placeholder exits with code zero |
+
+**3. Dataset preparation and lineage**
+
+**Dataset versions do not preserve historical datasets.**
+
+Every build writes to the same normalized and split paths. New database version records point back to those shared files. Consequently, “version 1” can acquire different contents after building “version 2.”
+
+I reproduced both the shared path and the changed historical contents.
+
+This breaks the central question a training system must answer:
+
+> Which exact examples produced this adapter?
+
+The relevant writes and version registration are in [data build](/Users/mac/Dev/MoroAI/moro/src/moro/cli/data.py:108).
+
+A dependable implementation needs:
+
+- Immutable output directories for each dataset version.
+- Checksums for normalized data and every split.
+- A build manifest containing source identities, transformation settings, seed, and relevant tool versions.
+- Temporary staging followed by atomic publication.
+- Training that explicitly selects and records a dataset version.
+
+**Source attribution is incorrect when multiple sources exist.**
+
+The build command chooses the most recently imported source record, rather than resolving the actual configured source. I reproduced a build whose contents came from one file but whose database lineage named another.
+
+It also permits a successful build without registering a version when no imported source record exists. See [source selection](/Users/mac/Dev/MoroAI/moro/src/moro/cli/data.py:143).
+
+**Normalization and cleaning disagree with training requirements.**
+
+Several data contracts need tightening:
+
+- Null content can become the literal string `"None"`.
+- Non-string content may be stringified instead of rejected.
+- Conversations do not receive sufficient structural validation during normalization.
+- Incomplete conversations can survive cleaning because the default minimum quality score is zero.
+- Training subsequently rejects some examples that the build accepted.
+- Plain text and Markdown ingestion produce text-only records that the current supervised normalization path cannot use directly.
+
+A dataset build should either produce trainable examples or explicitly identify a different output type. “Successfully imported text” and “ready for supervised fine-tuning” are different states.
+
+Relevant implementations: [normalization](/Users/mac/Dev/MoroAI/moro/src/moro/data/normalize.py), [cleaning](/Users/mac/Dev/MoroAI/moro/src/moro/data/clean.py), and [ingestion](/Users/mac/Dev/MoroAI/moro/src/moro/data/ingest.py).
+
+**Splitting can produce unusable or misleading datasets.**
+
+A one-row synthetic dataset produced:
+
+```text
+train: 0
+validation: 0
+eval: 1
+```
+
+The configuration also accepts validation and evaluation ratios that sum to one, leaving no training allocation.
+
+Beyond these correctness defects, there is no grouping by conversation, source document, customer, or other related-example identity. Related examples can therefore cross split boundaries and inflate measured performance.
+
+Missing controls include:
+
+- Guaranteed nonempty training data.
+- Explicit minimum-size rules.
+- Cross-field ratio validation.
+- Group-aware splitting.
+- Train-versus-golden-suite overlap detection.
+- A record of split membership.
+- Clear behavior when datasets grow between builds.
+
+See [splitter](/Users/mac/Dev/MoroAI/moro/src/moro/data/splitter.py) and [dataset configuration](/Users/mac/Dev/MoroAI/moro/src/moro/config/models.py:15).
+
+**Quality scores and token estimates are limited heuristics.**
+
+Current scoring does not establish factual correctness, instruction quality, label consistency, or task usefulness. Token estimates are word-based rather than derived from the selected model’s tokenizer.
+
+That matters for multilingual text, code, long strings without spaces, and chat-template overhead. Data accepted under an approximate length limit can still be truncated during training.
+
+“Near duplicate” handling normalizes case and whitespace; it does not detect semantic duplicates. Conversely, case normalization can conflate examples where case matters.
+
+**Import and build need stronger failure handling.**
+
+Additional gaps:
+
+- Data is loaded eagerly into memory.
+- `--limit` is applied after reading the complete source.
+- Negative limits are not rejected; zero does not behave like a zero-row limit.
+- `--force` is declared but unused.
+- JSON arrays silently discard some unsupported entries, while malformed JSONL can abort the entire read.
+- Rejected examples are counted but not preserved in a useful rejection artifact.
+- Directory hashes omit relative filenames.
+- Linked sources remain mutable.
+- Directory import lacks a source/destination containment guard.
+- File copying and database updates are not one recoverable operation.
+
+The containment issue is a static finding: importing a directory that contains the destination risks recursive copying. I did not execute that destructive scenario.
+
+**4. Training and reproducibility**
+
+**Runs are not bound to dataset versions.**
+
+Training reads a fixed `train.jsonl` path and creates a run without passing `dataset_version_id`.
+
+It writes a checksum for that training file, which is useful, but that is incomplete provenance:
+
+- Validation and evaluation split checksums are absent.
+- The original dataset may later be overwritten.
+- There is no immutable snapshot protecting the interval between hashing and reading.
+- The command does not verify that the existing split matches the current configuration.
+
+See [training data selection](/Users/mac/Dev/MoroAI/moro/src/moro/cli/train.py:51) and [run creation](/Users/mac/Dev/MoroAI/moro/src/moro/cli/train.py:86).
+
+**The configured output directory is ignored.**
+
+`training.output_dir` exists in the configuration, but training writes to the project’s hardcoded `runs` directory. This is particularly problematic when users configure a separate disk for large checkpoints.
+
+**Recipe planning and training use different memory models.**
+
+The local recipe planner is substantially more careful: it preserves the chosen model, represents unknown parameter counts explicitly, and labels estimates as uncalibrated.
+
+Training still calls the older backend estimator. Its model-name matching produces incorrect results, including the 13B/3B collision.
+
+This means a user can receive different guidance from:
+
+```text
+moro recipe suggest
+moro train --dry-run
+```
+
+The planner should feed a shared resolved training plan. That plan should record settings, assumptions, capability checks, and unresolved uncertainties. See [training estimation](/Users/mac/Dev/MoroAI/moro/src/moro/cli/train.py:66) and [recipe planner](/Users/mac/Dev/MoroAI/moro/src/moro/recipes/engine.py:63).
+
+**Dry-run is not a complete readiness check.**
+
+It does not establish all of the following:
+
+- Required training packages are compatible.
+- Model weights are available under the selected privacy mode.
+- The tokenizer has a compatible template.
+- Validation data is valid.
+- Quantization and precision work on the selected device.
+- The adapter targets exist.
+- Sufficient working disk and memory are available.
+
+A successful dry-run currently means considerably less than “this training job is ready.”
+
+**The run snapshot is incomplete.**
+
+For reproducibility, each run needs a resolved record of:
+
+- Immutable dataset and split identities.
+- Exact model revision or local weight checksums.
+- Tokenizer and chat-template identity.
+- MoroAI version and source commit.
+- Dependency versions.
+- Hardware and execution backend.
+- Effective configuration after overrides.
+- Seed and determinism settings.
+- Actual command and relevant environment settings.
+
+The present configuration snapshot and training-file checksum are a start, but do not satisfy the fuller reproducibility requirement in the architecture document.
+
+**Training completion needs stronger validation.**
+
+Current completion handling does not sufficiently validate finite metrics and final artifact integrity before marking success.
+
+Other limitations:
+
+- Adapter saving precedes final evaluation; evaluation failure can leave an adapter attached to a failed run.
+- Peak GPU measurement starts after model initialization, excluding loading peaks.
+- Reported allocated memory is not total process/device consumption.
+- Validation data is checked after expensive model loading.
+- Resume is explicitly unimplemented.
+- There is no recovery for abandoned “running” records after abrupt termination.
+- There is no consolidated MoroAI training report with a complete metrics history.
+- Truncation counts and loss of assistant-answer tokens are not reported.
+- Full-conversation training needs explicit documentation and later evaluation of whether assistant-only loss is preferable for supported tasks.
+
+Relevant implementation: [Hugging Face backend](/Users/mac/Dev/MoroAI/moro/src/moro/training/hf_backend.py).
+
+**5. Evaluation reliability**
+
+**Evaluation identity is broken across persistence and retrieval.**
+
+The runner creates a result ID. Storage generates another ID. The CLI prints the first, while `eval report` queries the second.
+
+I reproduced a successful evaluation record whose displayed ID could not retrieve its report.
+
+The fix needs one authoritative identity carried through creation, persistence, output, and retrieval. See [evaluation persistence](/Users/mac/Dev/MoroAI/moro/src/moro/cli/eval.py:86).
+
+**Model and run attribution are insufficiently constrained.**
+
+When both `--base-model` and `--run-id` are supplied, the base model wins, but the run association remains.
+
+Other selection problems:
+
+- An explicit run ID is used to construct an adapter path without first establishing a valid completed run record.
+- “Latest completed run” actually fetches the latest run and then checks its status.
+- A newer failed run can hide an older completed run.
+- Current project configuration can influence evaluation instead of the immutable configuration of the selected run.
+
+See [evaluation model selection](/Users/mac/Dev/MoroAI/moro/src/moro/cli/eval.py:50).
+
+**The scorer can confuse missing checks with success.**
+
+Generation-only examples receive a passing score. An empty expectation also passes. Unknown fields are silently ignored, so a misspelled assertion can turn a real check into an automatic pass.
+
+Generation-only cases should be explicitly **unscored**, not counted as evidence of correctness.
+
+Additional scorer defects:
+
+- `jsonschema` is not declared as a dependency.
+- Missing dependencies and invalid schemas become model failures.
+- An empty JSON schema is skipped because it is falsey.
+- Invalid regex patterns become failed answers rather than invalid-suite errors.
+- Substring checks cannot establish semantic correctness or distinguish a correct answer from its negation.
+
+See [scoring](/Users/mac/Dev/MoroAI/moro/src/moro/eval/scorers.py:12).
+
+**There is no dependable improvement measurement yet.**
+
+The project needs a first-class baseline-versus-adapter comparison using:
+
+- Identical cases.
+- Identical generation settings.
+- Recorded model identities.
+- Category-level results.
+- Explicit task metrics.
+- Regression thresholds.
+- Safety checks where required.
+- Sample sizes and uncertainty appropriate to the claims.
+
+A single pass-rate number does not establish that fine-tuning helped.
+
+**Evaluation may require more memory than training.**
+
+The inference loading path does not preserve the training quantization/device plan. A model that fits during QLoRA training can therefore fail during evaluation.
+
+Generation settings are also hardcoded rather than represented as reproducible evaluation configuration. Suite hashes, inference configuration, and complete model provenance are missing from the evidence record.
+
+See [evaluation runner](/Users/mac/Dev/MoroAI/moro/src/moro/eval/runner.py).
+
+**6. Export and deployment**
+
+**Export has a reproducible data-loss defect.**
+
+The exporter deletes the destination adapter directory before copying. When the destination is also the source, it deletes the trained adapter.
+
+This was reproduced only with disposable synthetic files.
+
+The exporter needs path-resolution checks, source/destination overlap protection, staging, and atomic publication. It should never delete a source artifact as part of packaging. See [adapter export](/Users/mac/Dev/MoroAI/moro/src/moro/export/manifest.py:17).
+
+**Release configuration currently promises enforcement that does not exist.**
+
+The configuration exposes:
+
+- Required evaluation suite.
+- Minimum improvement.
+- Maximum regression.
+- Safety-pass requirement.
+
+Export does not enforce those fields.
+
+It also accepts failed runs and checks adapter-directory existence rather than meaningful adapter validity. This allows a package to look releasable without the necessary evidence.
+
+See [release requirements](/Users/mac/Dev/MoroAI/moro/src/moro/config/models.py:84) and [export command](/Users/mac/Dev/MoroAI/moro/src/moro/cli/export.py:34).
+
+**Release manifests are incomplete and can describe the wrong model.**
+
+The export command supplies an empty artifact list and empty evaluation summary. It does not populate dataset lineage.
+
+It also takes the base model from the current project configuration, which may differ from the model used by the selected run.
+
+Missing release evidence includes:
+
+- Artifact inventory and checksums.
+- Exact base-model revision.
+- Dataset version.
+- Evaluation IDs and suite hashes.
+- Release-policy decision.
+- Configuration and software identity.
+- Meaningful model-card metrics and limitations.
+- Registration of exported artifacts in the database.
+
+**Ollama output is not yet a proven portable package.**
+
+The generated package refers to an absolute adapter path in the run directory. Moving the package or deleting the original run can break it.
+
+The raw Hugging Face model identifier is also used without validating its relationship to the target Ollama model or imported weights. Ollama documents model tags and supported local artifact inputs; actual compatibility must be demonstrated through a successful create-and-run test. [Ollama Modelfile documentation](https://docs.ollama.com/modelfile), [model import documentation](https://docs.ollama.com/import).
+
+The acceptance test should copy the release to a clean location, make the original run unavailable, import it into the supported Ollama version, and generate an answer.
+
+**Unsupported deployment paths must fail clearly.**
+
+GGUF conversion can remain deferred under the MVP scope. Returning success for an unimplemented operation should not.
+
+Merged export and GGUF support should be explicitly described as unavailable until implemented and validated.
+
+**7. Configuration, storage, and CLI contracts**
+
+**Configuration silently accepts mistakes.**
+
+The Pydantic models do not forbid unknown fields. I reproduced a misspelled batch-size setting being ignored while the default remained active.
+
+This is dangerous for settings that users believe control resource usage, privacy scanning, or evaluation.
+
+Configuration should reject unknown keys and validate cross-field relationships. Additional validation gaps include blank model names, empty target-module lists, finite numeric values, and usable source paths.
+
+See [configuration models](/Users/mac/Dev/MoroAI/moro/src/moro/config/models.py).
+
+**Several configuration fields are disconnected from behavior.**
+
+Examples include:
+
+- `training.output_dir`.
+- Evaluation defaults that the command does not consume.
+- Release formats and requirements.
+- Some declared CLI flags.
+
+There should be a testable mapping from every public configuration field to its consumer—or an explicit unsupported-field error.
+
+**Path semantics are inconsistent.**
+
+Dataset paths resolve relative to the project root, while local model paths can depend on the process working directory. Explicit configuration files introduce further ambiguity.
+
+Absolute paths in database records and generated deployment files also impair portability.
+
+The project needs one documented path-resolution contract.
+
+**Database integrity is incomplete.**
+
+SQLite with WAL and foreign keys enabled is a reasonable foundation. However:
+
+- Several important relationships lack foreign-key constraints.
+- Dataset version numbering uses count-plus-one without sufficient concurrency protection.
+- Source records can be updated while historical versions still reference them.
+- Project identity is based on mutable names.
+- Stored privacy metadata can become stale.
+- Run statuses are unconstrained strings.
+- Updating a nonexistent run is not reliably surfaced.
+- There is no schema migration mechanism.
+- Filesystem writes and database state can diverge after failures.
+
+See [storage implementation](/Users/mac/Dev/MoroAI/moro/src/moro/storage/db.py).
+
+**CLI behavior needs consistency.**
+
+Specific gaps:
+
+- The specified `moro runs list` command is absent.
+- `doctor --json` returns before the failure-exit logic, unlike human-readable output.
+- `diagnose --last` does not change selection behavior.
+- Diagnosis selects the latest run, not necessarily the latest failed run.
+- The no-runs diagnosis path raises a successful exit inside an exception handler that converts it into failure.
+- Some commands catch their own deliberate exits and label them unexpected errors.
+- JSON error output is not consistently machine-readable.
+- Status can hide database problems instead of explaining them.
+- Diagnostic suggestions can reference commands that do not exist.
+
+See [doctor](/Users/mac/Dev/MoroAI/moro/src/moro/cli/doctor.py:26) and [diagnose](/Users/mac/Dev/MoroAI/moro/src/moro/cli/diagnose.py:28).
+
+**8. Hardware planning**
+
+The new local planner makes uncertainty more visible, which is an improvement. Remaining gaps include:
+
+- Estimates are not calibrated against measured training runs.
+- Detection reports total GPU memory rather than currently available memory.
+- Apple unified memory is approximated as a fraction of system RAM.
+- Disk space is checked on `/`, not necessarily the filesystem holding data, cache, or outputs.
+- Architecture and adapter targets are inferred partly from names.
+- Model-family detection can match an organization or parent-directory name.
+- Selecting a different model in a generated patch can retain an incompatible revision from the existing configuration.
+- CPU, MPS, CUDA, and HIP need explicit compatibility decisions for each supported configuration.
+- `doctor` does not establish compatibility of the complete training stack.
+
+Sources: [hardware detection](/Users/mac/Dev/MoroAI/moro/src/moro/hardware/detector.py), [recipe engine](/Users/mac/Dev/MoroAI/moro/src/moro/recipes/engine.py), and [memory heuristics](/Users/mac/Dev/MoroAI/moro/src/moro/recipes/rules.py).
+
+A useful future distinction is:
+
+```text
+Detected → supported → estimated to fit → experimentally validated
+```
+
+Those are four different levels of evidence.
+
+**9. Privacy and governance**
+
+**The generated project template needs immediate attention.**
+
+It tells users to place datasets in `data/raw/`, but does not ignore that directory in Git. Ordinary `git add .` can therefore stage private training data.
+
+It also lacks broader environment-file and model-weight ignore patterns. See [generated project template](/Users/mac/Dev/MoroAI/moro/src/moro/templates/project.py:1).
+
+**PII scanning is advisory.**
+
+It is disabled by default. When enabled, flagged examples remain in the dataset.
+
+There is no configured policy to redact, quarantine, reject, or require review of flagged examples. A scan flag therefore does not establish that the resulting adapter is safe to distribute.
+
+**Local-only behavior needs stronger evidence.**
+
+The explicit local-loading behavior is useful. However, it is not an operating-system network boundary, and the CI environment applies additional offline variables.
+
+The project should document what local-only guarantees and test for attempted network access under its supported execution paths.
+
+**Governance records are largely absent.**
+
+The architecture discusses source, license, consent, retention, and release evidence. The implementation does not yet provide a complete lifecycle for these records.
+
+Needed capabilities include:
+
+- Dataset ownership and usage-permission metadata.
+- Retention and deletion policies.
+- Visibility into sensitive information in checkpoints and reports.
+- Release-time evidence checks.
+- A record of approval where the chosen release policy requires it.
+
+These are gaps against the broader architecture; they should be phased deliberately rather than all treated as immediate MVP requirements.
+
+**10. Test coverage and release engineering**
+
+The current test suite is valuable, but its passing result overstates end-to-end readiness if interpreted without context.
+
+The highest-value missing tests are behavioral:
+
+| Area | Necessary acceptance test |
+|---|---|
+| Dataset history | Rebuild without changing any previous version |
+| Source lineage | Build A after importing B and retain A’s identity |
+| Training | Reject stale or modified dataset artifacts |
+| Evaluation identity | Retrieve a report using exactly the printed ID |
+| Evaluation validation | Reject misspelled assertions and invalid suites |
+| Evaluation attribution | Prevent base-model results from masquerading as adapter results |
+| Release policy | Block failed, unevaluated, and regressed runs |
+| Export safety | Preserve source artifacts for overlapping paths |
+| Manifest integrity | Verify all packaged artifact checksums |
+| Deployment | Run the package independently of the original project |
+| Privacy defaults | Confirm raw data is ignored in generated projects |
+| Failure recovery | Explain and recover interrupted operations |
+
+Other release-engineering gaps:
+
+- No CUDA or MPS integration coverage.
+- No Windows/macOS CI coverage.
+- No recorded coverage measurement.
+- No clean-environment test of the installed wheel.
+- No complete dependency lock with transitive hashes.
+- No dependency-security scanning workflow.
+- No published support matrix tying platform, Python, device, and training features together.
+- No database migration and upgrade tests.
+- No GitHub releases returned by the release listing I checked.
+
+The current [CI workflow](/Users/mac/Dev/MoroAI/moro/.github/workflows/ci.yml) does build packages, but its CLI smoke check runs in the editable-install environment.
+
+**11. The instruction documents also need reconciliation**
+
+The documents are useful design references, but some starter code is incompatible with the current repository.
+
+In the [training starter document](/Users/mac/Dev/MoroAI/moro/instructions/MoroAI-Training-Engine-Starter-Code.txt), I found:
+
+- A pre-generated run ID followed by a storage function that generates another ID.
+- A dataset-version lookup expecting a field the current report does not contain.
+- New database columns without a migration for existing databases.
+- Invalid Python argument ordering in some Typer examples.
+- Automatic recipe application that needs reconciliation with explicit configuration and model-selection behavior.
+
+The [recipe starter document](/Users/mac/Dev/MoroAI/moro/instructions/MoroAI-Recipe-Engine-Starter-Code.txt) also contains assumptions that are less conservative than the current local planner.
+
+These documents should be converted into a requirements matrix, not copied wholesale into source.
+
+The matrix should identify:
+
+```text
+Requirement → current behavior → evidence → gap → acceptance test → milestone
+```
+
+That would also resolve contradictions between the original architecture, the narrower MVP, later starter documents, and current implementation.
+
+**12. Important problems that may not be obvious yet**
+
+These are risks implied by the design, not observed incidents.
+
+**Fine-tuning can appear successful while making the model worse.** Training loss can fall while instruction-following, factuality, or general capabilities regress. Baseline comparisons and category-level holdouts are necessary.
+
+**Evaluation leakage can resemble product improvement.** Related or repeated examples across training and evaluation can inflate scores without improving generalization.
+
+**Truncation can remove the answer being learned.** A long prompt may consume the context budget, leaving little or none of the assistant target. Tokenizer-aware reporting should measure this directly.
+
+**An adapter is not a self-contained model identity.** It depends on compatible base weights, revision, tokenizer, template, and sometimes runtime assumptions. Those dependencies belong in the release contract.
+
+**Training fit does not imply inference fit.** Quantization, loading strategy, context length, and cache memory differ across stages.
+
+**A seed is not a full reproducibility guarantee.** Hardware, kernels, library versions, and data ordering can change results. MoroAI should distinguish reproducible inputs from bitwise-identical execution.
+
+**Data deletion must consider derived artifacts.** Removing the original dataset does not remove examples from normalized copies, checkpoints, evaluation outputs, or potentially learned behavior.
+
+**Single-user tools still face concurrency.** Two terminals can build data, train, or export simultaneously. Shared paths and count-based versioning need protection even without a multiuser server.
+
+**A generated model card can accidentally overstate evidence.** The card should derive claims from recorded results and explicitly mark missing evidence.
+
+**13. What should remain out of the immediate MVP**
+
+The MVP specification explicitly defers several larger features. Their absence should not be counted as current implementation failure:
+
+- Web dashboard.
+- Multiuser platform.
+- Cloud synchronization.
+- Distributed training.
+- Custom training engine.
+- Layer streaming.
+- DPO/ORPO.
+- Plugin marketplace.
+- Advanced synthetic-data generation.
+
+GGUF conversion is also not the first completion blocker. The adapter and Ollama workflows need to become reliable before broadening deployment formats.
+
+See [MVP scope](/Users/mac/Dev/MoroAI/moro/instructions/MoroAI-MVP-Engineering-Spec.txt:45).
+
+**14. Recommended completion milestones**
+
+| Milestone | Scope | Completion evidence |
+|---|---|---|
+| **1. Stop destructive and misleading behavior** | Export overlap protection; reject invalid run exports; strict evaluation/config schemas; fix IDs and attribution; raw-data ignore; honest unsupported exits | Regression tests reproduce each defect before its fix and pass afterward |
+| **2. Establish immutable lineage** | Versioned datasets; correct source mapping; split hashes; atomic builds; run-to-version binding; migrations | Rebuilding cannot alter historical runs or their inputs |
+| **3. Unify training planning and evidence** | Shared resolved plan; capability preflight; output-directory support; model revision capture; finite metrics; durable reports | Dry-run and execution use the same plan, and every run is auditable |
+| **4. Make evaluation support decisions** | Baseline comparison; strict suites; unscored-case handling; inference planning; category/regression results | A result can be retrieved, reproduced, and attributed correctly |
+| **5. Make releases verifiable and portable** | Enforced requirements; checksummed manifests; evidence-backed cards; artifact registration; working Ollama package | A copied release runs independently and proves which evidence permitted export |
+| **6. Validate the real MVP** | Useful small open-model fine-tuning; representative data; supported hardware test; clean installation; full workflow | Documented import → build → train → compare → export → deploy demonstration |
+
+The appropriate release-readiness standard is concrete: **an immutable dataset produces a traceable run; that run receives a trustworthy comparison; enforced requirements permit a checksummed package; and that package works outside the original workspace.**
+
+MoroAI already has enough structure to reach that standard. The next work should close these integrity and validation gaps before expanding the feature surface.

@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class ProjectConfig(BaseModel):
@@ -82,6 +82,9 @@ class EvalConfig(BaseModel):
 
 
 class ReleaseRequirements(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    min_pass_rate: float | None = Field(default=None, ge=0, le=1)
     eval_suite: str | None = None
     min_improvement: float | None = None
     max_regression: float | None = None
@@ -89,6 +92,8 @@ class ReleaseRequirements(BaseModel):
 
 
 class ReleaseConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     export: list[Literal["adapter", "merged", "gguf", "ollama"]] = Field(
         default_factory=lambda: ["adapter", "ollama"]
     )

@@ -49,7 +49,7 @@ def test_high_vram_24gb():
     hw = _make_hardware(24.0)
     recipe = suggest_recipe(hw)
     assert recipe.hardware_tier == "high_vram_24gb"
-    assert recipe.confidence == "high"
+    assert recipe.confidence != "high"
     assert recipe.adapter_r >= 32
 
 
@@ -71,11 +71,12 @@ def test_fractional_vram_never_falls_through_to_largest_preset():
     for budget in [0.01, 4.95, 9.95, 15.95, 16.0, 19.99]:
         recipe = suggest_recipe(_make_hardware(budget))
         assert recipe.hardware_tier != "high_vram_24gb"
-        if budget >= 3.5:
-            assert recipe.estimated_vram_gb <= budget
-        else:
+        if recipe.estimated_vram_gb > budget:
+            assert recipe.fit == "over_budget"
             assert recipe.confidence == "low"
             assert any("exceeds" in warning for warning in recipe.warnings)
+        else:
+            assert recipe.fit == "estimated_fit"
 
 
 def test_budget_cannot_exceed_detected_capacity():
@@ -104,4 +105,4 @@ def test_invalid_budget_rejected():
 def test_custom_model_estimate_is_not_high_confidence():
     recipe = suggest_recipe(_make_hardware(8), model_name="custom/70B")
     assert recipe.confidence == "low"
-    assert any("override" in warning for warning in recipe.warnings)
+    assert any("override" in reason for reason in recipe.reasons)

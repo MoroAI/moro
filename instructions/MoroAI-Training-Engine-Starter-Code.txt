@@ -1,0 +1,1422 @@
+MoroAI Training Engine Starter Code**.
+
+This gives you:
+
+- a clean **training backend abstraction**
+- a proper **run lifecycle**
+- a working **QLoRA backend**
+- exact `moro train` implementation
+- run persistence
+- dry-run support
+- failure tracking
+- a basic `moro runs list` command
+
+This is the stage where MoroAI starts becoming real.
+
+---
+
+# 1. What we are building now
+
+After this step, MoroAI can do:
+
+```bash
+moro train
+moro train --dry-run
+moro runs list
+```
+
+And internally it will:
+
+1. load project config
+2. detect hardware
+3. suggest a safe recipe
+4. resolve the final training config
+5. create a run
+6. execute QLoRA training
+7. save adapter output
+8. record run status and metrics
+9. fail gracefully if something breaks
+
+---
+
+# 2. New files to add
+
+Add these files:
+
+```text
+src/moro/
+  storage/
+    runs.py
+  training/
+    __init__.py
+    models.py
+    backend.py
+    run.py
+    hf_backend.py
+  cli/
+    train.py
+```
+
+You will also update:
+
+```text
+src/moro/main.py
+```
+
+---
+
+# 3. Run persistence layer
+
+We need a simple table for runs.
+
+## `src/moro/storage/runs.py`
+
+```python
+import sqlite3
+
+from moro.storage.db import new_id, utcnow
+
+
+def ensure_runs_schema(conn: sqlite3.Connection) -> None:
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS runs (
+            id TEXT PRIMARY KEY,
+            project_id TEXT NOT NULL,
+            dataset_version_id TEXT,
+            run_name TEXT,
+            status TEXT NOT NULL,
+            config_hash TEXT NOT NULL,
+            model_name TEXT NOT NULL,
+            quantization TEXT NOT NULL,
+            output_dir TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            started_at TEXT,
+            finished_at TEXT,
+            peak_vram_gb REAL,
+            tokens_per_sec REAL,
+            train_loss REAL,
+            validation_loss REAL,
+            error TEXT
+        );
+        """
+    )
+    conn.commit()
+
+
+def create_run(
+    conn: sqlite3.Connection,
+    *,
+    project_id: str,
+    dataset_version_id: str | None,
+    run_name: str | None,
+    config_hash: str,
+    model_name: str,
+    quantization: str,
+    output_dir: str,
+) -> str:
+    run_id = new_id("run")
+
+    conn.execute(
+        """
+        INSERT INTO runs (
+            id,
+            project_id,
+            dataset_version_id,
+            run_name,
+            status,
+            config_hash,
+            model_name,
+            quantization,
+            output_dir,
+            created_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            run_id,
+            project_id,
+            dataset_version_id,
+            run_name,
+            "pending",
+            config_hash,
+            model_name,
+            quantization,
+            output_dir,
+            utcnow(),
+        ),
+    )
+    conn.commit()
+    return run_id
+
+
+def mark_run_running(conn: sqlite3.Connection, run_id: str) -> None:
+    conn.execute(
+        """
+        UPDATE runs
+        SET status = ?, started_at = ?
+        WHERE id = ?
+        """,
+        ("running", utcnow(), run_id),
+    )
+    conn.commit()
+
+
+def mark_run_completed(
+    conn: sqlite3.Connection,
+    run_id: str,
+    *,
+    peak_vram_gb: float | None = None,
+    tokens_per_sec: float | None = None,
+    train_loss: float | None = None,
+    validation_loss: float | None = None,
+) -> None:
+    conn.execute(
+        """
+        UPDATE runs
+        SET
+            status = ?,
+            finished_at = ?,
+            peak_vram_gb = ?,
+            tokens_per_sec = ?,
+            train_loss = ?,
+            validation_loss = ?,
+            error = NULL
+        WHERE id = ?
+        """,
+        (
+            "completed",
+            utcnow(),
+            peak_vram_gb,
+            tokens_per_sec,
+            train_loss,
+            validation_loss,
+            run_id,
+        ),
+    )
+    conn.commit()
+
+
+def mark_run_failed(
+    conn: sqlite3.Connection,
+    run_id: str,
+    error: str,
+) -> None:
+    conn.execute(
+        """
+        UPDATE runs
+        SET
+            status = ?,
+            finished_at = ?,
+            error = ?
+        WHERE id = ?
+        """,
+        ("failed", utcnow(), error, run_id),
+    )
+    conn.commit()
+
+
+def get_run(conn: sqlite3.Connection, run_id: str) -> sqlite3.Row | None:
+    return conn.execute(
+        """
+        SELECT *
+        FROM runs
+        WHERE id = ?
+        """,
+        (run_id,),
+    ).fetchone()
+
+
+def list_runs(
+    conn: sqlite3.Connection,
+    limit: int = 20,
+) -> list[sqlite3.Row]:
+    return conn.execute(
+        """
+        SELECT *
+        FROM runs
+        ORDER BY created_at DESC
+        LIMIT ?
+        """,
+        (limit,),
+    ).fetchall()
+```
+
+---
+
+# 4. Training models
+
+## `src/moro/training/__init__.py`
+
+```python
+```
+
+## `src/moro/training/models.py`
+
+```python
+from __future__ import annotations
+
+from enum import Enum
+from pathlib import Path
+from typing import Any, Literal
+
+from pydantic import BaseModel, ConfigDict, Field
+
+from moro.config.models import MoroConfig
+from moro.recipes.models import HardwareProfile
+
+
+class RunStatus(str, Enum):
+    pending = "pending"
+    running = "running"
+    completed = "completed"
+    failed = "failed"
+    cancelled = "cancelled"
+
+
+class RunContext(BaseModel):
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    run_id: str
+    project_root: Path
+    config: MoroConfig
+    hardware: HardwareProfile
+    train_path: Path
+    validation_path: Path | None = None
+    output_dir: Path
+    adapter_dir: Path
+    run_name: str | None = None
+    dry_run: bool = False
+
+
+class TrainResult(BaseModel):
+    status: Literal["completed", "failed", "cancelled"]
+    train_loss: float | None = None
+    validation_loss: float | None = None
+    peak_vram_gb: float | None = None
+    tokens_per_sec: float | None = None
+    adapter_path: Path | None = None
+    metrics: dict[str, Any] = Field(default_factory=dict)
+    error: str | None = None
+```
+
+---
+
+# 5. Run lifecycle helpers
+
+## `src/moro/training/run.py`
+
+```python
+import json
+from pathlib import Path
+
+from moro.config.models import MoroConfig
+from moro.core.hashing import sha256_text
+from moro.recipes.models import RecipeSuggestion
+
+
+def config_hash(config: MoroConfig) -> str:
+    payload = config.model_dump(mode="json")
+    canonical = json.dumps(payload, sort_keys=True, ensure_ascii=False)
+    return sha256_text(canonical)
+
+
+def latest_dataset_version_id(project_root: Path) -> str | None:
+    report_path = Path(project_root) / ".moro" / "reports" / "dataset_report.json"
+
+    if not report_path.exists():
+        return None
+
+    try:
+        payload = json.loads(report_path.read_text(encoding="utf-8"))
+        return payload.get("dataset_version_id")
+    except Exception:
+        return None
+
+
+def apply_recipe_to_config(
+    config: MoroConfig,
+    suggestion: RecipeSuggestion,
+) -> tuple[MoroConfig, list[str]]:
+    """
+    Resolve the final training config using the recipe suggestion.
+
+    This is intentionally opinionated:
+    the recipe engine helps protect the user from unsafe memory settings.
+    """
+    resolved = config.model_copy(deep=True)
+    warnings: list[str] = []
+
+    def maybe_update(
+        field_label: str,
+        old_value,
+        new_value,
+        setter,
+    ) -> None:
+        if old_value != new_value:
+            setter()
+            warnings.append(
+                f"{field_label} changed from {old_value!r} to {new_value!r} "
+                "based on recipe suggestion."
+            )
+
+    maybe_update(
+        "model.name",
+        resolved.model.name,
+        suggestion.model,
+        lambda: setattr(resolved.model, "name", suggestion.model),
+    )
+
+    maybe_update(
+        "model.quantization",
+        resolved.model.quantization,
+        suggestion.quantization,
+        lambda: setattr(resolved.model, "quantization", suggestion.quantization),
+    )
+
+    maybe_update(
+        "dataset.max_seq_length",
+        resolved.dataset.max_seq_length,
+        suggestion.max_seq_length,
+        lambda: setattr(resolved.dataset, "max_seq_length", suggestion.max_seq_length),
+    )
+
+    maybe_update(
+        "adapter.r",
+        resolved.adapter.r,
+        suggestion.adapter_r,
+        lambda: setattr(resolved.adapter, "r", suggestion.adapter_r),
+    )
+
+    maybe_update(
+        "adapter.alpha",
+        resolved.adapter.alpha,
+        suggestion.adapter_alpha,
+        lambda: setattr(resolved.adapter, "alpha", suggestion.adapter_alpha),
+    )
+
+    maybe_update(
+        "adapter.target_modules",
+        resolved.adapter.target_modules,
+        suggestion.target_modules,
+        lambda: setattr(resolved.adapter, "target_modules", suggestion.target_modules),
+    )
+
+    maybe_update(
+        "training.batch_size",
+        resolved.training.batch_size,
+        suggestion.batch_size,
+        lambda: setattr(resolved.training, "batch_size", suggestion.batch_size),
+    )
+
+    maybe_update(
+        "training.gradient_accumulation_steps",
+        resolved.training.gradient_accumulation_steps,
+        suggestion.gradient_accumulation_steps,
+        lambda: setattr(
+            resolved.training,
+            "gradient_accumulation_steps",
+            suggestion.gradient_accumulation_steps,
+        ),
+    )
+
+    maybe_update(
+        "training.optimizer",
+        resolved.training.optimizer,
+        suggestion.optimizer,
+        lambda: setattr(resolved.training, "optimizer", suggestion.optimizer),
+    )
+
+    maybe_update(
+        "training.precision",
+        resolved.training.precision,
+        suggestion.precision,
+        lambda: setattr(resolved.training, "precision", suggestion.precision),
+    )
+
+    if resolved.training.gradient_checkpointing is not True:
+        resolved.training.gradient_checkpointing = True
+        warnings.append("gradient_checkpointing forced to true for memory safety.")
+
+    return resolved, warnings
+
+
+def save_run_snapshot(
+    project_root: Path,
+    run_id: str,
+    config: MoroConfig,
+) -> tuple[Path, Path]:
+    output_dir = Path(project_root) / "runs" / run_id
+    adapter_dir = output_dir / "adapter"
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+    adapter_dir.mkdir(parents=True, exist_ok=True)
+
+    snapshot_path = output_dir / "config_snapshot.json"
+    snapshot_path.write_text(
+        json.dumps(config.model_dump(mode="json"), indent=2, ensure_ascii=False),
+        encoding="utf-8",
+    )
+
+    return output_dir, adapter_dir
+```
+
+---
+
+# 6. Training backend abstraction
+
+## `src/moro/training/backend.py`
+
+```python
+from abc import ABC, abstractmethod
+
+from moro.core.errors import TrainingError
+from moro.training.models import RunContext, TrainResult
+
+
+class TrainingBackend(ABC):
+    name: str = "base"
+
+    @abstractmethod
+    def validate(self, ctx: RunContext) -> None:
+        """
+        Validate whether this backend can run the current context.
+        """
+
+    @abstractmethod
+    def train(self, ctx: RunContext) -> TrainResult:
+        """
+        Execute training.
+        """
+
+
+def get_backend(name: str = "hf-qlora") -> TrainingBackend:
+    backend_name = name.strip().lower()
+
+    if backend_name in {"hf", "huggingface", "hf-qlora", "qlora"}:
+        from moro.training.hf_backend import HuggingFaceQLoRABackend
+
+        return HuggingFaceQLoRABackend()
+
+    raise TrainingError(f"Unknown training backend: {name}")
+```
+
+---
+
+# 7. QLoRA backend
+
+This is the real training backend.
+
+It is starter-grade, but structured correctly.
+
+## `src/moro/training/hf_backend.py`
+
+```python
+import importlib.util
+from pathlib import Path
+
+from moro.core.errors import DatasetError, DependencyError, TrainingError
+from moro.training.backend import TrainingBackend
+from moro.training.models import RunContext, TrainResult
+
+REQUIRED_PACKAGES = [
+    "torch",
+    "transformers",
+    "datasets",
+    "peft",
+    "accelerate",
+    "bitsandbytes",
+]
+
+
+def _missing_dependencies() -> list[str]:
+    missing = []
+
+    for package in REQUIRED_PACKAGES:
+        if importlib.util.find_spec(package) is None:
+            missing.append(package)
+
+    return missing
+
+
+def _require_dependencies() -> None:
+    missing = _missing_dependencies()
+
+    if missing:
+        raise DependencyError(
+            "Missing training dependencies: "
+            + ", ".join(missing)
+            + "\nInstall them with: pip install 'moroai[train]'"
+        )
+
+
+class HuggingFaceQLoRABackend(TrainingBackend):
+    name = "hf-qlora"
+
+    def validate(self, ctx: RunContext) -> None:
+        missing = _missing_dependencies()
+        if missing:
+            raise DependencyError(
+                "Missing training dependencies: "
+                + ", ".join(missing)
+                + "\nInstall them with: pip install 'moroai[train]'"
+            )
+
+        if not ctx.train_path.exists():
+            raise DatasetError(
+                f"Training split not found: {ctx.train_path}. "
+                "Run `moro data build` first."
+            )
+
+        if ctx.train_path.stat().st_size == 0:
+            raise DatasetError(
+                f"Training split is empty: {ctx.train_path}"
+            )
+
+        if not ctx.config.model.name:
+            raise TrainingError("model.name is required in moro.yaml")
+
+        if ctx.config.model.quantization in {"nf4", "int8"} and not ctx.hardware.cuda_available:
+            # Not fatal for validation, but likely problematic in practice.
+            pass
+
+    def train(self, ctx: RunContext) -> TrainResult:
+        if ctx.dry_run:
+            return TrainResult(
+                status="completed",
+                metrics={"dry_run": True},
+            )
+
+        _require_dependencies()
+
+        import torch
+        from datasets import load_dataset
+        from peft import LoraConfig, TaskType, get_peft_model, prepare_model_for_kbit_training
+        from transformers import (
+            AutoModelForCausalLM,
+            AutoTokenizer,
+            BitsAndBytesConfig,
+            DataCollatorForLanguageModeling,
+            Trainer,
+            TrainingArguments,
+        )
+
+        try:
+            # -------------------------------------------------------
+            # Paths and config shortcuts
+            # -------------------------------------------------------
+            config = ctx.config
+            hardware = ctx.hardware
+
+            model_name = config.model.name
+            quantization = config.model.quantization
+            max_seq_length = config.dataset.max_seq_length
+
+            # -------------------------------------------------------
+            # Tokenizer
+            # -------------------------------------------------------
+            tokenizer = AutoTokenizer.from_pretrained(
+                model_name,
+                trust_remote_code=config.model.trust_remote_code,
+            )
+
+            if tokenizer.pad_token is None:
+                tokenizer.pad_token = tokenizer.eos_token
+
+            tokenizer.padding_side = "right"
+
+            # -------------------------------------------------------
+            # Dataset loading
+            # -------------------------------------------------------
+            data_files = {
+                "train": str(ctx.train_path),
+            }
+
+            if ctx.validation_path and ctx.validation_path.exists():
+                data_files["validation"] = str(ctx.validation_path)
+
+            raw_datasets = load_dataset("json", data_files=data_files)
+
+            column_names = raw_datasets["train"].column_names
+
+            def _messages_to_text(messages: list[dict]) -> str:
+                try:
+                    return tokenizer.apply_chat_template(
+                        messages,
+                        tokenize=False,
+                        add_generation_prompt=False,
+                    )
+                except Exception:
+                    parts = []
+                    for message in messages:
+                        role = str(message.get("role", "user")).strip()
+                        content = str(message.get("content", "")).strip()
+                        parts.append(f"<|{role}|>\n{content}")
+                    return "\n".join(parts)
+
+            def tokenize_function(examples):
+                texts = []
+
+                for messages in examples["messages"]:
+                    texts.append(_messages_to_text(messages))
+
+                tokenized = tokenizer(
+                    texts,
+                    truncation=True,
+                    max_length=max_seq_length,
+                    padding=False,
+                )
+
+                tokenized["labels"] = [
+                    input_ids.copy() for input_ids in tokenized["input_ids"]
+                ]
+
+                return tokenized
+
+            tokenized_datasets = raw_datasets.map(
+                tokenize_function,
+                batched=True,
+                remove_columns=column_names,
+                desc="Tokenizing dataset",
+            )
+
+            train_dataset = tokenized_datasets["train"]
+            eval_dataset = tokenized_datasets.get("validation")
+
+            data_collator = DataCollatorForLanguageModeling(
+                tokenizer=tokenizer,
+                mlm=False,
+            )
+
+            # -------------------------------------------------------
+            # Torch dtype and quantization config
+            # -------------------------------------------------------
+            if config.training.precision == "bf16":
+                torch_dtype = torch.bfloat16
+                compute_dtype = torch.bfloat16
+            elif config.training.precision == "fp16":
+                torch_dtype = torch.float16
+                compute_dtype = torch.float16
+            elif config.training.precision == "fp32":
+                torch_dtype = torch.float32
+                compute_dtype = torch.float32
+            else:
+                if hardware.cuda_available:
+                    torch_dtype = torch.float16
+                    compute_dtype = torch.float16
+                else:
+                    torch_dtype = torch.float32
+                    compute_dtype = torch.float32
+
+            model_kwargs = {
+                "trust_remote_code": config.model.trust_remote_code,
+                "torch_dtype": torch_dtype,
+            }
+
+            if quantization == "nf4":
+                bnb_config = BitsAndBytesConfig(
+                    load_in_4bit=True,
+                    bnb_4bit_quant_type="nf4",
+                    bnb_4bit_use_double_quant=True,
+                    bnb_4bit_compute_dtype=compute_dtype,
+                )
+                model_kwargs["quantization_config"] = bnb_config
+                model_kwargs["device_map"] = "auto"
+            elif quantization == "int8":
+                bnb_config = BitsAndBytesConfig(
+                    load_in_8bit=True,
+                )
+                model_kwargs["quantization_config"] = bnb_config
+                model_kwargs["device_map"] = "auto"
+            else:
+                model_kwargs["device_map"] = "auto" if hardware.gpu_available else {"": "cpu"}
+
+            # -------------------------------------------------------
+            # Model loading
+            # -------------------------------------------------------
+            model = AutoModelForCausalLM.from_pretrained(
+                model_name,
+                **model_kwargs,
+            )
+
+            if quantization in {"nf4", "int8"}:
+                model = prepare_model_for_kbit_training(model)
+
+            if config.training.gradient_checkpointing:
+                model.gradient_checkpointing_enable()
+                model.config.use_cache = False
+
+            # -------------------------------------------------------
+            # LoRA configuration
+            # -------------------------------------------------------
+            target_modules = config.adapter.target_modules
+
+            if target_modules == "auto" or not target_modules:
+                target_modules = [
+                    "q_proj",
+                    "k_proj",
+                    "v_proj",
+                    "o_proj",
+                ]
+
+            lora_config = LoraConfig(
+                task_type=TaskType.CAUSAL_LM,
+                r=config.adapter.r,
+                lora_alpha=config.adapter.alpha,
+                lora_dropout=config.adapter.dropout,
+                bias=config.adapter.bias,
+                target_modules=list(target_modules),
+            )
+
+            model = get_peft_model(model, lora_config)
+
+            if config.training.gradient_checkpointing:
+                try:
+                    model.enable_input_require_grads()
+                except Exception:
+                    pass
+
+            model.print_trainable_parameters()
+
+            # -------------------------------------------------------
+            # Training arguments
+            # -------------------------------------------------------
+            args_dict = {
+                "output_dir": str(ctx.output_dir),
+                "overwrite_output_dir": True,
+                "num_train_epochs": float(config.training.epochs),
+                "max_steps": int(config.training.max_steps or -1),
+                "per_device_train_batch_size": int(config.training.batch_size),
+                "per_device_eval_batch_size": int(config.training.batch_size),
+                "gradient_accumulation_steps": int(config.training.gradient_accumulation_steps),
+                "learning_rate": float(config.training.learning_rate),
+                "optim": config.training.optimizer,
+                "fp16": config.training.precision == "fp16",
+                "bf16": config.training.precision == "bf16",
+                "gradient_checkpointing": bool(config.training.gradient_checkpointing),
+                "logging_steps": int(config.training.logging_steps),
+                "save_steps": int(config.training.save_steps),
+                "save_total_limit": 1,
+                "seed": int(config.project.seed),
+                "remove_unused_columns": False,
+                "report_to": [],
+            }
+
+            if eval_dataset is not None:
+                args_dict["evaluation_strategy"] = "steps"
+                args_dict["eval_steps"] = int(config.training.save_steps)
+
+            training_args = TrainingArguments(**args_dict)
+
+            # -------------------------------------------------------
+            # Trainer
+            # -------------------------------------------------------
+            trainer = Trainer(
+                model=model,
+                args=training_args,
+                train_dataset=train_dataset,
+                eval_dataset=eval_dataset,
+                tokenizer=tokenizer,
+                data_collator=data_collator,
+            )
+
+            if torch.cuda.is_available():
+                torch.cuda.reset_peak_memory_stats()
+
+            train_result = trainer.train()
+
+            # -------------------------------------------------------
+            # Save adapter output
+            # -------------------------------------------------------
+            ctx.adapter_dir.mkdir(parents=True, exist_ok=True)
+
+            try:
+                trainer.save_model(ctx.adapter_dir)
+            except Exception:
+                model.save_pretrained(ctx.adapter_dir)
+
+            # -------------------------------------------------------
+            # Metrics
+            # -------------------------------------------------------
+            train_metrics = train_result.metrics or {}
+
+            eval_metrics = {}
+            if eval_dataset is not None:
+                try:
+                    eval_metrics = trainer.evaluate()
+                except Exception:
+                    eval_metrics = {}
+
+            train_loss = train_metrics.get("train_loss")
+            validation_loss = eval_metrics.get("eval_loss")
+
+            peak_vram_gb = None
+            if torch.cuda.is_available():
+                peak_vram_gb = round(
+                    torch.cuda.max_memory_reserved() / (1024**3),
+                    2,
+                )
+
+            tokens_per_sec = train_metrics.get("train_tokens_per_second")
+            if tokens_per_sec is None:
+                tokens_per_sec = train_metrics.get("train_samples_per_second")
+
+            return TrainResult(
+                status="completed",
+                train_loss=train_loss,
+                validation_loss=validation_loss,
+                peak_vram_gb=peak_vram_gb,
+                tokens_per_sec=tokens_per_sec,
+                adapter_path=ctx.adapter_dir,
+                metrics={
+                    "train": train_metrics,
+                    "eval": eval_metrics,
+                },
+            )
+
+        except DependencyError:
+            raise
+        except DatasetError:
+            raise
+        except Exception as exc:
+            raise TrainingError(f"Training failed: {exc}") from exc
+```
+
+---
+
+# 8. Exact `moro train` CLI implementation
+
+## `src/moro/cli/train.py`
+
+```python
+import json
+from pathlib import Path
+
+import typer
+from rich.console import Console
+from rich.table import Table
+
+from moro.config.loader import load_config
+from moro.core.errors import (
+    ConfigError,
+    DatasetError,
+    DependencyError,
+    ProjectError,
+    TrainingError,
+)
+from moro.core.hashing import sha256_text
+from moro.core.project import require_project_root
+from moro.hardware.profile import detect_hardware_profile
+from moro.recipes.engine import suggest_recipe
+from moro.storage.db import get_connection, get_or_create_project, new_id
+from moro.storage.runs import (
+    create_run,
+    ensure_runs_schema,
+    list_runs,
+    mark_run_completed,
+    mark_run_failed,
+    mark_run_running,
+)
+from moro.training.backend import get_backend
+from moro.training.models import RunContext
+from moro.training.run import (
+    apply_recipe_to_config,
+    config_hash,
+    latest_dataset_version_id,
+    save_run_snapshot,
+)
+
+console = Console()
+
+runs_app = typer.Typer(
+    name="runs",
+    help="Run history commands",
+    no_args_is_help=True,
+)
+
+
+def train_command(
+    config: Path = typer.Option(
+        default=Path("moro.yaml"),
+        "--config",
+        help="Path to moro config file.",
+    ),
+    run_name: str | None = typer.Option(
+        default=None,
+        "--run-name",
+        help="Optional run name.",
+    ),
+    dry_run: bool = typer.Option(
+        default=False,
+        "--dry-run",
+        help="Validate and show the training plan without running training.",
+    ),
+    resume: str | None = typer.Option(
+        default=None,
+        "--resume",
+        help="Resume a previous run by run id.",
+    ),
+) -> None:
+    """
+    Train a model using the current MoroAI config.
+    """
+    if resume:
+        console.print(
+            "[bold yellow]Resume is not supported yet in this starter training engine.[/bold yellow]"
+        )
+        raise typer.Exit(code=2)
+
+    run_id: str | None = None
+    conn = None
+
+    try:
+        root = require_project_root()
+
+        config_path = config.expanduser()
+        if not config_path.is_absolute():
+            config_path = root / config_path
+
+        cfg = load_config(config_path)
+
+        hardware = detect_hardware_profile()
+        suggestion = suggest_recipe(cfg, hardware=hardware)
+
+        resolved_cfg, recipe_warnings = apply_recipe_to_config(cfg, suggestion)
+
+        train_path = root / "data" / "splits" / "train.jsonl"
+        validation_path = root / "data" / "splits" / "validation.jsonl"
+
+        if not train_path.exists():
+            raise DatasetError(
+                "No training split found. Run `moro data build` first."
+            )
+
+        backend = get_backend("hf-qlora")
+
+        if not dry_run:
+            run_id = new_id("run")
+            output_dir, adapter_dir = save_run_snapshot(
+                project_root=root,
+                run_id=run_id,
+                config=resolved_cfg,
+            )
+        else:
+            run_id = "dry-run"
+            output_dir = root / "runs" / "<run_id>"
+            adapter_dir = root / "runs" / "<run_id>" / "adapter"
+
+        ctx = RunContext(
+            run_id=run_id,
+            project_root=root,
+            config=resolved_cfg,
+            hardware=hardware,
+            train_path=train_path,
+            validation_path=validation_path if validation_path.exists() else None,
+            output_dir=output_dir,
+            adapter_dir=adapter_dir,
+            run_name=run_name,
+            dry_run=dry_run,
+        )
+
+        backend.validate(ctx)
+
+        if dry_run:
+            table = Table(title="MoroAI Training Dry Run")
+            table.add_column("Field", style="cyan")
+            table.add_column("Value", style="white")
+
+            table.add_row("Run id", run_id)
+            table.add_row("Model", resolved_cfg.model.name)
+            table.add_row("Quantization", resolved_cfg.model.quantization)
+            table.add_row("Max seq length", str(resolved_cfg.dataset.max_seq_length))
+            table.add_row("LoRA r", str(resolved_cfg.adapter.r))
+            table.add_row("LoRA alpha", str(resolved_cfg.adapter.alpha))
+            table.add_row("Target modules", ", ".join(resolved_cfg.adapter.target_modules))
+            table.add_row("Batch size", str(resolved_cfg.training.batch_size))
+            table.add_row(
+                "Gradient accumulation",
+                str(resolved_cfg.training.gradient_accumulation_steps),
+            )
+            table.add_row("Optimizer", resolved_cfg.training.optimizer)
+            table.add_row("Precision", resolved_cfg.training.precision)
+            table.add_row(
+                "Gradient checkpointing",
+                "Yes" if resolved_cfg.training.gradient_checkpointing else "No",
+            )
+            table.add_row("Train path", str(train_path))
+            table.add_row(
+                "Validation path",
+                str(validation_path) if validation_path.exists() else "-",
+            )
+
+            console.print(table)
+
+            if suggestion.warnings or recipe_warnings:
+                console.print("\n[bold yellow]Warnings:[/bold yellow]")
+                for warning in suggestion.warnings + recipe_warnings:
+                    console.print(f"- {warning}")
+
+            console.print("\n[bold green]Dry run complete. No training was executed.[/bold green]")
+            return
+
+        # -----------------------------------------------------------
+        # Persist run record
+        # -----------------------------------------------------------
+        conn = get_connection(root)
+        ensure_runs_schema(conn)
+
+        project_id = get_or_create_project(
+            conn,
+            cfg.project.name,
+            cfg.project.privacy_mode,
+        )
+
+        dataset_version_id = latest_dataset_version_id(root)
+
+        cfg_hash = config_hash(resolved_cfg)
+
+        create_run(
+            conn,
+            project_id=project_id,
+            dataset_version_id=dataset_version_id,
+            run_name=run_name,
+            config_hash=cfg_hash,
+            model_name=resolved_cfg.model.name,
+            quantization=resolved_cfg.model.quantization,
+            output_dir=str(output_dir),
+        )
+
+        mark_run_running(conn, run_id)
+
+        console.print(f"[bold green]Starting training run:[/bold green] {run_id}")
+        console.print(f"Output directory: {output_dir}")
+
+        # -----------------------------------------------------------
+        # Execute training
+        # -----------------------------------------------------------
+        result = backend.train(ctx)
+
+        mark_run_completed(
+            conn,
+            run_id,
+            peak_vram_gb=result.peak_vram_gb,
+            tokens_per_sec=result.tokens_per_sec,
+            train_loss=result.train_loss,
+            validation_loss=result.validation_loss,
+        )
+
+        console.print("\n[bold green]Training completed.[/bold green]")
+        console.print(f"Run id: {run_id}")
+        console.print(f"Adapter output: {result.adapter_path}")
+        console.print(f"Train loss: {result.train_loss}")
+        console.print(f"Validation loss: {result.validation_loss}")
+        console.print(f"Peak VRAM (GB): {result.peak_vram_gb}")
+        console.print(f"Tokens/sec: {result.tokens_per_sec}")
+
+    except ProjectError as exc:
+        console.print(f"[bold red]Project error:[/bold red] {exc}")
+        raise typer.Exit(code=2)
+    except ConfigError as exc:
+        if conn and run_id:
+            mark_run_failed(conn, run_id, str(exc))
+        console.print(f"[bold red]Config error:[/bold red] {exc}")
+        raise typer.Exit(code=2)
+    except DatasetError as exc:
+        if conn and run_id:
+            mark_run_failed(conn, run_id, str(exc))
+        console.print(f"[bold red]Dataset error:[/bold red] {exc}")
+        raise typer.Exit(code=5)
+    except DependencyError as exc:
+        if conn and run_id:
+            mark_run_failed(conn, run_id, str(exc))
+        console.print(f"[bold red]Dependency error:[/bold red] {exc}")
+        raise typer.Exit(code=3)
+    except TrainingError as exc:
+        if conn and run_id:
+            mark_run_failed(conn, run_id, str(exc))
+        console.print(f"[bold red]Training error:[/bold red] {exc}")
+        raise typer.Exit(code=4)
+    except Exception as exc:
+        if conn and run_id:
+            mark_run_failed(conn, run_id, str(exc))
+        console.print(f"[bold red]Unexpected error:[/bold red] {exc}")
+        raise typer.Exit(code=1)
+
+
+@runs_app.command("list")
+def runs_list_command(
+    limit: int = typer.Option(
+        default=20,
+        help="Maximum number of runs to show.",
+    ),
+    json_output: bool = typer.Option(
+        default=False,
+        "--json",
+        help="Output runs as JSON.",
+    ),
+) -> None:
+    """
+    List previous training runs.
+    """
+    try:
+        root = require_project_root()
+        conn = get_connection(root)
+        ensure_runs_schema(conn)
+
+        rows = list_runs(conn, limit=limit)
+
+        if json_output:
+            payload = [dict(row) for row in rows]
+            typer.echo(json.dumps(payload, indent=2))
+            return
+
+        if not rows:
+            console.print("No runs found.")
+            return
+
+        table = Table(title="MoroAI Runs")
+        table.add_column("Run ID", style="cyan")
+        table.add_column("Status", style="white")
+        table.add_column("Model", style="white")
+        table.add_column("Created", style="white")
+        table.add_column("Train loss", style="white")
+        table.add_column("Val loss", style="white")
+
+        for row in rows:
+            table.add_row(
+                row["id"],
+                row["status"],
+                row["model_name"],
+                row["created_at"],
+                str(row["train_loss"]),
+                str(row["validation_loss"]),
+            )
+
+        console.print(table)
+
+    except ProjectError as exc:
+        console.print(f"[bold red]Project error:[/bold red] {exc}")
+        raise typer.Exit(code=2)
+    except Exception as exc:
+        console.print(f"[bold red]Unexpected error:[/bold red] {exc}")
+        raise typer.Exit(code=1)
+```
+
+---
+
+# 9. Register `moro train` and `moro runs`
+
+Update `src/moro/main.py`.
+
+Add:
+
+```python
+from moro.cli.train import runs_app, train_command
+```
+
+Then register:
+
+```python
+app.command(name="train", help="Train a model using the current config")(train_command)
+app.add_typer(runs_app, name="runs")
+```
+
+## Updated core section of `main.py`
+
+```python
+app.command(name="init", help="Initialize a new MoroAI project")(init_command)
+app.command(name="status", help="Show current project status")(status_command)
+app.command(name="doctor", help="Check environment and hardware readiness")(doctor_command)
+app.command(name="import", help="Import raw data into the project")(import_command)
+app.command(name="train", help="Train a model using the current config")(train_command)
+
+app.add_typer(data_app, name="data")
+app.add_typer(recipe_app, name="recipe")
+app.add_typer(runs_app, name="runs")
+```
+
+---
+
+# 10. How to use the training engine
+
+Inside a MoroAI project:
+
+## Dry run first
+```bash
+moro train --dry-run
+```
+
+This will:
+- validate config
+- detect hardware
+- suggest recipe adjustments
+- show the final training plan
+- not run training
+
+---
+
+## Real training
+```bash
+moro train
+```
+
+This will:
+- create a run
+- save config snapshot
+- execute QLoRA training
+- save adapter output
+- record metrics
+- mark run completed or failed
+
+---
+
+## List runs
+```bash
+moro runs list
+```
+
+Or JSON:
+
+```bash
+moro runs list --json
+```
+
+---
+
+# 11. What this training engine does architecturally
+
+This is important.
+
+We are not just calling a training script.
+
+We are introducing a proper execution layer.
+
+## Backend abstraction
+MoroAI can now support multiple training backends later:
+- `hf-qlora`
+- `unsloth`
+- experimental streaming backend
+- custom research backend
+
+without changing the CLI.
+
+---
+
+## Run lifecycle
+Each run has:
+- id
+- status
+- config hash
+- dataset version link
+- output directory
+- metrics
+- error state
+
+That makes training reproducible and auditable.
+
+---
+
+## Recipe integration
+Training does not blindly use raw config.
+
+It uses:
+- hardware detection
+- recipe suggestion
+- safe resolution of final settings
+
+This is what makes MoroAI feel like a real system.
+
+---
+
+# 12. Important limitations of this starter training backend
+
+This is a strong starter, but it is not final production-grade.
+
+Current limitations:
+- chat template handling is basic
+- no advanced packing
+- no masking of system/user tokens
+- no model-family-specific module mapping
+- no automatic OOM retry yet
+- no layer streaming
+- no advanced eval integration yet
+
+That is okay.
+
+The architecture is correct, and now we can improve the backend safely.
+
+---
+
+# 13. What to improve immediately after this
+
+The next best upgrades are:
+
+## A. Better dataset-to-training formatting
+Improve:
+- chat templating
+- assistant-only loss masking
+- packing
+- token budget control
+
+## B. OOM recovery
+If training fails with CUDA OOM:
+- lower sequence length
+- reduce adapter rank
+- reduce target modules
+- retry once
+
+## C. Training report generation
+After each run:
+- write `training_report.json`
+- store peak memory
+- store throughput
+- store final adapter path
+
+## D. Eval integration
+After training:
+- automatically run:
+  - base vs tuned eval
+  - golden suite eval
+
+---
+
+# 14. What you now have
+
+At this point, MoroAI has:
+
+- project system
+- config system
+- data pipeline
+- recipe engine
+- hardware detection
+- training backend abstraction
+- run lifecycle
+- QLoRA execution
+- run persistence
+- dry-run support
+- failure tracking
+
+This is now a genuine MVP foundation.
+
+---
+
+# 15. What to build next
+
+The next major module should be:
+
+# **MoroAI Evaluation Engine Starter Code**
+
+including:
+- eval suite loader
+- scorers
+- runner
+- report generator
+- exact `moro eval run` implementation
+
+That will complete the most important early loop:
+
+```text
+data → recipe → train → eval
+```
+
+If you want, I can generate that next in the same in-depth format.

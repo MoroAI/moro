@@ -1,12 +1,11 @@
-from pathlib import Path
-
 import typer
 from rich.console import Console
 
-from moro.core.errors import ExportError, ProjectError
+from moro.core.errors import ConfigError, ExportError, ProjectError
 from moro.core.project import load_project_config, require_project_root
+from moro.export.eligibility import resolve_export_run
+from moro.export.gates import check_release_requirements, write_gate_report
 from moro.export.ollama import generate_ollama_package
-from moro.storage import db as storage_db
 
 console = Console()
 
@@ -25,23 +24,12 @@ def deploy_command(
         root = require_project_root()
         cfg = load_project_config()
 
-        conn = storage_db.get_connection(root)
-        project_id = storage_db.get_or_create_project(conn, cfg.project.name)
-
-        if run_id:
-            run_row = conn.execute("SELECT * FROM runs WHERE id = ?", (run_id,)).fetchone()
-        else:
-            run_row = storage_db.get_latest_run(conn, project_id)
-
-        conn.close()
-
-        if not run_row:
-            console.print("[red]No completed run found. Run `moro train` first.[/red]")
-            raise typer.Exit(code=1)
-
-        resolved_run_id = run_row["id"]
-        run_dir = Path(run_row["output_dir"])
-        adapter_path = run_dir / "adapter"
+        if target != "ollama":
+            raise ExportError(f"Unsupported deployment target: {target}")
+        selected = resolve_export_run(root, cfg.project.name, run_id)
+        gate = check_release_requirements(root, selected, cfg)
+        resolved_run_id = selected.id
+        adapter_path = selected.adapter_path
 
         version = tag or "latest"
         out_dir = root / "releases" / f"{resolved_run_id}_{version}"
@@ -52,10 +40,11 @@ def deploy_command(
             )
             pkg_dir = generate_ollama_package(
                 adapter_path=adapter_path,
-                base_model=cfg.model.name,
+                base_model=selected.config.model.name,
                 project_name=cfg.project.name,
                 out_dir=out_dir,
             )
+            write_gate_report(gate, pkg_dir)
             console.print(
                 f"\n[bold green]✓[/bold green] Ollama package created: [bold]{pkg_dir}[/bold]"
             )
@@ -64,19 +53,10 @@ def deploy_command(
             console.print(f"  [cyan]ollama create {model_slug} -f {pkg_dir / 'Modelfile'}[/cyan]")
             console.print(f"  [cyan]ollama run {model_slug}[/cyan]")
 
-        elif target == "gguf":
-            console.print(
-                "[yellow]GGUF export is not yet implemented in this MVP.[/yellow]\n"
-                "Use llama.cpp's convert_hf_to_gguf.py manually with the merged model."
-            )
-        else:
-            console.print(f"[red]Unknown target: {target}[/red]")
-            raise typer.Exit(code=1)
-
     except ExportError as exc:
         console.print(f"[bold red]Export error:[/bold red] {exc}")
         raise typer.Exit(code=1)
-    except ProjectError as exc:
+    except (ProjectError, ConfigError) as exc:
         console.print(f"[bold red]Error:[/bold red] {exc}")
         raise typer.Exit(code=1)
     except Exception as exc:

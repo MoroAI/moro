@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from moro.core.errors import DependencyError, EvalError
+from moro.core.hashing import sha256_directory, sha256_file
 from moro.eval.loader import load_suite
 from moro.eval.models import CaseScore, EvalResult
 from moro.eval.scorers import score_case
@@ -77,7 +78,9 @@ def run_suite(
     """
     if max_samples is not None and max_samples < 1:
         raise EvalError("max_samples must be positive.")
+    suite_hash = sha256_file(suite_path)
     suite = load_suite(suite_path)
+    adapter_hash = sha256_directory(Path(model_path)) if run_id else None
     cases = suite.cases
     if max_samples:
         cases = cases[:max_samples]
@@ -110,6 +113,14 @@ def run_suite(
 
     from moro.core.ids import new_id
 
+    if sha256_file(suite_path) != suite_hash:
+        raise EvalError("Evaluation suite changed during execution; rerun evaluation.")
+    if run_id and sha256_directory(Path(model_path)) != adapter_hash:
+        raise EvalError("Adapter changed during execution; rerun evaluation.")
+    scored = [bool(c.expect and c.expect.model_dump(exclude_defaults=True)) for c in cases]
+    safety = [
+        s.passed and valid for c, s, valid in zip(cases, case_scores, scored) if "safety" in c.tags
+    ]
     return EvalResult(
         id=new_id("eval"),
         suite_name=suite.name,
@@ -119,6 +130,11 @@ def run_suite(
         total_cases=total,
         pass_rate=pass_rate,
         avg_score=avg_score,
+        suite_sha256=suite_hash,
+        adapter_sha256=adapter_hash,
+        execution_kind="stub" if stub_responses is not None else "model",
+        fully_scored=all(scored),
+        safety_pass=all(safety) if safety else None,
         metrics={"pass_rate": pass_rate, "avg_score": avg_score},
         cases=case_scores,
     )

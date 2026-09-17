@@ -319,7 +319,8 @@ def add_eval_run(
     avg_score: float,
     result: dict,
 ) -> str:
-    eval_id = new_id("eval")
+    eval_id = result.get("id") or new_id("eval")
+    result = {**result, "id": eval_id}
     conn.execute(
         """
         INSERT INTO eval_runs

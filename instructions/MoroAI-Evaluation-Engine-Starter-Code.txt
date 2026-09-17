@@ -1,0 +1,1496 @@
+MoroAI Evaluation Engine Starter Code**.
+
+This includes:
+
+- eval suite loader
+- scorers
+- runner
+- report generator
+- persistence
+- exact `moro eval run` implementation
+- support for:
+  - evaluating a trained run
+  - evaluating a base/custom model
+  - scoring from a predictions file
+
+This turns MoroAI from “can train” into “can prove whether training helped.”
+
+---
+
+# 1. What the evaluation engine does
+
+The evaluation engine answers:
+
+> Did the model actually improve on the cases I care about?
+
+It supports:
+
+- loading eval suites from YAML/JSON
+- generating model outputs
+- deterministic scoring
+- report generation
+- run comparison groundwork
+- eval persistence
+
+This is the trust layer.
+
+---
+
+# 2. New files to add
+
+Add these files:
+
+```text
+src/moro/
+  storage/
+    evals.py
+  eval/
+    __init__.py
+    models.py
+    loader.py
+    scorers.py
+    runner.py
+    report.py
+  cli/
+    eval.py
+```
+
+You will also update:
+
+```text
+src/moro/main.py
+```
+
+---
+
+# 3. Eval persistence layer
+
+## `src/moro/storage/evals.py`
+
+```python
+import sqlite3
+
+from moro.eval.models import EvalResult
+from moro.storage.db import utcnow
+
+
+def ensure_eval_schema(conn: sqlite3.Connection) -> None:
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS eval_runs (
+            id TEXT PRIMARY KEY,
+            run_id TEXT,
+            suite_name TEXT NOT NULL,
+            model TEXT,
+            created_at TEXT NOT NULL,
+            total_cases INTEGER NOT NULL,
+            pass_rate REAL NOT NULL,
+            avg_score REAL NOT NULL,
+            result_json TEXT NOT NULL
+        );
+        """
+    )
+    conn.commit()
+
+
+def save_eval_run(
+    conn: sqlite3.Connection,
+    result: EvalResult,
+) -> str:
+    conn.execute(
+        """
+        INSERT INTO eval_runs (
+            id,
+            run_id,
+            suite_name,
+            model,
+            created_at,
+            total_cases,
+            pass_rate,
+            avg_score,
+            result_json
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            result.id,
+            result.run_id,
+            result.suite_name,
+            result.model,
+            result.created_at.isoformat(),
+            result.total_cases,
+            result.pass_rate,
+            result.avg_score,
+            result.model_dump_json(),
+        ),
+    )
+    conn.commit()
+    return result.id
+
+
+def get_eval_run(
+    conn: sqlite3.Connection,
+    eval_id: str,
+) -> sqlite3.Row | None:
+    return conn.execute(
+        """
+        SELECT *
+        FROM eval_runs
+        WHERE id = ?
+        """,
+        (eval_id,),
+    ).fetchone()
+
+
+def list_eval_runs(
+    conn: sqlite3.Connection,
+    limit: int = 20,
+) -> list[sqlite3.Row]:
+    return conn.execute(
+        """
+        SELECT *
+        FROM eval_runs
+        ORDER BY created_at DESC
+        LIMIT ?
+        """,
+        (limit,),
+    ).fetchall()
+```
+
+---
+
+# 4. Eval models
+
+## `src/moro/eval/__init__.py`
+
+```python
+```
+
+## `src/moro/eval/models.py`
+
+```python
+from __future__ import annotations
+
+from datetime import datetime
+from typing import Any, Literal
+
+from pydantic import BaseModel, Field, field_validator
+
+from moro.core.errors import MoroError
+
+
+class EvalError(MoroError):
+    """Raised for eval suite, scoring, or evaluation execution problems."""
+
+
+class EvalMessage(BaseModel):
+    role: Literal["system", "user", "assistant"]
+    content: str
+
+
+class EvalGenerationConfig(BaseModel):
+    max_new_tokens: int = 128
+    temperature: float = 0.0
+    top_p: float = 1.0
+    do_sample: bool = False
+
+
+class EvalExpect(BaseModel):
+    contains: list[str] = Field(default_factory=list)
+    any_of_contains: list[str] = Field(default_factory=list)
+    regex: list[str] = Field(default_factory=list)
+    not_contains: list[str] = Field(default_factory=list)
+    json_required_keys: list[str] = Field(default_factory=list)
+    json_schema: dict[str, Any] | None = None
+
+
+class EvalCase(BaseModel):
+    id: str
+    messages: list[EvalMessage]
+    expect: EvalExpect | None = None
+    tags: list[str] = Field(default_factory=list)
+    generation: EvalGenerationConfig | None = None
+
+
+class EvalSuite(BaseModel):
+    name: str
+    version: str = "1"
+    description: str | None = None
+    cases: list[EvalCase]
+    generation: EvalGenerationConfig = Field(default_factory=EvalGenerationConfig)
+
+    @field_validator("cases")
+    @classmethod
+    def validate_cases(cls, cases: list[EvalCase]) -> list[EvalCase]:
+        ids = set()
+
+        for case in cases:
+            if not case.id:
+                raise ValueError("eval case id cannot be empty")
+
+            if case.id in ids:
+                raise ValueError(f"duplicate eval case id: {case.id}")
+
+            ids.add(case.id)
+
+        if not cases:
+            raise ValueError("eval suite must contain at least one case")
+
+        return cases
+
+
+class CaseOutput(BaseModel):
+    case_id: str
+    output: str
+    model: str | None = None
+    latency_ms: float | None = None
+    error: str | None = None
+
+
+class CaseCheck(BaseModel):
+    name: str
+    passed: bool
+    details: dict[str, Any] = Field(default_factory=dict)
+
+
+class CaseScore(BaseModel):
+    case_id: str
+    passed: bool
+    score: float
+    checks: list[CaseCheck] = Field(default_factory=list)
+    output: str | None = None
+    error: str | None = None
+
+
+class EvalResult(BaseModel):
+    id: str
+    suite_name: str
+    suite_version: str
+    run_id: str | None = None
+    model: str | None = None
+    created_at: datetime
+    total_cases: int
+    scored_cases: int
+    pass_rate: float
+    avg_score: float
+    metrics: dict[str, float] = Field(default_factory=dict)
+    cases: list[CaseScore] = Field(default_factory=list)
+```
+
+---
+
+# 5. Eval suite loader
+
+## `src/moro/eval/loader.py`
+
+```python
+import json
+from pathlib import Path
+
+import yaml
+
+from moro.eval.models import EvalError, EvalSuite
+
+
+def load_eval_suite(path: Path) -> EvalSuite:
+    path = Path(path).expanduser()
+
+    if not path.exists():
+        raise EvalError(f"Eval suite not found: {path}")
+
+    try:
+        raw_text = path.read_text(encoding="utf-8")
+    except OSError as exc:
+        raise EvalError(f"Could not read eval suite: {path}") from exc
+
+    try:
+        if path.suffix.lower() == ".json":
+            data = json.loads(raw_text)
+        else:
+            data = yaml.safe_load(raw_text)
+    except Exception as exc:
+        raise EvalError(f"Invalid eval suite format: {path}") from exc
+
+    if not isinstance(data, dict):
+        raise EvalError(f"Eval suite must be a mapping: {path}")
+
+    try:
+        return EvalSuite.model_validate(data)
+    except Exception as exc:
+        raise EvalError(f"Invalid eval suite: {path}\n{exc}") from exc
+```
+
+---
+
+# 6. Scorers
+
+## `src/moro/eval/scorers.py`
+
+```python
+import json
+import re
+
+from moro.eval.models import CaseCheck, CaseOutput, CaseScore, EvalCase
+
+
+def score_case(case: EvalCase, output: CaseOutput) -> CaseScore:
+    if output.error:
+        return CaseScore(
+            case_id=case.id,
+            passed=False,
+            score=0.0,
+            checks=[
+                CaseCheck(
+                    name="generation",
+                    passed=False,
+                    details={"error": output.error},
+                )
+            ],
+            output=output.output,
+            error=output.error,
+        )
+
+    text = output.output or ""
+    checks: list[CaseCheck] = []
+
+    expect = case.expect
+
+    if expect is None:
+        nonempty = bool(text.strip())
+        checks.append(
+            CaseCheck(
+                name="nonempty",
+                passed=nonempty,
+                details={},
+            )
+        )
+    else:
+        lower_text = text.lower()
+
+        if expect.contains:
+            missing = [
+                item
+                for item in expect.contains
+                if item.lower() not in lower_text
+            ]
+            checks.append(
+                CaseCheck(
+                    name="contains",
+                    passed=len(missing) == 0,
+                    details={"missing": missing},
+                )
+            )
+
+        if expect.any_of_contains:
+            found = [
+                item
+                for item in expect.any_of_contains
+                if item.lower() in lower_text
+            ]
+            checks.append(
+                CaseCheck(
+                    name="any_of_contains",
+                    passed=len(found) > 0,
+                    details={"found": found},
+                )
+            )
+
+        if expect.regex:
+            failed_patterns = []
+
+            for pattern in expect.regex:
+                try:
+                    if not re.search(pattern, text, flags=re.IGNORECASE):
+                        failed_patterns.append(pattern)
+                except re.error:
+                    failed_patterns.append(pattern)
+
+            checks.append(
+                CaseCheck(
+                    name="regex",
+                    passed=len(failed_patterns) == 0,
+                    details={"failed_patterns": failed_patterns},
+                )
+            )
+
+        if expect.not_contains:
+            present = [
+                item
+                for item in expect.not_contains
+                if item.lower() in lower_text
+            ]
+            checks.append(
+                CaseCheck(
+                    name="not_contains",
+                    passed=len(present) == 0,
+                    details={"present": present},
+                )
+            )
+
+        required_keys = list(expect.json_required_keys or [])
+
+        if expect.json_schema and isinstance(expect.json_schema, dict):
+            schema_required = expect.json_schema.get("required", [])
+            if isinstance(schema_required, list):
+                required_keys.extend([str(k) for k in schema_required])
+
+        if required_keys:
+            try:
+                parsed = _parse_json_any(text)
+
+                if not isinstance(parsed, dict):
+                    checks.append(
+                        CaseCheck(
+                            name="json_keys",
+                            passed=False,
+                            details={"reason": "parsed JSON is not an object"},
+                        )
+                    )
+                else:
+                    missing = [key for key in required_keys if key not in parsed]
+                    checks.append(
+                        CaseCheck(
+                            name="json_keys",
+                            passed=len(missing) == 0,
+                            details={"missing": missing},
+                        )
+                    )
+
+            except Exception as exc:
+                checks.append(
+                    CaseCheck(
+                        name="json_keys",
+                        passed=False,
+                        details={"reason": str(exc)},
+                    )
+                )
+
+    if not checks:
+        passed = bool(text.strip())
+        score = 1.0 if passed else 0.0
+    else:
+        passed = all(check.passed for check in checks)
+        score = sum(1.0 for check in checks if check.passed) / len(checks)
+
+    return CaseScore(
+        case_id=case.id,
+        passed=passed,
+        score=score,
+        checks=checks,
+        output=text,
+        error=None,
+    )
+
+
+def _parse_json_any(text: str):
+    text = text.strip()
+
+    # Direct JSON
+    try:
+        return json.loads(text)
+    except Exception:
+        pass
+
+    # Remove code fences if present
+    if "```" in text:
+        cleaned = text.replace("```json", "").replace("```", "").strip()
+        try:
+            return json.loads(cleaned)
+        except Exception:
+            pass
+
+    # Try extracting first JSON object
+    start = text.find("{")
+    end = text.rfind("}")
+
+    if start != -1 and end != -1 and end > start:
+        candidate = text[start:end + 1]
+        try:
+            return json.loads(candidate)
+        except Exception:
+            pass
+
+    raise ValueError("Could not parse JSON from output")
+```
+
+---
+
+# 7. Evaluation runner
+
+This includes:
+- scoring
+- prediction loading
+- optional model generation
+
+## `src/moro/eval/runner.py`
+
+```python
+import importlib.util
+import json
+import time
+from collections import defaultdict
+from datetime import datetime, timezone
+from pathlib import Path
+
+from moro.core.errors import DependencyError
+from moro.eval.models import (
+    CaseOutput,
+    EvalError,
+    EvalResult,
+    EvalSuite,
+)
+from moro.eval.scorers import score_case
+from moro.storage.db import new_id
+
+
+def run_eval_suite(
+    suite: EvalSuite,
+    outputs: list[CaseOutput],
+    run_id: str | None = None,
+    model: str | None = None,
+) -> EvalResult:
+    output_map = {output.case_id: output for output in outputs}
+
+    case_scores = []
+
+    for case in suite.cases:
+        output = output_map.get(case.id)
+
+        if output is None:
+            output = CaseOutput(
+                case_id=case.id,
+                output="",
+                model=model,
+                error="missing output",
+            )
+
+        case_scores.append(score_case(case, output))
+
+    total_cases = len(suite.cases)
+    scored_cases = len(outputs)
+
+    passed_cases = sum(1 for case in case_scores if case.passed)
+
+    pass_rate = (passed_cases / total_cases) if total_cases else 0.0
+    avg_score = (
+        sum(case.score for case in case_scores) / total_cases
+        if total_cases
+        else 0.0
+    )
+
+    metrics: dict[str, float] = {
+        "pass_rate": round(pass_rate, 4),
+        "avg_score": round(avg_score, 4),
+    }
+
+    # Tag-level metrics
+    tag_stats = defaultdict(lambda: {"total": 0, "passed": 0})
+
+    for case, score in zip(suite.cases, case_scores):
+        for tag in case.tags:
+            tag_stats[tag]["total"] += 1
+            if score.passed:
+                tag_stats[tag]["passed"] += 1
+
+    for tag, stats in tag_stats.items():
+        if stats["total"] > 0:
+            metrics[f"pass_rate_tag:{tag}"] = round(
+                stats["passed"] / stats["total"],
+                4,
+            )
+
+    return EvalResult(
+        id=new_id("eval"),
+        suite_name=suite.name,
+        suite_version=suite.version,
+        run_id=run_id,
+        model=model,
+        created_at=datetime.now(timezone.utc),
+        total_cases=total_cases,
+        scored_cases=scored_cases,
+        pass_rate=round(pass_rate, 4),
+        avg_score=round(avg_score, 4),
+        metrics=metrics,
+        cases=case_scores,
+    )
+
+
+def load_predictions(path: Path) -> list[CaseOutput]:
+    path = Path(path).expanduser()
+
+    if not path.exists():
+        raise EvalError(f"Predictions file not found: {path}")
+
+    outputs: list[CaseOutput] = []
+
+    with path.open("r", encoding="utf-8") as f:
+        for line_number, line in enumerate(f, start=1):
+            line = line.strip()
+            if not line:
+                continue
+
+            try:
+                obj = json.loads(line)
+            except json.JSONDecodeError as exc:
+                raise EvalError(
+                    f"Invalid JSONL in predictions file at line {line_number}"
+                ) from exc
+
+            case_id = obj.get("case_id") or obj.get("id")
+            output_text = (
+                obj.get("output")
+                or obj.get("text")
+                or obj.get("response")
+                or obj.get("completion")
+            )
+
+            if not case_id:
+                raise EvalError(
+                    f"Missing case_id in predictions file at line {line_number}"
+                )
+
+            if output_text is None:
+                raise EvalError(
+                    f"Missing output field in predictions file at line {line_number}"
+                )
+
+            outputs.append(
+                CaseOutput(
+                    case_id=str(case_id),
+                    output=str(output_text),
+                    model=obj.get("model"),
+                    latency_ms=obj.get("latency_ms"),
+                    error=obj.get("error"),
+                )
+            )
+
+    return outputs
+
+
+def generate_outputs_for_cases(
+    suite: EvalSuite,
+    model_name: str,
+    adapter_path: Path | None = None,
+    quantization: str = "none",
+    max_samples: int | None = None,
+) -> list[CaseOutput]:
+    missing = []
+
+    for package in ("torch", "transformers"):
+        if importlib.util.find_spec(package) is None:
+            missing.append(package)
+
+    if adapter_path and importlib.util.find_spec("peft") is None:
+        missing.append("peft")
+
+    if quantization in {"nf4", "int8"} and importlib.util.find_spec("bitsandbytes") is None:
+        missing.append("bitsandbytes")
+
+    if missing:
+        raise DependencyError(
+            "Missing eval dependencies: "
+            + ", ".join(missing)
+            + "\nInstall them with: pip install 'moroai[train]'"
+        )
+
+    import torch
+    from transformers import AutoModelForCausalLM, AutoTokenizer
+
+    if adapter_path:
+        adapter_path = Path(adapter_path)
+        if not adapter_path.exists():
+            raise EvalError(f"Adapter path not found: {adapter_path}")
+
+    if quantization in {"nf4", "int8"} and not torch.cuda.is_available():
+        raise EvalError(
+            "Quantized inference in this starter eval backend requires a CUDA GPU."
+        )
+
+    tokenizer = AutoTokenizer.from_pretrained(model_name)
+
+    if tokenizer.pad_token is None:
+        tokenizer.pad_token = tokenizer.eos_token
+
+    if torch.cuda.is_available():
+        torch_dtype = torch.float16
+        device_map = "auto"
+    else:
+        torch_dtype = torch.float32
+        device_map = {"": "cpu"}
+
+    model_kwargs = {
+        "torch_dtype": torch_dtype,
+        "device_map": device_map,
+    }
+
+    if quantization == "nf4":
+        from transformers import BitsAndBytesConfig
+
+        bnb_config = BitsAndBytesConfig(
+            load_in_4bit=True,
+            bnb_4bit_quant_type="nf4",
+            bnb_4bit_use_double_quant=True,
+            bnb_4bit_compute_dtype=torch.float16,
+        )
+        model_kwargs["quantization_config"] = bnb_config
+        model_kwargs["device_map"] = "auto"
+
+    elif quantization == "int8":
+        from transformers import BitsAndBytesConfig
+
+        bnb_config = BitsAndBytesConfig(
+            load_in_8bit=True,
+        )
+        model_kwargs["quantization_config"] = bnb_config
+        model_kwargs["device_map"] = "auto"
+
+    model = AutoModelForCausalLM.from_pretrained(
+        model_name,
+        **model_kwargs,
+    )
+
+    if adapter_path:
+        from peft import PeftModel
+
+        model = PeftModel.from_pretrained(model, str(adapter_path))
+
+    model.eval()
+
+    cases = suite.cases
+    if max_samples is not None:
+        cases = cases[:max_samples]
+
+    outputs: list[CaseOutput] = []
+
+    for case in cases:
+        gen_config = case.generation or suite.generation
+
+        try:
+            messages = [message.model_dump() for message in case.messages]
+
+            try:
+                prompt = tokenizer.apply_chat_template(
+                    messages,
+                    tokenize=False,
+                    add_generation_prompt=True,
+                )
+            except Exception:
+                prompt = _simple_chat_prompt(messages)
+
+            inputs = tokenizer(
+                prompt,
+                return_tensors="pt",
+                truncation=True,
+                max_length=1024,
+            ).to(model.device)
+
+            start = time.time()
+
+            with torch.no_grad():
+                generated = model.generate(
+                    **inputs,
+                    max_new_tokens=gen_config.max_new_tokens,
+                    temperature=gen_config.temperature,
+                    top_p=gen_config.top_p,
+                    do_sample=bool(gen_config.do_sample and gen_config.temperature > 0),
+                    pad_token_id=tokenizer.pad_token_id,
+                )
+
+            new_tokens = generated[0][inputs["input_ids"].shape[1]:]
+            text = tokenizer.decode(new_tokens, skip_special_tokens=True).strip()
+
+            outputs.append(
+                CaseOutput(
+                    case_id=case.id,
+                    output=text,
+                    model=model_name,
+                    latency_ms=round((time.time() - start) * 1000, 2),
+                )
+            )
+
+        except Exception as exc:
+            outputs.append(
+                CaseOutput(
+                    case_id=case.id,
+                    output="",
+                    model=model_name,
+                    error=str(exc),
+                )
+            )
+
+    return outputs
+
+
+def _simple_chat_prompt(messages: list[dict]) -> str:
+    parts = []
+
+    for message in messages:
+        role = message.get("role", "user")
+        content = message.get("content", "")
+        parts.append(f"<|{role}|>\n{content}")
+
+    parts.append("<|assistant|>\n")
+
+    return "\n".join(parts)
+```
+
+---
+
+# 8. Report generator
+
+## `src/moro/eval/report.py`
+
+```python
+import json
+from pathlib import Path
+
+from moro.eval.models import EvalResult
+
+
+def save_eval_report(root: Path, result: EvalResult) -> Path:
+    reports_dir = Path(root) / ".moro" / "reports"
+    reports_dir.mkdir(parents=True, exist_ok=True)
+
+    report_path = reports_dir / f"eval_{result.id}.json"
+
+    report_path.write_text(
+        json.dumps(result.model_dump(mode="json"), indent=2, ensure_ascii=False),
+        encoding="utf-8",
+    )
+
+    return report_path
+```
+
+---
+
+# 9. Exact `moro eval` CLI implementation
+
+## `src/moro/cli/eval.py`
+
+```python
+import json
+from pathlib import Path
+
+import typer
+from rich.console import Console
+from rich.table import Table
+
+from moro.core.errors import DependencyError, ProjectError
+from moro.core.project import load_project_config, require_project_root
+from moro.eval.loader import load_eval_suite
+from moro.eval.models import EvalError
+from moro.eval.report import save_eval_report
+from moro.eval.runner import (
+    generate_outputs_for_cases,
+    load_predictions,
+    run_eval_suite,
+)
+from moro.storage.db import get_connection
+from moro.storage.evals import (
+    ensure_eval_schema,
+    get_eval_run,
+    list_eval_runs,
+    save_eval_run,
+)
+from moro.storage.runs import ensure_runs_schema, get_run
+
+console = Console()
+
+eval_app = typer.Typer(
+    name="eval",
+    help="Evaluation commands",
+    no_args_is_help=True,
+)
+
+
+@eval_app.command("run")
+def eval_run_command(
+    suite_path: Path = typer.Argument(
+        ...,
+        help="Path to eval suite YAML/JSON file.",
+        exists=True,
+        dir_okay=False,
+        resolve_path=True,
+    ),
+    run_id: str | None = typer.Option(
+        default=None,
+        "--run-id",
+        help="Evaluate a previous Moro training run.",
+    ),
+    model: str | None = typer.Option(
+        default=None,
+        "--model",
+        help="Model to evaluate if not using --run-id.",
+    ),
+    adapter_path: Path | None = typer.Option(
+        default=None,
+        "--adapter-path",
+        help="Optional adapter path to load on top of the model.",
+    ),
+    predictions: Path | None = typer.Option(
+        default=None,
+        "--predictions",
+        help="Optional JSONL file with pre-generated outputs.",
+    ),
+    quantization: str | None = typer.Option(
+        default=None,
+        "--quantization",
+        help="Quantization mode: none, int8, nf4.",
+    ),
+    max_samples: int | None = typer.Option(
+        default=None,
+        "--max-samples",
+        help="Limit number of eval cases.",
+    ),
+    json_output: bool = typer.Option(
+        default=False,
+        "--json",
+        help="Print result as JSON.",
+    ),
+) -> None:
+    """
+    Run an evaluation suite.
+    """
+    try:
+        root = require_project_root()
+        suite = load_eval_suite(suite_path)
+
+        if predictions:
+            outputs = load_predictions(predictions)
+            model_label = "predictions"
+            selected_run_id = run_id
+        else:
+            if run_id:
+                conn = get_connection(root)
+                ensure_runs_schema(conn)
+
+                row = get_run(conn, run_id)
+                if not row:
+                    raise EvalError(f"Run not found: {run_id}")
+
+                selected_run_id = row["id"]
+                model_label = model or row["model_name"]
+                selected_quantization = quantization or row["quantization"]
+
+                if adapter_path is None:
+                    adapter_path = Path(row["output_dir"]) / "adapter"
+
+                if not adapter_path.exists():
+                    raise EvalError(
+                        f"Adapter not found for run {run_id}: {adapter_path}"
+                    )
+
+            else:
+                cfg = load_project_config()
+                selected_run_id = None
+                model_label = model or cfg.model.name
+                selected_quantization = quantization or cfg.model.quantization
+
+            outputs = generate_outputs_for_cases(
+                suite=suite,
+                model_name=model_label,
+                adapter_path=adapter_path,
+                quantization=selected_quantization,
+                max_samples=max_samples,
+            )
+
+        result = run_eval_suite(
+            suite=suite,
+            outputs=outputs,
+            run_id=selected_run_id,
+            model=model_label,
+        )
+
+        conn = get_connection(root)
+        ensure_eval_schema(conn)
+        save_eval_run(conn, result)
+
+        report_path = save_eval_report(root, result)
+
+        if json_output:
+            typer.echo(result.model_dump_json(indent=2))
+            return
+
+        table = Table(title="MoroAI Eval Result")
+        table.add_column("Metric", style="cyan")
+        table.add_column("Value", style="white")
+
+        table.add_row("Eval ID", result.id)
+        table.add_row("Suite", result.suite_name)
+        table.add_row("Version", result.suite_version)
+        table.add_row("Model", result.model or "-")
+        table.add_row("Run ID", result.run_id or "-")
+        table.add_row("Total cases", str(result.total_cases))
+        table.add_row("Scored cases", str(result.scored_cases))
+        table.add_row("Pass rate", str(result.pass_rate))
+        table.add_row("Avg score", str(result.avg_score))
+        table.add_row("Report", str(report_path))
+
+        console.print(table)
+
+        failed_cases = [case for case in result.cases if not case.passed]
+
+        if failed_cases:
+            console.print("\n[bold yellow]Failed cases:[/bold yellow]")
+
+            for case in failed_cases[:5]:
+                reasons = []
+
+                for check in case.checks:
+                    if not check.passed:
+                        reasons.append(check.name)
+
+                console.print(
+                    f"- {case.case_id}: failed checks: {', '.join(reasons)}"
+                )
+
+    except ProjectError as exc:
+        console.print(f"[bold red]Project error:[/bold red] {exc}")
+        raise typer.Exit(code=2)
+    except EvalError as exc:
+        console.print(f"[bold red]Eval error:[/bold red] {exc}")
+        raise typer.Exit(code=6)
+    except DependencyError as exc:
+        console.print(f"[bold red]Dependency error:[/bold red] {exc}")
+        raise typer.Exit(code=3)
+    except Exception as exc:
+        console.print(f"[bold red]Unexpected error:[/bold red] {exc}")
+        raise typer.Exit(code=1)
+
+
+@eval_app.command("list")
+def eval_list_command(
+    limit: int = typer.Option(
+        default=20,
+        help="Maximum number of eval runs to show.",
+    ),
+    json_output: bool = typer.Option(
+        default=False,
+        "--json",
+        help="Output as JSON.",
+    ),
+) -> None:
+    """
+    List previous eval runs.
+    """
+    try:
+        root = require_project_root()
+        conn = get_connection(root)
+        ensure_eval_schema(conn)
+
+        rows = list_eval_runs(conn, limit=limit)
+
+        if json_output:
+            payload = [dict(row) for row in rows]
+            typer.echo(json.dumps(payload, indent=2))
+            return
+
+        if not rows:
+            console.print("No eval runs found.")
+            return
+
+        table = Table(title="MoroAI Eval Runs")
+        table.add_column("Eval ID", style="cyan")
+        table.add_column("Suite", style="white")
+        table.add_column("Model", style="white")
+        table.add_column("Created", style="white")
+        table.add_column("Pass rate", style="white")
+        table.add_column("Avg score", style="white")
+
+        for row in rows:
+            table.add_row(
+                row["id"],
+                row["suite_name"],
+                row["model"] or "-",
+                row["created_at"],
+                str(row["pass_rate"]),
+                str(row["avg_score"]),
+            )
+
+        console.print(table)
+
+    except ProjectError as exc:
+        console.print(f"[bold red]Project error:[/bold red] {exc}")
+        raise typer.Exit(code=2)
+    except Exception as exc:
+        console.print(f"[bold red]Unexpected error:[/bold red] {exc}")
+        raise typer.Exit(code=1)
+
+
+@eval_app.command("report")
+def eval_report_command(
+    eval_id: str = typer.Argument(
+        ...,
+        help="Eval run ID",
+    ),
+    json_output: bool = typer.Option(
+        default=False,
+        "--json",
+        help="Print full stored JSON.",
+    ),
+) -> None:
+    """
+    Show a stored eval report.
+    """
+    try:
+        root = require_project_root()
+        conn = get_connection(root)
+        ensure_eval_schema(conn)
+
+        row = get_eval_run(conn, eval_id)
+
+        if not row:
+            raise EvalError(f"Eval run not found: {eval_id}")
+
+        if json_output:
+            typer.echo(row["result_json"])
+            return
+
+        payload = json.loads(row["result_json"])
+
+        table = Table(title="MoroAI Eval Report")
+        table.add_column("Metric", style="cyan")
+        table.add_column("Value", style="white")
+
+        table.add_row("Eval ID", payload.get("id", "-"))
+        table.add_row("Suite", payload.get("suite_name", "-"))
+        table.add_row("Model", payload.get("model", "-"))
+        table.add_row("Run ID", payload.get("run_id", "-"))
+        table.add_row("Total cases", str(payload.get("total_cases", 0)))
+        table.add_row("Pass rate", str(payload.get("pass_rate", 0)))
+        table.add_row("Avg score", str(payload.get("avg_score", 0)))
+
+        console.print(table)
+
+    except ProjectError as exc:
+        console.print(f"[bold red]Project error:[/bold red] {exc}")
+        raise typer.Exit(code=2)
+    except EvalError as exc:
+        console.print(f"[bold red]Eval error:[/bold red] {exc}")
+        raise typer.Exit(code=6)
+    except Exception as exc:
+        console.print(f"[bold red]Unexpected error:[/bold red] {exc}")
+        raise typer.Exit(code=1)
+```
+
+---
+
+# 10. Register the eval CLI
+
+Update `src/moro/main.py`.
+
+Add:
+
+```python
+from moro.cli.eval import eval_app
+```
+
+Then register:
+
+```python
+app.add_typer(eval_app, name="eval")
+```
+
+## Updated command registration section
+
+```python
+app.add_typer(data_app, name="data")
+app.add_typer(recipe_app, name="recipe")
+app.add_typer(runs_app, name="runs")
+app.add_typer(eval_app, name="eval")
+```
+
+---
+
+# 11. Example eval suite
+
+Use this if you need a fresh example.
+
+## `eval/support-golden-v1.yaml`
+
+```yaml
+name: support-golden-v1
+version: "1"
+description: Basic support assistant golden questions
+generation:
+  max_new_tokens: 128
+  temperature: 0.0
+  top_p: 1.0
+  do_sample: false
+cases:
+  - id: reset_password
+    messages:
+      - role: user
+        content: "How do I reset my password?"
+    expect:
+      contains:
+        - "Settings"
+        - "Security"
+    tags:
+      - account
+
+  - id: refund_policy
+    messages:
+      - role: user
+        content: "What is your refund policy?"
+    expect:
+      any_of_contains:
+        - "refund"
+        - "14 days"
+    tags:
+      - billing
+```
+
+---
+
+# 12. Exact usage
+
+## A. Evaluate a trained run
+
+```bash
+moro eval run eval/support-golden-v1.yaml --run-id run_20250101123456_ab12
+```
+
+This will:
+- load the run from storage
+- locate its adapter
+- generate outputs
+- score them
+- save an eval report
+
+---
+
+## B. Evaluate a base model directly
+
+```bash
+moro eval run eval/support-golden-v1.yaml --model Qwen/Qwen2.5-1.5B-Instruct
+```
+
+---
+
+## C. Evaluate from pre-generated predictions
+
+This is extremely useful for testing scorers without GPU inference.
+
+### Predictions file format
+
+```json
+{"case_id": "reset_password", "output": "Go to Settings, then Security, then Reset Password."}
+{"case_id": "refund_policy", "output": "You can request a refund within 14 days."}
+```
+
+Then run:
+
+```bash
+moro eval run eval/support-golden-v1.yaml --predictions preds.jsonl
+```
+
+---
+
+## D. List eval runs
+
+```bash
+moro eval list
+```
+
+Or JSON:
+
+```bash
+moro eval list --json
+```
+
+---
+
+## E. Show a saved eval report
+
+```bash
+moro eval report eval_20250101123500_cd34
+```
+
+Or full JSON:
+
+```bash
+moro eval report eval_20250101123500_cd34 --json
+```
+
+---
+
+# 13. What this completes
+
+This is a major milestone.
+
+You now have the first real MoroAI loop:
+
+```bash
+moro init
+moro import data/raw/support.jsonl
+moro data build
+moro doctor
+moro recipe suggest
+moro train
+moro eval run eval/support-golden-v1.yaml --run-id <run_id>
+```
+
+That means MoroAI can now:
+
+- prepare data
+- suggest safe training settings
+- train
+- evaluate
+- store evidence
+- produce reports
+
+That is the core of the product.
+
+---
+
+# 14. What is strong about this starter eval engine
+
+## It is already useful
+Even before adding advanced judging, it supports:
+- golden cases
+- deterministic checks
+- JSON output checks
+- safety-style negative checks
+- prediction-file scoring
+- trained-run evaluation
+
+## It is extensible
+You can later add:
+- semantic similarity
+- local LLM-as-judge
+- pairwise comparison
+- rubric scoring
+- regression gates
+- release gating
+
+## It is connected to the lifecycle
+Eval is not floating separately.
+It links to:
+- runs
+- models
+- reports
+- storage
+
+That is exactly right.
+
+---
+
+# 15. Important limitations of this starter version
+
+Be clear about what this is not yet:
+
+## Not yet included
+- LLM-as-judge
+- pairwise base vs tuned comparison
+- automatic eval gating
+- batch inference optimization
+- merged-model eval
+- advanced chat template handling for every model family
+- streaming generation
+
+That is okay.
+
+The architecture is correct, and those can now be added cleanly.
+
+---
+
+# 16. Best next upgrades for the eval engine
+
+The next most valuable upgrades would be:
+
+## A. Base vs tuned comparison
+Run the same suite on:
+- base model
+- trained adapter
+
+Then output:
+- delta in pass rate
+- delta in avg score
+- improved/regressed cases
+
+This is huge.
+
+## B. Release gates
+Allow:
+```yaml
+release:
+  require:
+    eval_suite: support-golden-v1
+    min_pass_rate: 0.7
+```
+
+## C. Local judge scoring
+Add optional model-based scoring for:
+- helpfulness
+- tone
+- groundedness
+- instruction following
+
+## D. Better reporting
+Generate:
+- failed case samples
+- output diffs
+- tag-level performance
+- regression highlights
+
+---
+
+# 17. What to build next after this
+
+The next logical module is one of these:
+
+## Option 1: Export & Deploy Starter
+This completes the full loop:
+
+```text
+data → train → eval → export → deploy
+```
+
+Includes:
+- `moro export`
+- `moro deploy --target ollama`
+- model card generation
+- release manifest
+
+## Option 2: Base vs tuned eval comparison
+This strengthens trust first.
+
+Includes:
+- `moro eval compare`
+- automatic delta reporting
+- improved/regressed case listing
+
+---
+
+# 18. My recommendation
+
+If the goal is to complete the product loop first, build:
+
+## **Export & Deploy Starter next**
+
+If the goal is to strengthen credibility first, build:
+
+## **Eval comparison next**
+
+My recommendation:
+
+> build **Export & Deploy** next, then immediately add **eval compare**.
+
+That gives you both:
+- a complete end-to-end workflow
+- stronger proof of value
+
+---
+
+If you want, I can now generate the next in-depth starter kit:
+
+# **MoroAI Export & Deploy Starter Code**
+
+including:
+- adapter export
+- model card generation
+- release manifest
+- Ollama deployment prep
+- exact `moro export` implementation
+- exact `moro deploy --target ollama` implementation

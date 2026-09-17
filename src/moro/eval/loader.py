@@ -1,9 +1,10 @@
+import re
 from pathlib import Path
 
 import yaml
 from pydantic import ValidationError
 
-from moro.core.errors import EvalError
+from moro.core.errors import DependencyError, EvalError
 from moro.eval.models import EvalSuite
 
 
@@ -44,5 +45,43 @@ def load_suite(path: Path) -> EvalSuite:
         if cid in seen:
             raise EvalError(f"Duplicate case ID in eval suite: {cid!r}")
         seen.add(cid)
+
+    for case in suite.cases:
+        if (
+            not case.id.strip()
+            or not case.messages
+            or any(not m.content.strip() for m in case.messages)
+        ):
+            raise EvalError("Evaluation cases require an ID and nonempty messages.")
+        expect = case.expect
+        if expect is None:
+            continue
+        if not (
+            expect.contains
+            or expect.any_of_contains
+            or expect.regex
+            or expect.json_schema is not None
+        ):
+            raise EvalError(f"Empty expectation in case {case.id}.")
+        if any(
+            not term.strip() for term in expect.contains + expect.any_of_contains + expect.regex
+        ):
+            raise EvalError(f"Empty check in case {case.id}.")
+        for pattern in expect.regex:
+            try:
+                re.compile(pattern)
+            except re.error as exc:
+                raise EvalError(f"Invalid regex in case {case.id}: {exc}") from exc
+        if expect.json_schema is not None:
+            try:
+                import jsonschema
+            except ImportError as exc:
+                raise DependencyError("JSON schema scoring requires moroai[eval].") from exc
+            try:
+                jsonschema.validators.validator_for(expect.json_schema).check_schema(
+                    expect.json_schema
+                )
+            except jsonschema.SchemaError as exc:
+                raise EvalError(f"Invalid JSON schema in case {case.id}: {exc}") from exc
 
     return suite

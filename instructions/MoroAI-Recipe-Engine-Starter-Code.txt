@@ -1,0 +1,1258 @@
+*MoroAI Recipe Engine Starter Code**, including:
+
+- `src/moro/recipes/engine.py`
+- `src/moro/recipes/rules.py`
+- `src/moro/recipes/presets.py`
+- `src/moro/cli/recipe.py`
+- exact `moro recipe suggest` implementation
+
+And because the recipe engine needs hardware context, I’ll also include the small but important supporting module:
+
+- `src/moro/hardware/profile.py`
+
+This gives you a working, opinionated, hardware-aware recipe suggestion system.
+
+---
+
+# 1. What the recipe engine should do
+
+The recipe engine’s job is to answer:
+
+> Given this user’s config and hardware, what is the safest, most practical training recipe to start with?
+
+It should suggest:
+- model
+- quantization
+- LoRA rank
+- LoRA alpha
+- target modules
+- max sequence length
+- batch size
+- gradient accumulation
+- optimizer
+- precision
+- gradient checkpointing
+- estimated VRAM
+- warnings
+- confidence level
+
+This is one of the most important parts of MoroAI.
+
+---
+
+# 2. New files to add
+
+Add these files:
+
+```text
+src/moro/
+  hardware/
+    __init__.py
+    profile.py
+  recipes/
+    __init__.py
+    models.py
+    presets.py
+    rules.py
+    engine.py
+  cli/
+    recipe.py
+```
+
+---
+
+# 3. Hardware profile model and detector
+
+## `src/moro/hardware/__init__.py`
+
+```python
+```
+
+## `src/moro/hardware/profile.py`
+
+```python
+import importlib.util
+import os
+import platform
+import shutil
+import sys
+from pathlib import Path
+
+from moro.recipes.models import HardwareProfile
+
+
+def _cpu_ram_gb() -> float:
+    try:
+        if hasattr(os, "sysconf"):
+            page_size = os.sysconf("SC_PAGE_SIZE")
+            phys_pages = os.sysconf("SC_PHYS_PAGES")
+            return round((page_size * phys_pages) / (1024**3), 2)
+    except Exception:
+        pass
+
+    return 0.0
+
+
+def detect_hardware_profile() -> HardwareProfile:
+    disk = shutil.disk_usage(Path.cwd())
+
+    gpu_available = False
+    gpu_vendor = "cpu"
+    gpu_name = None
+    vram_gb = None
+    torch_version = None
+    cuda_available = False
+    mps_available = False
+
+    torch_installed = importlib.util.find_spec("torch") is not None
+
+    if torch_installed:
+        try:
+            import torch
+
+            torch_version = torch.__version__
+            cuda_available = torch.cuda.is_available()
+
+            if cuda_available:
+                gpu_available = True
+                gpu_vendor = "nvidia"
+                gpu_name = torch.cuda.get_device_name(0)
+                props = torch.cuda.get_device_properties(0)
+                vram_gb = round(props.total_memory / (1024**3), 2)
+
+            elif hasattr(torch, "backends") and hasattr(torch.backends, "mps"):
+                if torch.backends.mps.is_available():
+                    gpu_available = True
+                    gpu_vendor = "apple"
+                    gpu_name = "Apple Silicon (MPS)"
+                    mps_available = True
+
+        except Exception:
+            # If torch exists but fails to load fully, keep degraded profile.
+            pass
+
+    if not gpu_available:
+        gpu_vendor = "cpu"
+
+    return HardwareProfile(
+        gpu_available=gpu_available,
+        gpu_vendor=gpu_vendor,
+        gpu_name=gpu_name,
+        vram_gb=vram_gb,
+        cpu_ram_gb=_cpu_ram_gb(),
+        disk_free_gb=round(disk.free / (1024**3), 2),
+        python_version=sys.version.split()[0],
+        torch_version=torch_version,
+        cuda_available=cuda_available,
+        mps_available=mps_available,
+        platform=platform.platform(),
+    )
+```
+
+---
+
+# 4. Recipe engine data models
+
+## `src/moro/recipes/__init__.py`
+
+```python
+```
+
+## `src/moro/recipes/models.py`
+
+```python
+from typing import Literal
+
+from pydantic import BaseModel, Field
+
+
+class HardwareProfile(BaseModel):
+    gpu_available: bool
+    gpu_vendor: Literal["nvidia", "amd", "apple", "cpu", "unknown"]
+    gpu_name: str | None = None
+    vram_gb: float | None = None
+    cpu_ram_gb: float = 0.0
+    disk_free_gb: float = 0.0
+    python_version: str = ""
+    torch_version: str | None = None
+    cuda_available: bool = False
+    mps_available: bool = False
+    platform: str = ""
+
+
+class RecipeSuggestion(BaseModel):
+    model: str
+    model_class: str
+    quantization: Literal["none", "int8", "nf4"]
+    adapter_r: int
+    adapter_alpha: int
+    target_modules: list[str]
+    max_seq_length: int
+    batch_size: int
+    gradient_accumulation_steps: int
+    optimizer: Literal[
+        "adamw_torch",
+        "adamw_8bit",
+        "paged_adamw_8bit",
+    ]
+    gradient_checkpointing: bool
+    precision: Literal["auto", "bf16", "fp16", "fp32"]
+    estimated_vram_gb: float
+    target_vram_gb: float | None = None
+    confidence: Literal["low", "medium", "high"]
+    warnings: list[str] = Field(default_factory=list)
+```
+
+---
+
+# 5. Recipe presets
+
+These are the opinionated defaults.
+
+## `src/moro/recipes/presets.py`
+
+```python
+from dataclasses import dataclass
+
+
+ATTENTION_MODULES = (
+    "q_proj",
+    "k_proj",
+    "v_proj",
+    "o_proj",
+)
+
+EXTENDED_MODULES = (
+    "q_proj",
+    "k_proj",
+    "v_proj",
+    "o_proj",
+    "gate_proj",
+    "up_proj",
+    "down_proj",
+)
+
+
+@dataclass(frozen=True)
+class ModelPreset:
+    class_name: str
+    min_vram_gb: float
+    comfortable_vram_gb: float
+    default_max_seq_length: int
+    default_lora_r: int
+    default_target_modules: tuple[str, ...]
+    example_models: tuple[str, ...]
+
+
+MODEL_PRESETS: dict[str, ModelPreset] = {
+    "0.5b": ModelPreset(
+        class_name="0.5b",
+        min_vram_gb=2.0,
+        comfortable_vram_gb=3.0,
+        default_max_seq_length=512,
+        default_lora_r=8,
+        default_target_modules=ATTENTION_MODULES,
+        example_models=(
+            "Qwen/Qwen2.5-0.5B-Instruct",
+            "HuggingFaceTB/SmolLM-135M-Instruct",
+        ),
+    ),
+    "1b": ModelPreset(
+        class_name="1b",
+        min_vram_gb=3.0,
+        comfortable_vram_gb=4.0,
+        default_max_seq_length=1024,
+        default_lora_r=8,
+        default_target_modules=ATTENTION_MODULES,
+        example_models=(
+            "TinyLlama/TinyLlama-1.1B-Chat-v1.0",
+        ),
+    ),
+    "1.5b": ModelPreset(
+        class_name="1.5b",
+        min_vram_gb=4.0,
+        comfortable_vram_gb=6.0,
+        default_max_seq_length=1024,
+        default_lora_r=16,
+        default_target_modules=ATTENTION_MODULES,
+        example_models=(
+            "Qwen/Qwen2.5-1.5B-Instruct",
+        ),
+    ),
+    "3b": ModelPreset(
+        class_name="3b",
+        min_vram_gb=6.0,
+        comfortable_vram_gb=10.0,
+        default_max_seq_length=2048,
+        default_lora_r=16,
+        default_target_modules=ATTENTION_MODULES,
+        example_models=(
+            "Qwen/Qwen2.5-3B-Instruct",
+        ),
+    ),
+    "7b": ModelPreset(
+        class_name="7b",
+        min_vram_gb=10.0,
+        comfortable_vram_gb=18.0,
+        default_max_seq_length=2048,
+        default_lora_r=16,
+        default_target_modules=ATTENTION_MODULES,
+        example_models=(
+            "Qwen/Qwen2.5-7B-Instruct",
+        ),
+    ),
+    "8b": ModelPreset(
+        class_name="8b",
+        min_vram_gb=12.0,
+        comfortable_vram_gb=24.0,
+        default_max_seq_length=2048,
+        default_lora_r=16,
+        default_target_modules=ATTENTION_MODULES,
+        example_models=(
+            "meta-llama/Llama-3.1-8B-Instruct",
+        ),
+    ),
+    "13b": ModelPreset(
+        class_name="13b",
+        min_vram_gb=18.0,
+        comfortable_vram_gb=32.0,
+        default_max_seq_length=2048,
+        default_lora_r=16,
+        default_target_modules=ATTENTION_MODULES,
+        example_models=(
+            "Qwen/Qwen2.5-14B-Instruct",
+        ),
+    ),
+}
+
+ORDERED_MODEL_CLASSES = tuple(MODEL_PRESETS.keys())
+
+
+def get_model_preset(class_name: str) -> ModelPreset:
+    return MODEL_PRESETS.get(class_name, MODEL_PRESETS["1.5b"])
+```
+
+---
+
+# 6. Recipe rules
+
+This is the heart of the heuristic logic.
+
+## `src/moro/recipes/rules.py`
+
+```python
+import re
+
+from moro.recipes.presets import (
+    ATTENTION_MODULES,
+    EXTENDED_MODULES,
+    ORDERED_MODEL_CLASSES,
+    get_model_preset,
+)
+
+
+BASE_MEMORY_NF4_GB = {
+    "0.5b": 0.75,
+    "1b": 1.10,
+    "1.5b": 1.70,
+    "3b": 2.90,
+    "7b": 5.70,
+    "8b": 6.30,
+    "13b": 9.80,
+}
+
+ACTIVATION_COEFFICIENT = {
+    "0.5b": 0.15,
+    "1b": 0.25,
+    "1.5b": 0.35,
+    "3b": 0.65,
+    "7b": 1.25,
+    "8b": 1.40,
+    "13b": 2.10,
+}
+
+ADAPTER_BASE_GB = {
+    "0.5b": 0.05,
+    "1b": 0.08,
+    "1.5b": 0.12,
+    "3b": 0.20,
+    "7b": 0.35,
+    "8b": 0.40,
+    "13b": 0.60,
+}
+
+
+def _class_index(class_name: str) -> int:
+    if class_name not in ORDERED_MODEL_CLASSES:
+        return ORDERED_MODEL_CLASSES.index("1.5b")
+    return ORDERED_MODEL_CLASSES.index(class_name)
+
+
+def infer_model_class(model_name: str) -> str:
+    """
+    Infer model size class from model name.
+
+    Examples:
+    - Qwen/Qwen2.5-1.5B-Instruct -> 1.5b
+    - meta-llama/Llama-3.1-8B-Instruct -> 8b
+    - TinyLlama/TinyLlama-1.1B-Chat-v1.0 -> 1b
+    """
+    name = model_name.lower()
+
+    # Billion-parameter pattern
+    b_matches = re.findall(r"(\d+(?:\.\d+)?)\s*b\b", name)
+    if b_matches:
+        try:
+            values = [float(x) for x in b_matches]
+            billions = max(values)
+            return _normalize_billions_to_class(billions)
+        except Exception:
+            pass
+
+    # Million-parameter pattern
+    m_matches = re.findall(r"(\d+(?:\.\d+)?)\s*m\b", name)
+    if m_matches:
+        try:
+            values = [float(x) for x in m_matches]
+            millions = max(values)
+            billions = millions / 1000.0
+            return _normalize_billions_to_class(billions)
+        except Exception:
+            pass
+
+    # Fallback by keywords
+    if any(token in name for token in ("tiny", "smol", "small", "mini")):
+        return "0.5b"
+    if "medium" in name:
+        return "3b"
+    if "large" in name:
+        return "7b"
+
+    # Conservative default for unknown model names
+    return "1.5b"
+
+
+def _normalize_billions_to_class(billions: float) -> str:
+    if billions <= 0.6:
+        return "0.5b"
+    if billions <= 1.2:
+        return "1b"
+    if billions <= 2.0:
+        return "1.5b"
+    if billions <= 4.0:
+        return "3b"
+    if billions <= 7.5:
+        return "7b"
+    if billions <= 9.5:
+        return "8b"
+    return "13b"
+
+
+def max_model_class_for_vram(target_vram_gb: float) -> str:
+    if target_vram_gb <= 0:
+        return "0.5b"
+    if target_vram_gb < 3:
+        return "0.5b"
+    if target_vram_gb < 5:
+        return "1b"
+    if target_vram_gb < 7:
+        return "1.5b"
+    if target_vram_gb < 10:
+        return "3b"
+    if target_vram_gb < 18:
+        return "7b"
+    if target_vram_gb < 24:
+        return "8b"
+    return "13b"
+
+
+def choose_model_class_for_vram(
+    target_vram_gb: float,
+    desired_class: str,
+) -> str:
+    max_allowed = max_model_class_for_vram(target_vram_gb)
+
+    desired_idx = _class_index(desired_class)
+    allowed_idx = _class_index(max_allowed)
+
+    if desired_idx <= allowed_idx:
+        return desired_class
+
+    return max_allowed
+
+
+def choose_max_seq_length(
+    requested_seq_length: int | None,
+    target_vram_gb: float,
+    model_class: str,
+) -> int:
+    preset = get_model_preset(model_class)
+
+    if target_vram_gb <= 0:
+        max_by_vram = 256
+    elif target_vram_gb < 4:
+        max_by_vram = 512
+    elif target_vram_gb < 6:
+        max_by_vram = 1024
+    elif target_vram_gb < 10:
+        max_by_vram = 2048
+    else:
+        max_by_vram = 4096
+
+    requested = requested_seq_length or preset.default_max_seq_length
+
+    return max(
+        256,
+        min(
+            requested,
+            preset.default_max_seq_length,
+            max_by_vram,
+        ),
+    )
+
+
+def choose_lora_rank(
+    target_vram_gb: float,
+    model_class: str,
+    seq_length: int,
+) -> int:
+    preset = get_model_preset(model_class)
+    r = preset.default_lora_r
+
+    if target_vram_gb <= 0:
+        return 4
+
+    if target_vram_gb < 4:
+        r = min(r, 8)
+    elif target_vram_gb < 6:
+        r = min(r, 8)
+    elif target_vram_gb < 10:
+        r = min(r, 16)
+    else:
+        r = min(r, 32)
+
+    # Long contexts increase activation pressure, so reduce rank slightly.
+    if seq_length >= 2048:
+        r = max(4, r // 2)
+
+    return r
+
+
+def choose_target_modules(
+    target_vram_gb: float,
+    model_class: str,
+) -> list[str]:
+    """
+    Conservative default:
+    - attention-only for most low-memory cases
+    - extended modules only when there is enough headroom
+    """
+    if model_class in {"0.5b", "1b", "1.5b"} and target_vram_gb >= 6:
+        return list(EXTENDED_MODULES)
+
+    if model_class == "3b" and target_vram_gb >= 12:
+        return list(EXTENDED_MODULES)
+
+    return list(ATTENTION_MODULES)
+
+
+def choose_gradient_accumulation_steps(
+    target_vram_gb: float,
+    seq_length: int,
+) -> int:
+    if target_vram_gb <= 0:
+        return 8
+
+    if target_vram_gb < 4:
+        return 32
+
+    if target_vram_gb < 8:
+        return 16
+
+    if seq_length > 1024:
+        return 16
+
+    return 8
+
+
+def choose_precision(hardware) -> str:
+    if hardware.cuda_available:
+        return "auto"
+    if hardware.mps_available:
+        return "auto"
+    return "fp32"
+
+
+def estimate_base_memory_gb(
+    model_class: str,
+    quantization: str,
+) -> float:
+    base = BASE_MEMORY_NF4_GB.get(model_class, 1.7)
+
+    if quantization == "int8":
+        return base * 1.9
+    if quantization == "none":
+        return base * 3.6
+
+    return base
+
+
+def estimate_activation_memory_gb(
+    model_class: str,
+    seq_length: int,
+    batch_size: int,
+    gradient_checkpointing: bool,
+) -> float:
+    coeff = ACTIVATION_COEFFICIENT.get(model_class, 0.35)
+    mem = coeff * (seq_length / 1024.0) * batch_size
+
+    if gradient_checkpointing:
+        mem *= 0.65
+
+    return mem
+
+
+def estimate_adapter_memory_gb(
+    model_class: str,
+    lora_r: int,
+    target_modules: list[str],
+) -> float:
+    base = ADAPTER_BASE_GB.get(model_class, 0.12)
+    module_factor = len(target_modules) / 4.0
+    rank_factor = lora_r / 16.0
+
+    return base * module_factor * rank_factor
+
+
+def estimate_total_memory_gb(
+    *,
+    model_class: str,
+    quantization: str,
+    max_seq_length: int,
+    batch_size: int,
+    adapter_r: int,
+    target_modules: list[str],
+    gradient_checkpointing: bool,
+    optimizer: str,
+) -> float:
+    if quantization == "none":
+        optimizer_overhead = 0.45
+    elif optimizer == "paged_adamw_8bit":
+        optimizer_overhead = 0.25
+    else:
+        optimizer_overhead = 0.40
+
+    base = estimate_base_memory_gb(model_class, quantization)
+    activations = estimate_activation_memory_gb(
+        model_class=model_class,
+        seq_length=max_seq_length,
+        batch_size=batch_size,
+        gradient_checkpointing=gradient_checkpointing,
+    )
+    adapter = estimate_adapter_memory_gb(
+        model_class=model_class,
+        lora_r=adapter_r,
+        target_modules=target_modules,
+    )
+
+    safety_margin = 0.50
+
+    total = base + activations + adapter + optimizer_overhead + safety_margin
+    return round(total, 2)
+```
+
+---
+
+# 7. Recipe engine
+
+This ties everything together.
+
+## `src/moro/recipes/engine.py`
+
+```python
+from moro.config.models import MoroConfig
+from moro.hardware.profile import detect_hardware_profile
+from moro.recipes.models import HardwareProfile, RecipeSuggestion
+from moro.recipes.presets import ATTENTION_MODULES, get_model_preset
+from moro.recipes.rules import (
+    choose_gradient_accumulation_steps,
+    choose_lora_rank,
+    choose_max_seq_length,
+    choose_model_class_for_vram,
+    choose_precision,
+    choose_target_modules,
+    estimate_total_memory_gb,
+    infer_model_class,
+)
+
+
+def suggest_recipe(
+    config: MoroConfig,
+    hardware: HardwareProfile | None = None,
+    model_override: str | None = None,
+    target_vram_gb: float | None = None,
+    max_seq_length_override: int | None = None,
+) -> RecipeSuggestion:
+    hardware = hardware or detect_hardware_profile()
+    warnings: list[str] = []
+
+    if hardware.torch_version is None:
+        warnings.append(
+            "PyTorch is not installed. Training will not work until torch is installed."
+        )
+
+    # Determine usable VRAM target
+    if target_vram_gb is not None:
+        target_vram = float(target_vram_gb)
+    elif hardware.gpu_available and hardware.vram_gb:
+        target_vram = float(hardware.vram_gb)
+    else:
+        target_vram = 0.0
+
+    # Decide model
+    desired_model = model_override or config.model.name
+    desired_class = infer_model_class(desired_model)
+
+    if target_vram <= 0:
+        chosen_class = "0.5b"
+        warnings.append(
+            "No usable GPU VRAM detected. Recommending very small local settings."
+        )
+    else:
+        chosen_class = choose_model_class_for_vram(
+            target_vram_gb=target_vram,
+            desired_class=desired_class,
+        )
+
+    preset = get_model_preset(chosen_class)
+
+    if chosen_class != desired_class:
+        chosen_model = preset.example_models[0]
+        warnings.append(
+            f"Requested model class '{desired_class}' is too large for available memory. "
+            f"Recommending '{chosen_model}' instead."
+        )
+    else:
+        chosen_model = desired_model
+
+    # Quantization
+    quantization = config.model.quantization
+
+    if target_vram <= 0:
+        quantization = "none"
+        warnings.append(
+            "Quantization disabled because no CUDA GPU VRAM was detected."
+        )
+    elif target_vram < 12 and quantization != "nf4":
+        quantization = "nf4"
+        warnings.append(
+            "Forced quantization to nf4 to fit within available memory."
+        )
+
+    # Sequence length
+    requested_seq_length = max_seq_length_override or config.dataset.max_seq_length
+    max_seq_length = choose_max_seq_length(
+        requested_seq_length=requested_seq_length,
+        target_vram_gb=target_vram,
+        model_class=chosen_class,
+    )
+
+    if requested_seq_length and max_seq_length < requested_seq_length:
+        warnings.append(
+            f"Reduced max_seq_length from {requested_seq_length} to {max_seq_length} "
+            "to reduce memory pressure."
+        )
+
+    # Adapter settings
+    adapter_r = choose_lora_rank(
+        target_vram_gb=target_vram,
+        model_class=chosen_class,
+        seq_length=max_seq_length,
+    )
+    adapter_alpha = adapter_r * 2
+
+    target_modules = choose_target_modules(
+        target_vram_gb=target_vram,
+        model_class=chosen_class,
+    )
+
+    # Training settings
+    batch_size = 1
+    gradient_accumulation_steps = choose_gradient_accumulation_steps(
+        target_vram_gb=target_vram,
+        seq_length=max_seq_length,
+    )
+
+    optimizer = "paged_adamw_8bit" if hardware.cuda_available else "adamw_torch"
+    precision = choose_precision(hardware)
+    gradient_checkpointing = True
+
+    # Estimate memory
+    if target_vram <= 0:
+        estimated_vram = 0.0
+    else:
+        estimated_vram = estimate_total_memory_gb(
+            model_class=chosen_class,
+            quantization=quantization,
+            max_seq_length=max_seq_length,
+            batch_size=batch_size,
+            adapter_r=adapter_r,
+            target_modules=target_modules,
+            gradient_checkpointing=gradient_checkpointing,
+            optimizer=optimizer,
+        )
+
+    # Fallback if estimate still looks too high
+    if target_vram > 0 and estimated_vram > target_vram:
+        max_seq_length = max(256, int(max_seq_length * 0.75))
+        adapter_r = max(4, adapter_r // 2)
+        adapter_alpha = adapter_r * 2
+        target_modules = list(ATTENTION_MODULES)
+
+        estimated_vram = estimate_total_memory_gb(
+            model_class=chosen_class,
+            quantization=quantization,
+            max_seq_length=max_seq_length,
+            batch_size=batch_size,
+            adapter_r=adapter_r,
+            target_modules=target_modules,
+            gradient_checkpointing=gradient_checkpointing,
+            optimizer=optimizer,
+        )
+
+        warnings.append(
+            "Initial recipe exceeded available VRAM. "
+            "Reduced sequence length and adapter size automatically."
+        )
+
+    # Confidence
+    if not hardware.gpu_available or hardware.torch_version is None:
+        confidence = "low"
+    elif target_vram > 0 and estimated_vram <= target_vram * 0.85:
+        confidence = "high"
+    elif target_vram > 0 and estimated_vram <= target_vram:
+        confidence = "medium"
+    else:
+        confidence = "low"
+
+    return RecipeSuggestion(
+        model=chosen_model,
+        model_class=chosen_class,
+        quantization=quantization,
+        adapter_r=adapter_r,
+        adapter_alpha=adapter_alpha,
+        target_modules=target_modules,
+        max_seq_length=max_seq_length,
+        batch_size=batch_size,
+        gradient_accumulation_steps=gradient_accumulation_steps,
+        optimizer=optimizer,
+        gradient_checkpointing=gradient_checkpointing,
+        precision=precision,
+        estimated_vram_gb=estimated_vram,
+        target_vram_gb=target_vram if target_vram > 0 else None,
+        confidence=confidence,
+        warnings=warnings,
+    )
+```
+
+---
+
+# 8. CLI command: `moro recipe suggest`
+
+## `src/moro/cli/recipe.py`
+
+```python
+import json
+
+import typer
+from rich.console import Console
+from rich.table import Table
+
+from moro.core.errors import ConfigError, ProjectError
+from moro.core.project import load_project_config
+from moro.hardware.profile import detect_hardware_profile
+from moro.recipes.engine import suggest_recipe
+
+console = Console()
+
+recipe_app = typer.Typer(
+    name="recipe",
+    help="Recipe commands",
+    no_args_is_help=True,
+)
+
+
+@recipe_app.command("suggest")
+def recipe_suggest_command(
+    model: str | None = typer.Option(
+        default=None,
+        "--model",
+        help="Override the model from moro.yaml.",
+    ),
+    target_vram: float | None = typer.Option(
+        default=None,
+        "--target-vram",
+        help="Override GPU VRAM target in GB.",
+    ),
+    max_seq_length: int | None = typer.Option(
+        default=None,
+        "--max-seq-length",
+        help="Override max sequence length.",
+    ),
+    json_output: bool = typer.Option(
+        default=False,
+        "--json",
+        help="Print output as JSON.",
+    ),
+) -> None:
+    """
+    Suggest a safe training recipe based on config and hardware.
+    """
+    try:
+        config = load_project_config()
+        hardware = detect_hardware_profile()
+
+        suggestion = suggest_recipe(
+            config=config,
+            hardware=hardware,
+            model_override=model,
+            target_vram_gb=target_vram,
+            max_seq_length_override=max_seq_length,
+        )
+
+        if json_output:
+            typer.echo(suggestion.model_dump_json(indent=2))
+            return
+
+        table = Table(title="MoroAI Recipe Suggestion")
+        table.add_column("Field", style="cyan")
+        table.add_column("Value", style="white")
+
+        table.add_row("Model", suggestion.model)
+        table.add_row("Model class", suggestion.model_class)
+        table.add_row("Quantization", suggestion.quantization)
+        table.add_row("LoRA r", str(suggestion.adapter_r))
+        table.add_row("LoRA alpha", str(suggestion.adapter_alpha))
+        table.add_row("Target modules", ", ".join(suggestion.target_modules))
+        table.add_row("Max sequence length", str(suggestion.max_seq_length))
+        table.add_row("Batch size", str(suggestion.batch_size))
+        table.add_row(
+            "Gradient accumulation steps",
+            str(suggestion.gradient_accumulation_steps),
+        )
+        table.add_row("Optimizer", suggestion.optimizer)
+        table.add_row(
+            "Gradient checkpointing",
+            "Yes" if suggestion.gradient_checkpointing else "No",
+        )
+        table.add_row("Precision", suggestion.precision)
+        table.add_row("Estimated VRAM (GB)", str(suggestion.estimated_vram_gb))
+        table.add_row("Target VRAM (GB)", str(suggestion.target_vram_gb or "-"))
+        table.add_row("Confidence", suggestion.confidence)
+
+        console.print(table)
+
+        if hardware.gpu_name:
+            console.print(f"\n[bold]GPU:[/bold] {hardware.gpu_name}")
+        else:
+            console.print("\n[bold]GPU:[/bold] None detected")
+
+        if hardware.vram_gb:
+            console.print(f"[bold]VRAM:[/bold] {hardware.vram_gb} GB")
+        else:
+            console.print("[bold]VRAM:[/bold] Unknown")
+
+        if suggestion.warnings:
+            console.print("\n[bold yellow]Warnings:[/bold yellow]")
+            for warning in suggestion.warnings:
+                console.print(f"- {warning}")
+
+    except ProjectError as exc:
+        console.print(f"[bold red]Project error:[/bold red] {exc}")
+        raise typer.Exit(code=2)
+    except ConfigError as exc:
+        console.print(f"[bold red]Config error:[/bold red] {exc}")
+        raise typer.Exit(code=2)
+    except Exception as exc:
+        console.print(f"[bold red]Unexpected error:[/bold red] {exc}")
+        raise typer.Exit(code=1)
+```
+
+---
+
+# 9. Register the recipe command in `main.py`
+
+Update your existing `src/moro/main.py`.
+
+Add this import:
+
+```python
+from moro.cli.recipe import recipe_app
+```
+
+Then add:
+
+```python
+app.add_typer(recipe_app, name="recipe")
+```
+
+## Updated minimal `src/moro/main.py`
+
+```python
+import typer
+
+from moro import __version__
+from moro.cli.init import init_command
+from moro.cli.status import status_command
+from moro.cli.doctor import doctor_command
+from moro.cli.data import data_app, import_command
+from moro.cli.recipe import recipe_app
+
+app = typer.Typer(
+    name="moro",
+    help="MoroAI: local-first model adaptation foundry.",
+    no_args_is_help=True,
+    add_completion=False,
+)
+
+
+@app.callback()
+def main() -> None:
+    """
+    MoroAI CLI.
+
+    Build, evaluate, and deploy local models from private data.
+    """
+    pass
+
+
+app.command(name="init", help="Initialize a new MoroAI project")(init_command)
+app.command(name="status", help="Show current project status")(status_command)
+app.command(name="doctor", help="Check environment and hardware readiness")(doctor_command)
+app.command(name="import", help="Import raw data into the project")(import_command)
+
+app.add_typer(data_app, name="data")
+app.add_typer(recipe_app, name="recipe")
+
+
+@app.command(name="version", help="Show MoroAI version")
+def version_command() -> None:
+    typer.echo(__version__)
+
+
+if __name__ == "__main__":
+    app()
+```
+
+---
+
+# 10. How to use it
+
+Inside a MoroAI project:
+
+```bash
+moro recipe suggest
+```
+
+Override hardware target:
+
+```bash
+moro recipe suggest --target-vram 6
+```
+
+Override model:
+
+```bash
+moro recipe suggest --model Qwen/Qwen2.5-1.5B-Instruct
+```
+
+Override sequence length:
+
+```bash
+moro recipe suggest --max-seq-length 2048
+```
+
+JSON output:
+
+```bash
+moro recipe suggest --json
+```
+
+Combined:
+
+```bash
+moro recipe suggest --target-vram 8 --max-seq-length 1024 --json
+```
+
+---
+
+# 11. What this engine is actually doing
+
+This is not magic — it is a deliberate heuristic system.
+
+It reasons across:
+
+## 1. Model size
+It infers the model class from the name:
+- `0.5b`
+- `1b`
+- `1.5b`
+- `3b`
+- `7b`
+- `8b`
+- `13b`
+
+## 2. Available memory
+It chooses the largest model class that is likely to fit.
+
+## 3. Sequence length
+It reduces context length when memory is tight.
+
+## 4. Adapter size
+It lowers LoRA rank when:
+- VRAM is small
+- sequence length is large
+
+## 5. Target modules
+It starts with attention-only modules in constrained settings.
+
+## 6. Optimizer and precision
+It chooses conservative settings for low-resource environments.
+
+## 7. Confidence scoring
+It tells the user how much trust to place in the suggestion.
+
+This is exactly the right MVP behavior.
+
+---
+
+# 12. Important limitations of this starter engine
+
+This engine is intentionally heuristic-based.
+
+It does **not** yet:
+- measure real runtime memory
+- benchmark actual model loading
+- account perfectly for every architecture
+- know every model’s module names
+- replace profiling on real hardware
+
+That is okay.
+
+The right evolution path is:
+
+### Phase 1
+Rule-based presets  
+✅ this is what we just built
+
+### Phase 2
+Profiler-assisted suggestions  
+- load model briefly
+- measure actual memory
+- adjust recipe
+
+### Phase 3
+Benchmark feedback loop  
+- store successful configs
+- improve suggestions over time
+
+---
+
+# 13. How to make this engine much stronger next
+
+The next upgrades I would make are:
+
+## A. Add a real memory probe
+Run a tiny profiling step:
+- load model
+- run one forward pass
+- run one backward pass if possible
+- measure peak VRAM
+
+Then feed that back into the engine.
+
+## B. Add model-family awareness
+Some models use different module names.
+
+For example:
+- Llama/Qwen often use `q_proj`, `k_proj`, etc.
+- other architectures may differ
+
+So later you need:
+- model family detection
+- module mapping table
+
+## C. Add tokenizer-aware sequence planning
+Right now sequence length is config-driven.
+
+Later:
+- inspect dataset token distribution
+- choose seq length based on p95 token count
+- reduce unnecessary padding
+
+## D. Add saved “known good recipes”
+For example:
+- `low-vram-1b`
+- `support-agent-1.5b`
+- `doc-summarizer-3b`
+
+Then the engine can suggest:
+- recommended recipe
+- alternative aggressive recipe
+- conservative recipe
+
+That would be excellent UX.
+
+---
+
+# 14. What you now have
+
+With this code, MoroAI now has:
+
+- hardware detection
+- model class inference
+- memory-aware recipe suggestion
+- conservative low-VRAM defaults
+- JSON output
+- CLI integration
+- warnings
+- confidence scoring
+
+That makes the product feel much more intelligent.
+
+And more importantly, it directly supports the core MoroAI promise:
+
+> private data → safe local training → trustworthy local model
+
+---
+
+# 15. What to build immediately after this
+
+The next best module is the **training backend starter**.
+
+That would include:
+
+- `src/moro/training/backend.py`
+- `src/moro/training/run.py`
+- `src/moro/training/hf_backend.py`
+- `src/moro/cli/train.py`
+
+This will give you:
+
+```bash
+moro train
+```
+
+and connect the recipe engine to actual execution.
+
+---
+
+If you want, I can now generate the next in-depth starter kit:
+
+# **MoroAI Training Engine Starter Code**
+
+including:
+- training backend abstraction
+- run lifecycle
+- QLoRA backend
+- exact `moro train` implementation

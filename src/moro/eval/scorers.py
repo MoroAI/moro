@@ -56,17 +56,22 @@ def score_case(case: EvalCase, response: str) -> CaseScore:
         checks.append(passed)
 
     # json_schema — attempt to parse response as JSON and validate
-    if case.expect.json_schema:
+    if case.expect.json_schema is not None:
+        import json
+
+        from moro.core.errors import DependencyError
+
         try:
-            import json
-
             import jsonschema
+        except ImportError as exc:
+            raise DependencyError("JSON schema scoring requires moroai[eval].") from exc
 
+        try:
             parsed = json.loads(response)
             jsonschema.validate(parsed, case.expect.json_schema)
             details["json_schema"] = "passed"
             checks.append(True)
-        except Exception as exc:
+        except (json.JSONDecodeError, jsonschema.ValidationError) as exc:
             details["json_schema"] = str(exc)
             checks.append(False)
 

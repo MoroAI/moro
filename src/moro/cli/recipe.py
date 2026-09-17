@@ -1,7 +1,12 @@
+from pathlib import Path
+
 import typer
 from rich.console import Console
 from rich.table import Table
 
+from moro.config.loader import load_config
+from moro.core.errors import ConfigError
+from moro.core.paths import CONFIG_FILE, find_project_root
 from moro.hardware.detector import detect_hardware
 from moro.hardware.profile import HardwareProfile
 from moro.recipes.engine import suggest_recipe
@@ -12,6 +17,8 @@ console = Console()
 
 @app.command("suggest")
 def suggest_command(
+    config_path: Path | None = typer.Option(None, "--config", help="Use an explicit moro.yaml."),
+    yaml_patch: bool = typer.Option(False, "--yaml-patch", help="Print a YAML patch for review."),
     model: str | None = typer.Option(
         None,
         "--model",
@@ -37,6 +44,14 @@ def suggest_command(
     ),
 ) -> None:
     """Suggest a hardware-safe training recipe."""
+    if yaml_patch and json_output:
+        raise typer.BadParameter("Choose either --yaml-patch or --json.")
+    root = find_project_root()
+    cfg_file = config_path or (root / CONFIG_FILE if root else None)
+    try:
+        config = load_config(cfg_file) if cfg_file else None
+    except ConfigError as exc:
+        raise typer.BadParameter(str(exc)) from exc
     with console.status("[cyan]Detecting hardware…[/cyan]"):
         raw = detect_hardware()
 
@@ -44,12 +59,19 @@ def suggest_command(
     try:
         suggestion = suggest_recipe(
             hardware=hardware,
+            config=config,
             model_name=model,
             target_vram=target_vram,
             max_seq_length=max_seq_length,
         )
     except ValueError as exc:
         raise typer.BadParameter(str(exc)) from exc
+
+    if yaml_patch:
+        import yaml
+
+        typer.echo(yaml.safe_dump(suggestion.config_patch, sort_keys=False).rstrip())
+        return
 
     if json_output:
         import json
@@ -76,13 +98,21 @@ def suggest_command(
     table.add_row("Optimizer", suggestion.optimizer)
     table.add_row("Gradient checkpointing", str(suggestion.gradient_checkpointing))
     table.add_row("Precision", suggestion.precision)
-    table.add_row("Est. VRAM usage", f"{suggestion.estimated_vram_gb:.1f} GB")
+    table.add_row("Memory fit", suggestion.fit)
+    estimate = suggestion.estimated_memory_gb
+    table.add_row(
+        "Estimated memory (GiB)", f"{estimate:.2f}" if estimate is not None else "unknown"
+    )
+    table.add_row("Parameter source", suggestion.parameter_source)
     table.add_row(
         "Confidence",
         suggestion.confidence,
     )
 
     console.print(table)
+
+    for reason in suggestion.reasons:
+        console.print(f"  {reason}")
 
     if suggestion.warnings:
         console.print("\n[bold yellow]Warnings:[/bold yellow]")

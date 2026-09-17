@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import json
 import shutil
+import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -16,23 +17,46 @@ from moro.core.ids import new_id
 
 def export_adapter(run_dir: Path, out_dir: Path) -> Path:
     """
-    Copy the adapter files from a run directory to the output directory.
+    Stage an independent adapter copy, refusing overlaps and existing exports.
 
-    Returns the destination path.
+    Publication is a same-filesystem rename. This does not make the surrounding
+    manifest/card writes transactional or protect against concurrent source edits.
     """
-    adapter_src = Path(run_dir) / "adapter"
-    if not adapter_src.exists():
-        raise ExportError(f"Adapter not found in run directory: {adapter_src}")
+    try:
+        adapter_src = (Path(run_dir) / "adapter").resolve()
+        if not adapter_src.is_dir():
+            raise ExportError(f"Adapter directory not found: {adapter_src}")
 
-    out_dir = Path(out_dir)
-    out_dir.mkdir(parents=True, exist_ok=True)
-    dest = out_dir / "adapter"
+        out_dir = Path(out_dir)
+        dest = out_dir / "adapter"
+        resolved_dest = dest.resolve()
+        if adapter_src.is_relative_to(resolved_dest) or resolved_dest.is_relative_to(adapter_src):
+            raise ExportError(
+                "Adapter source and export destination overlap; choose another --out."
+            )
+        if dest.exists() or dest.is_symlink():
+            raise ExportError(f"Export destination already exists: {dest}. Choose a fresh --out.")
 
-    if dest.exists():
-        shutil.rmtree(dest)
+        # Refuse links rather than following them into unrelated or recursive trees.
+        for entry in adapter_src.rglob("*"):
+            if entry.is_symlink():
+                raise ExportError(f"Adapter contains a symbolic link: {entry}")
 
-    shutil.copytree(adapter_src, dest)
-    return dest
+        out_dir.mkdir(parents=True, exist_ok=True)
+        with tempfile.TemporaryDirectory(prefix=".moro-export-", dir=out_dir) as staging:
+            staged_adapter = Path(staging) / "adapter"
+            shutil.copytree(adapter_src, staged_adapter, symlinks=True)
+            # Also catch links introduced while copying; never publish a linked bundle.
+            if any(entry.is_symlink() for entry in staged_adapter.rglob("*")):
+                raise ExportError("Adapter contains a symbolic link introduced during export.")
+            if dest.exists() or dest.is_symlink():
+                raise ExportError(
+                    f"Export destination already exists: {dest}. Choose a fresh --out."
+                )
+            staged_adapter.rename(dest)
+        return dest
+    except (OSError, RuntimeError) as exc:
+        raise ExportError(f"Could not export adapter: {exc}") from exc
 
 
 def generate_manifest(
@@ -42,6 +66,7 @@ def generate_manifest(
     artifact_paths: list[Path],
     eval_summary: dict | None = None,
     dataset_version_id: str | None = None,
+    base_model_revision: str | None = None,
 ) -> dict:
     """
     Generate a release manifest dict.
@@ -64,6 +89,7 @@ def generate_manifest(
         "run_id": run_id,
         "created_at": datetime.now(timezone.utc).isoformat(),
         "base_model": base_model,
+        "base_model_revision": base_model_revision,
         "dataset_version_id": dataset_version_id,
         "eval_summary": eval_summary or {},
         "artifacts": artifacts,

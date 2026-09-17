@@ -5,9 +5,10 @@ import typer
 from rich.console import Console
 from rich.table import Table
 
-from moro.core.errors import EvalError, ProjectError
+from moro.core.errors import DependencyError, EvalError, ExportError, ProjectError
 from moro.core.project import load_project_config, require_project_root
 from moro.eval.runner import run_suite
+from moro.export.eligibility import resolve_export_run
 from moro.storage import db as storage_db
 
 app = typer.Typer(name="eval", help="Evaluation operations.")
@@ -47,27 +48,14 @@ def eval_run_command(
         root = require_project_root()
         cfg = load_project_config()
 
-        # Determine model path
+        if base_model and run_id:
+            raise EvalError("Choose --base-model or --run-id, not both.")
         if base_model:
             model_path = base_model
-        elif run_id:
-            model_path = str(root / "runs" / run_id / "adapter")
         else:
-            # Try latest run
-            conn = storage_db.get_connection(root)
-            project_id = storage_db.get_or_create_project(conn, cfg.project.name)
-            run_row = storage_db.get_latest_run(conn, project_id)
-            conn.close()
-            if run_row and run_row["status"] == "completed":
-                model_path = str(Path(run_row["output_dir"]) / "adapter")
-                run_id = run_row["id"]
-                if not json_output:
-                    console.print(f"[dim]Using latest completed run: {run_id}[/dim]")
-            else:
-                raise EvalError(
-                    "No completed run found. Specify --run-id or --base-model, "
-                    "or run `moro train` first."
-                )
+            selected = resolve_export_run(root, cfg.project.name, run_id)
+            model_path = str(selected.adapter_path)
+            run_id = selected.id
 
         if not json_output:
             console.print(f"[cyan]→[/cyan]  Evaluating: [bold]{model_path}[/bold]")
@@ -80,7 +68,9 @@ def eval_run_command(
                 run_id=run_id,
                 max_samples=max_samples,
                 local_only=cfg.project.privacy_mode == "local_only",
-                revision=cfg.model.revision if not run_id else None,
+                revision=cfg.model.revision
+                if not run_id and model_path == cfg.model.name
+                else None,
             )
 
         # Persist to DB
@@ -123,7 +113,7 @@ def eval_run_command(
         console.print(f"[bold]Avg score:[/bold] {result.avg_score:.4f}")
         console.print(f"\n[dim]Eval ID: {result.id}[/dim]")
 
-    except EvalError as exc:
+    except (EvalError, ExportError, DependencyError) as exc:
         console.print(f"[bold red]Eval error:[/bold red] {exc}")
         raise typer.Exit(code=1)
     except ProjectError as exc:

@@ -1,0 +1,844 @@
+
+When we finish this, MoroAI will officially support the full lifecycle:
+
+```text
+data → recipe → train → eval → export → deploy
+```
+
+Below is the **MoroAI Export & Deploy Starter Code**. 
+
+This includes:
+- release persistence
+- adapter and merged-model export
+- automated model card generation
+- release manifest generation
+- Ollama deployment preparation (`Modelfile` + deployment guide)
+- exact `moro export` implementation
+- exact `moro deploy --target ollama` implementation
+
+---
+
+# 1. What we are building now
+
+After this step, MoroAI can do:
+
+```bash
+moro export --run-id <run_id> --version v0.1.0
+moro export --run-id <run_id> --version v0.1.0-merged --merge
+moro deploy --target ollama --version v0.1.0-merged
+```
+
+Internally it will:
+1. locate the trained run and its eval results
+2. package the adapter (and optionally merge it into the base model)
+3. generate a professional `model_card.md`
+4. generate a `manifest.json` for reproducibility
+5. generate an Ollama `Modelfile` and deployment instructions
+6. register the release in the local SQLite database
+
+This turns a training experiment into a **shippable artifact**.
+
+---
+
+# 2. New files to add
+
+Add these files to your project:
+
+```text
+src/moro/
+  storage/
+    releases.py
+  export/
+    __init__.py
+    models.py
+    manifest.py
+    model_card.py
+    ollama.py
+  cli/
+    export.py
+```
+
+You will also update:
+```text
+src/moro/main.py
+```
+
+---
+
+# 3. Release persistence layer
+
+## `src/moro/storage/releases.py`
+
+```python
+import sqlite3
+
+from moro.storage.db import new_id, utcnow
+
+
+def ensure_releases_schema(conn: sqlite3.Connection) -> None:
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS releases (
+            id TEXT PRIMARY KEY,
+            project_id TEXT NOT NULL,
+            run_id TEXT NOT NULL,
+            version TEXT NOT NULL,
+            status TEXT NOT NULL,
+            manifest_path TEXT NOT NULL,
+            created_at TEXT NOT NULL
+        );
+        """
+    )
+    conn.commit()
+
+
+def create_release(
+    conn: sqlite3.Connection,
+    *,
+    project_id: str,
+    run_id: str,
+    version: str,
+    manifest_path: str,
+) -> str:
+    release_id = new_id("rel")
+
+    conn.execute(
+        """
+        INSERT INTO releases (
+            id, project_id, run_id, version, status, manifest_path, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            release_id,
+            project_id,
+            run_id,
+            version,
+            "packaged",
+            manifest_path,
+            utcnow(),
+        ),
+    )
+    conn.commit()
+    return release_id
+
+
+def list_releases(
+    conn: sqlite3.Connection,
+    limit: int = 20,
+) -> list[sqlite3.Row]:
+    return conn.execute(
+        """
+        SELECT * FROM releases
+        ORDER BY created_at DESC
+        LIMIT ?
+        """,
+        (limit,),
+    ).fetchall()
+```
+
+---
+
+# 4. Export models
+
+## `src/moro/export/__init__.py`
+
+```python
+```
+
+## `src/moro/export/models.py`
+
+```python
+from __future__ import annotations
+
+from datetime import datetime
+from pathlib import Path
+from typing import Any
+
+from pydantic import BaseModel, Field
+
+
+class ArtifactInfo(BaseModel):
+    type: str  # e.g., "adapter", "merged_model", "model_card", "manifest"
+    path: str
+    size_bytes: int | None = None
+    sha256: str | None = None
+
+
+class ReleaseManifest(BaseModel):
+    release_id: str
+    project_name: str
+    run_id: str
+    version: str
+    created_at: datetime
+    base_model: str
+    dataset_version_id: str | None = None
+    eval_summary: dict[str, Any] = Field(default_factory=dict)
+    artifacts: list[ArtifactInfo] = Field(default_factory=list)
+    training_config: dict[str, Any] = Field(default_factory=dict)
+```
+
+---
+
+# 5. Manifest generator
+
+## `src/moro/export/manifest.py`
+
+```python
+import json
+from pathlib import Path
+
+from moro.config.models import MoroConfig
+from moro.export.models import ArtifactInfo, ReleaseManifest
+
+
+def build_manifest(
+    release_id: str,
+    project_name: str,
+    run_id: str,
+    version: str,
+    config: MoroConfig,
+    dataset_version_id: str | None,
+    eval_summary: dict,
+    artifacts: list[ArtifactInfo],
+) -> ReleaseManifest:
+    return ReleaseManifest(
+        release_id=release_id,
+        project_name=project_name,
+        run_id=run_id,
+        version=version,
+        created_at=__import__("datetime").datetime.now(__import__("datetime").timezone.utc),
+        base_model=config.model.name,
+        dataset_version_id=dataset_version_id,
+        eval_summary=eval_summary,
+        artifacts=artifacts,
+        training_config=config.training.model_dump(mode="json"),
+    )
+
+
+def save_manifest(manifest: ReleaseManifest, release_dir: Path) -> Path:
+    manifest_path = release_dir / "manifest.json"
+    manifest_path.write_text(
+        json.dumps(manifest.model_dump(mode="json"), indent=2, ensure_ascii=False),
+        encoding="utf-8",
+    )
+    return manifest_path
+```
+
+---
+
+# 6. Model card generator
+
+## `src/moro/export/model_card.py`
+
+```python
+from pathlib import Path
+
+from moro.config.models import MoroConfig
+
+
+def generate_model_card(
+    project_name: str,
+    version: str,
+    config: MoroConfig,
+    eval_summary: dict,
+    dataset_version_id: str | None,
+) -> str:
+    eval_md = "No evaluation results recorded."
+    if eval_summary:
+        eval_md = "| Metric | Value |\n|---|---|\n"
+        for k, v in eval_summary.items():
+            eval_md += f"| {k} | {v} |\n"
+
+    return f"""---
+license: apache-2.0
+base_model: {config.model.name}
+tags:
+- moroai
+- local-ai
+- {project_name}
+---
+
+# {project_name} ({version})
+
+This model was adapted using **MoroAI**, a local-first model adaptation foundry.
+
+## Base Model
+- **Model:** `{config.model.name}`
+- **Quantization:** {config.model.quantization}
+
+## Dataset
+- **Dataset Version ID:** `{dataset_version_id or 'unknown'}`
+- **Max Sequence Length:** {config.dataset.max_seq_length}
+
+## Training Configuration
+- **Adapter:** {config.adapter.type} (r={config.adapter.r}, alpha={config.adapter.alpha})
+- **Target Modules:** {', '.join(config.adapter.target_modules) if isinstance(config.adapter.target_modules, list) else config.adapter.target_modules}
+- **Optimizer:** {config.training.optimizer}
+- **Learning Rate:** {config.training.learning_rate}
+- **Batch Size:** {config.training.batch_size}
+- **Gradient Accumulation:** {config.training.gradient_accumulation_steps}
+- **Epochs:** {config.training.epochs}
+
+## Evaluation Results
+{eval_md}
+
+## Usage
+
+### With Hugging Face Transformers (Adapter)
+```python
+from transformers import AutoModelForCausalLM, AutoTokenizer
+from peft import PeftModel
+
+base_model = AutoModelForCausalLM.from_pretrained("{config.model.name}")
+model = PeftModel.from_pretrained(base_model, "path/to/adapter")
+tokenizer = AutoTokenizer.from_pretrained("{config.model.name}")
+```
+
+### With Ollama (Merged & GGUF)
+See the `README_OLLAMA.md` included in this release for deployment instructions.
+
+## Generated by
+[MoroAI](https://github.com/moroai/moro)
+"""
+
+
+def save_model_card(content: str, release_dir: Path) -> Path:
+    card_path = release_dir / "model_card.md"
+    card_path.write_text(content, encoding="utf-8")
+    return card_path
+```
+
+---
+
+# 7. Ollama deployment generator
+
+Ollama requires GGUF files. Since converting PyTorch weights to GGUF requires external `llama.cpp` binaries, MoroAI will generate the `Modelfile`, a merge script, and a clear deployment guide.
+
+## `src/moro/export/ollama.py`
+
+```python
+from pathlib import Path
+
+
+def generate_modelfile(project_name: str, version: str, system_prompt: str) -> str:
+    return f"""# Modelfile for {project_name} ({version})
+# Generated by MoroAI
+
+FROM ./{project_name}-{version}.Q4_K_M.gguf
+
+SYSTEM "{system_prompt}"
+
+PARAMETER temperature 0.1
+PARAMETER top_p 0.9
+PARAMETER stop "<|im_end|>"
+PARAMETER stop "<|endoftext|>"
+"""
+
+
+def generate_ollama_readme(project_name: str, version: str, base_model: str) -> str:
+    return f"""# Ollama Deployment Guide for {project_name} ({version})
+
+Ollama requires models to be in the GGUF format. This release includes the merged PyTorch weights. 
+Follow these steps to convert and deploy locally.
+
+## Step 1: Convert to GGUF
+You will need the `llama.cpp` repository to convert the merged model.
+
+```bash
+git clone https://github.com/ggerganov/llama.cpp
+cd llama.cpp
+make
+python3 convert.py ../{project_name}-{version}-merged --outtype f16 --outfile ../{project_name}-{version}.f16.gguf
+```
+
+## Step 2: Quantize (Recommended)
+For fast local inference, quantize the F16 model to Q4_K_M:
+
+```bash
+./quantize ../{project_name}-{version}.f16.gguf ../{project_name}-{version}.Q4_K_M.gguf Q4_K_M
+```
+
+## Step 3: Create the Ollama Model
+Move the `Q4_K_M.gguf` file into this directory, then run:
+
+```bash
+ollama create {project_name}:{version} -f Modelfile
+```
+
+## Step 4: Run Locally
+
+```bash
+ollama run {project_name}:{version}
+```
+
+## Base Model
+This model was adapted from `{base_model}`.
+"""
+
+
+def save_ollama_files(
+    release_dir: Path, 
+    project_name: str, 
+    version: str, 
+    base_model: str,
+    system_prompt: str = "You are a helpful assistant."
+) -> tuple[Path, Path]:
+    modelfile_path = release_dir / "Modelfile"
+    modelfile_path.write_text(
+        generate_modelfile(project_name, version, system_prompt), 
+        encoding="utf-8"
+    )
+
+    readme_path = release_dir / "README_OLLAMA.md"
+    readme_path.write_text(
+        generate_ollama_readme(project_name, version, base_model), 
+        encoding="utf-8"
+    )
+
+    return modelfile_path, readme_path
+```
+
+---
+
+# 8. Exact `moro export` and `moro deploy` CLI
+
+## `src/moro/cli/export.py`
+
+```python
+import importlib.util
+import json
+import shutil
+from pathlib import Path
+
+import typer
+from rich.console import Console
+from rich.table import Table
+
+from moro.config.loader import load_config
+from moro.core.errors import DependencyError, ExportError, ProjectError
+from moro.core.project import require_project_root
+from moro.export.manifest import build_manifest, save_manifest
+from moro.export.model_card import generate_model_card, save_model_card
+from moro.export.models import ArtifactInfo
+from moro.export.ollama import save_ollama_files
+from moro.storage.db import get_connection, get_or_create_project
+from moro.storage.evals import ensure_eval_schema, list_eval_runs
+from moro.storage.releases import (
+    create_release,
+    ensure_releases_schema,
+    list_releases,
+)
+from moro.storage.runs import ensure_runs_schema, get_run
+from moro.training.run import latest_dataset_version_id
+
+console = Console()
+
+export_app = typer.Typer(
+    name="export",
+    help="Export and deploy models",
+    no_args_is_help=True,
+    invoke_without_command=True,
+)
+
+
+def _get_latest_eval_summary(conn, run_id: str) -> dict:
+    ensure_eval_schema(conn)
+    rows = conn.execute(
+        "SELECT result_json FROM eval_runs WHERE run_id = ? ORDER BY created_at DESC LIMIT 1",
+        (run_id,),
+    ).fetchall()
+    
+    if not rows:
+        return {}
+        
+    try:
+        result = json.loads(rows[0]["result_json"])
+        return {
+            "pass_rate": result.get("pass_rate"),
+            "avg_score": result.get("avg_score"),
+            "total_cases": result.get("total_cases"),
+        }
+    except Exception:
+        return {}
+
+
+def _merge_adapter(base_model_name: str, adapter_path: Path, output_dir: Path) -> None:
+    if importlib.util.find_spec("peft") is None or importlib.util.find_spec("torch") is None:
+        raise DependencyError("Merging requires `torch` and `peft`. Install with `pip install 'moroai[train]'`.")
+
+    import torch
+    from peft import PeftModel
+    from transformers import AutoModelForCausalLM, AutoTokenizer
+
+    console.print(f"[cyan]Loading base model {base_model_name}...[/cyan]")
+    
+    # Use float16 for merging to save memory, fallback to float32 if no CUDA
+    dtype = torch.float16 if torch.cuda.is_available() else torch.float32
+    
+    base_model = AutoModelForCausalLM.from_pretrained(
+        base_model_name, 
+        torch_dtype=dtype, 
+        low_cpu_mem_usage=True
+    )
+    
+    console.print(f"[cyan]Loading adapter from {adapter_path}...[/cyan]")
+    model = PeftModel.from_pretrained(base_model, str(adapter_path))
+    
+    console.print("[cyan]Merging weights (this may take a moment)...[/cyan]")
+    merged_model = model.merge_and_unload()
+    
+    output_dir.mkdir(parents=True, exist_ok=True)
+    merged_model.save_pretrained(output_dir)
+    
+    console.print("[cyan]Saving tokenizer...[/cyan]")
+    tokenizer = AutoTokenizer.from_pretrained(base_model_name)
+    tokenizer.save_pretrained(output_dir)
+    
+    console.print(f"[bold green]Merged model saved to {output_dir}[/bold green]")
+
+
+@export_app.callback(invoke_without_command=True)
+def export_command(
+    ctx: typer.Context,
+    run_id: str = typer.Option(
+        ...,
+        "--run-id",
+        help="The training run ID to export.",
+    ),
+    version: str = typer.Option(
+        ...,
+        "--version",
+        help="Release version (e.g., v0.1.0).",
+    ),
+    merge: bool = typer.Option(
+        False,
+        "--merge",
+        help="Merge LoRA adapter into the base model.",
+    ),
+) -> None:
+    """
+    Export a trained run into a packaged release.
+    """
+    if ctx.invoked_subcommand is not None:
+        return
+
+    try:
+        root = require_project_root()
+        cfg = load_config(root / "moro.yaml")
+        conn = get_connection(root)
+        ensure_runs_schema(conn)
+        ensure_releases_schema(conn)
+
+        run_row = get_run(conn, run_id)
+        if not run_row:
+            raise ExportError(f"Run not found: {run_id}")
+
+        if run_row["status"] != "completed":
+            raise ExportError(f"Cannot export run with status: {run_row['status']}")
+
+        release_dir = root / "releases" / f"{cfg.project.name}-{version}"
+        if release_dir.exists():
+            raise ExportError(f"Release directory already exists: {release_dir}")
+            
+        release_dir.mkdir(parents=True, exist_ok=True)
+        artifacts: list[ArtifactInfo] = []
+
+        # 1. Copy Adapter
+        adapter_src = Path(run_row["output_dir"]) / "adapter"
+        adapter_dest = release_dir / "adapter"
+        if adapter_src.exists():
+            shutil.copytree(adapter_src, adapter_dest)
+            artifacts.append(ArtifactInfo(type="adapter", path="adapter"))
+
+        # 2. Merge if requested
+        if merge:
+            merged_dest = release_dir / f"{cfg.project.name}-{version}-merged"
+            _merge_adapter(cfg.model.name, adapter_src, merged_dest)
+            artifacts.append(ArtifactInfo(type="merged_model", path=merged_dest.name))
+
+        # 3. Get Eval Summary
+        eval_summary = _get_latest_eval_summary(conn, run_id)
+
+        # 4. Generate Model Card
+        dataset_version_id = latest_dataset_version_id(root)
+        card_content = generate_model_card(
+            cfg.project.name, version, cfg, eval_summary, dataset_version_id
+        )
+        card_path = save_model_card(card_content, release_dir)
+        artifacts.append(ArtifactInfo(type="model_card", path="model_card.md"))
+
+        # 5. Generate Manifest
+        project_id = get_or_create_project(conn, cfg.project.name, cfg.project.privacy_mode)
+        
+        # Temporary ID for manifest, will be replaced by DB ID
+        temp_release_id = f"rel_{version}" 
+        
+        manifest = build_manifest(
+            release_id=temp_release_id,
+            project_name=cfg.project.name,
+            run_id=run_id,
+            version=version,
+            config=cfg,
+            dataset_version_id=dataset_version_id,
+            eval_summary=eval_summary,
+            artifacts=artifacts,
+        )
+        manifest_path = save_manifest(manifest, release_dir)
+        artifacts.append(ArtifactInfo(type="manifest", path="manifest.json"))
+
+        # 6. Save to DB
+        release_id = create_release(
+            conn,
+            project_id=project_id,
+            run_id=run_id,
+            version=version,
+            manifest_path=str(manifest_path),
+        )
+        
+        # Update manifest with real DB ID
+        manifest.release_id = release_id
+        save_manifest(manifest, release_dir)
+
+        console.print(f"\n[bold green]Release {version} exported successfully![/bold green]")
+        console.print(f"Directory: {release_dir}")
+        console.print(f"Release ID: {release_id}")
+
+    except ProjectError as exc:
+        console.print(f"[bold red]Project error:[/bold red] {exc}")
+        raise typer.Exit(code=2)
+    except ExportError as exc:
+        console.print(f"[bold red]Export error:[/bold red] {exc}")
+        raise typer.Exit(code=7)
+    except DependencyError as exc:
+        console.print(f"[bold red]Dependency error:[/bold red] {exc}")
+        raise typer.Exit(code=3)
+    except Exception as exc:
+        console.print(f"[bold red]Unexpected error:[/bold red] {exc}")
+        raise typer.Exit(code=1)
+
+
+@export_app.command("deploy")
+def deploy_command(
+    target: str = typer.Option(
+        ...,
+        "--target",
+        help="Deployment target (currently supports: ollama).",
+    ),
+    version: str = typer.Option(
+        ...,
+        "--version",
+        help="Release version to deploy.",
+    ),
+) -> None:
+    """
+    Prepare deployment artifacts for a specific target.
+    """
+    try:
+        root = require_project_root()
+        cfg = load_config(root / "moro.yaml")
+
+        if target.lower() != "ollama":
+            raise ExportError(f"Unsupported deployment target: {target}. Use 'ollama'.")
+
+        release_dir = root / "releases" / f"{cfg.project.name}-{version}"
+        if not release_dir.exists():
+            raise ExportError(f"Release not found: {release_dir}. Run `moro export` first.")
+
+        merged_dir = release_dir / f"{cfg.project.name}-{version}-merged"
+        if not merged_dir.exists():
+            console.print(
+                "[bold yellow]Warning:[/bold yellow] Merged model not found in release. "
+                "Ollama requires a merged model. Re-run export with `--merge`."
+            )
+
+        modelfile_path, readme_path = save_ollama_files(
+            release_dir=release_dir,
+            project_name=cfg.project.name,
+            version=version,
+            base_model=cfg.model.name,
+            system_prompt="You are a helpful, domain-specific assistant.",
+        )
+
+        console.print(f"\n[bold green]Ollama deployment files generated![/bold green]")
+        console.print(f"Modelfile: {modelfile_path}")
+        console.print(f"Guide: {readme_path}")
+        console.print(f"\n[cyan]Next steps:[/cyan]")
+        console.print(f"1. Open {readme_path} to see how to convert the merged model to GGUF.")
+        console.print(f"2. Run `ollama create {cfg.project.name}:{version} -f Modelfile` inside the release directory.")
+
+    except ProjectError as exc:
+        console.print(f"[bold red]Project error:[/bold red] {exc}")
+        raise typer.Exit(code=2)
+    except ExportError as exc:
+        console.print(f"[bold red]Export error:[/bold red] {exc}")
+        raise typer.Exit(code=7)
+    except Exception as exc:
+        console.print(f"[bold red]Unexpected error:[/bold red] {exc}")
+        raise typer.Exit(code=1)
+
+
+@export_app.command("list")
+def list_command(
+    limit: int = typer.Option(20, help="Max releases to show."),
+) -> None:
+    """List packaged releases."""
+    try:
+        root = require_project_root()
+        conn = get_connection(root)
+        ensure_releases_schema(conn)
+
+        rows = list_releases(conn, limit=limit)
+        if not rows:
+            console.print("No releases found.")
+            return
+
+        table = Table(title="MoroAI Releases")
+        table.add_column("Release ID", style="cyan")
+        table.add_column("Version", style="white")
+        table.add_column("Run ID", style="white")
+        table.add_column("Created", style="white")
+
+        for row in rows:
+            table.add_row(row["id"], row["version"], row["run_id"], row["created_at"])
+
+        console.print(table)
+
+    except Exception as exc:
+        console.print(f"[bold red]Error:[/bold red] {exc}")
+        raise typer.Exit(code=1)
+```
+
+---
+
+# 9. Register the export CLI
+
+Update `src/moro/main.py`.
+
+Add the import:
+```python
+from moro.cli.export import export_app
+```
+
+Register it:
+```python
+app.add_typer(export_app, name="release") 
+# Note: naming the command group 'release' or 'export' both work. 
+# Let's use 'release' as the CLI group name to match the domain language.
+```
+
+*Correction for CLI naming:* Let's map it so the user types `moro release export` and `moro release deploy`. 
+
+Update `src/moro/cli/export.py` slightly:
+Change `@export_app.callback(invoke_without_command=True)` to just be the `export` command inside a `release_app` Typer group, OR just name the Typer app `release_app` and the commands `export` and `deploy`.
+
+Let's make it clean:
+```python
+# In src/moro/cli/export.py
+release_app = typer.Typer(name="release", help="Release and deploy models", no_args_is_help=True)
+
+@release_app.command("export")
+def export_command(...)
+
+@release_app.command("deploy")
+def deploy_command(...)
+
+@release_app.command("list")
+def list_command(...)
+```
+
+Then in `main.py`:
+```python
+from moro.cli.export import release_app
+app.add_typer(release_app, name="release")
+```
+
+---
+
+# 10. How to use it (The Full Loop)
+
+You have now completed the entire MVP loop. Here is the exact sequence a user will run:
+
+```bash
+# 1. Setup
+moro init my-support-bot
+cd my-support-bot
+
+# 2. Data
+moro import ./data/raw/tickets.jsonl
+moro data build
+
+# 3. Hardware & Recipe
+moro doctor
+moro recipe suggest
+
+# 4. Train
+moro train
+# (Note the run_id output, e.g., run_20231025103000_a1b2)
+
+# 5. Evaluate
+moro eval run eval/support-golden-v1.yaml --run-id run_20231025103000_a1b2
+
+# 6. Export (Adapter only)
+moro release export --run-id run_20231025103000_a1b2 --version v0.1.0
+
+# 7. Export (Merged for deployment)
+moro release export --run-id run_20231025103000_a1b2 --version v0.1.0-merged --merge
+
+# 8. Deploy Prep
+moro release deploy --target ollama --version v0.1.0-merged
+```
+
+---
+
+# 11. What this completes architecturally
+
+This is a massive milestone. 
+
+Most open-source fine-tuning tools stop at step 4. They give you a folder of `.bin` or `.safetensors` files and say "good luck."
+
+MoroAI now provides:
+1. **Provenance:** The `manifest.json` proves exactly what data, config, and evals created this model.
+2. **Trust:** The `model_card.md` is generated automatically from real run data, not hallucinated by the user.
+3. **Deployment Readiness:** The `--merge` flag handles the complex PEFT merging logic, and the Ollama generator bridges the gap between PyTorch and local inference engines.
+
+---
+
+# 12. Important limitations of this starter version
+
+To keep expectations clear:
+
+1. **GGUF Conversion is external:** MoroAI generates the *instructions* and the `Modelfile` for Ollama, but relies on the user to run `llama.cpp`'s `convert.py` and `quantize` binaries. Automating the C++ compilation and execution of `llama.cpp` inside a pure Python CLI is fragile and out of scope for MVP.
+2. **Merging takes RAM:** Merging a 7B model requires loading the full 7B model into RAM/VRAM. For 1B-3B models (MoroAI's sweet spot), this is trivial on consumer hardware.
+3. **No Docker deployment yet:** Only Ollama is supported in this starter. Docker/vLLM can be added to `moro release deploy` later.
+
+---
+
+# 13. What to build next
+
+You now have a fully functional, end-to-end MVP. 
+
+The next phase is about **hardening, comparing, and expanding**.
+
+### Immediate Next Steps (v0.5)
+1. **Base vs Tuned Eval Comparison:** Add `moro eval compare` to show exactly how much the model improved against the un-tuned base model.
+2. **Diagnostics Engine:** Add `moro diagnose` to parse OOM errors and suggest config changes.
+3. **Feedback Loop:** Add `moro learn import feedback.csv` to turn user corrections back into training data.
+
+### Strategic Next Steps (v1.0)
+1. **Advanced Data Quality:** Integrate `datasketch` for MinHash near-duplicate detection, and add basic PII regex scanning.
+2. **Unsloth Backend:** Add an optional `unsloth` training backend for 2x faster training on supported models.
+3. **Web Dashboard:** Build a lightweight local Gradio/Streamlit UI that reads the SQLite DB to visualize runs and evals.
+
+---
+
+# 14. Final Word on the MVP
+
+You now have the code, the architecture, and the exact execution plan for **MoroAI**. 
+
+You have successfully defined a product that solves a real, wicked problem (private, reliable local AI adaptation) and you have built the exact technical foundation to deliver it.
+
+**Your next action:**
+1. Create the `moroai/moro` GitHub repository.
+2. Push the scaffold and the code we've generated.
+3. Run the full loop yourself on a small dataset (like the `support.jsonl` example).
+4. Open source it and let the community see a tool that actually respects the full lifecycle.
