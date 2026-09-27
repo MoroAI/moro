@@ -13,10 +13,13 @@ from moro.cli.hooks import hooks_app
 from moro.cli.import_data import import_command
 from moro.cli.init import init_command
 from moro.cli.recipe import app as recipe_app
+from moro.cli.registry import app as registry_app
 from moro.cli.runs import app as runs_app
+from moro.cli.services import app as services_app
 from moro.cli.status import status_command
 from moro.cli.train import train_command
 from moro.cli.ui import ui_command
+from moro.cli.validate import validate_command
 
 app = typer.Typer(
     name="moro",
@@ -72,8 +75,18 @@ app.add_typer(guard_app, name="guard")
 # ── Continuous Learning Flywheel ──────────────────────────────────────────────
 app.add_typer(flywheel_app, name="flywheel")
 
+# ── Pre-Flight Validation ───────────────────────────────────────────────────
+app.command(name="validate", help="Run pre-flight validation on project config and environment.")(validate_command)
+
+# ── Model Registry ───────────────────────────────────────────────────────────
+app.add_typer(registry_app, name="registry")
+
+# ── Service Orchestrator ─────────────────────────────────────────────────────
+app.add_typer(services_app, name="services")
+
 # ── Mission Control Web Dashboard ─────────────────────────────────────────────
 app.command(name="ui", help="Launch the MoroAI Mission Control Web Dashboard.")(ui_command)
+app.command(name="dashboard", help="Launch the MoroAI Mission Control Web Dashboard.")(ui_command)
 
 # ── Version ──────────────────────────────────────────────────────────────────
 @app.command(name="version", help="Show MoroAI version.")

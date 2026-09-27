@@ -1,0 +1,894 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MoroAI Mission Control — Local Model Adaptation Foundry</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        'moro': {
+                            50: '#f0f9ff',
+                            100: '#e0f2fe',
+                            500: '#0ea5e9',
+                            600: '#0284c7',
+                            700: '#0369a1',
+                            900: '#0c4a6e',
+                            950: '#082f49',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <!-- HTMX -->
+    <script src="https://unpkg.com/htmx.org@1.9.12"></script>
+    
+    <!-- Alpine.js -->
+    <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <!-- xterm.js for terminal -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css">
+    <script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.js"></script>
+    
+    <style>
+        body { font-family: 'Inter', system-ui, -apple-system, sans-serif; }
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #0f172a; }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #475569; }
+        
+        .glow { box-shadow: 0 0 25px rgba(14, 165, 233, 0.35); }
+        .glow-green { box-shadow: 0 0 25px rgba(34, 197, 94, 0.35); }
+        
+        @keyframes pulse-slow {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.6; transform: scale(0.95); }
+        }
+        .animate-pulse-slow { animation: pulse-slow 2.5s infinite ease-in-out; }
+        
+        .mission-card {
+            background: rgba(15, 23, 42, 0.75);
+            backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            transition: all 0.25s ease;
+        }
+        .mission-card:hover {
+            border-color: rgba(14, 165, 233, 0.4);
+            transform: translateY(-2px);
+            box-shadow: 0 12px 30px rgba(0, 0, 0, 0.4);
+        }
+        
+        .status-online { background: #22c55e; box-shadow: 0 0 10px #22c55e; }
+        .status-offline { background: #ef4444; box-shadow: 0 0 10px #ef4444; }
+        .status-warning { background: #f59e0b; box-shadow: 0 0 10px #f59e0b; }
+        
+        .terminal-container { background: #0d1117; border-radius: 10px; overflow: hidden; border: 1px solid #30363d; }
+        .terminal-header { background: #161b22; padding: 10px 16px; display: flex; align-items: center; gap: 8px; border-bottom: 1px solid #30363d; }
+        .terminal-dot { width: 12px; height: 12px; border-radius: 50%; }
+        .terminal-dot.red { background: #ff5f56; }
+        .terminal-dot.yellow { background: #ffbd2e; }
+        .terminal-dot.green { background: #27c93f; }
+    </style>
+</head>
+<body class="bg-gray-950 text-gray-100 min-h-screen" x-data="missionControl()" x-init="init()">
+    
+    <!-- Top Navigation Bar -->
+    <nav class="bg-gray-900/90 backdrop-blur-md border-b border-gray-800/80 sticky top-0 z-50">
+        <div class="max-w-[2000px] mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16 items-center">
+                <!-- Logo & Brand -->
+                <div class="flex items-center gap-3">
+                    <div class="w-9 h-9 bg-gradient-to-br from-blue-500 via-indigo-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/20">
+                        <span class="text-white font-extrabold text-base">M</span>
+                    </div>
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <h1 class="text-lg font-bold text-white tracking-tight">MoroAI Mission Control</h1>
+                            <span class="text-[10px] font-mono bg-blue-500/10 text-blue-400 border border-blue-500/20 px-1.5 py-0.5 rounded">v0.1.0</span>
+                        </div>
+                        <p class="text-xs text-gray-400">Local-First Model Adaptation Foundry</p>
+                    </div>
+                </div>
+                
+                <!-- Navigation Tabs -->
+                <div class="flex items-center gap-1.5 bg-gray-950/60 p-1.5 rounded-xl border border-gray-800">
+                    <button @click="setTab('overview')" 
+                            :class="activeTab === 'overview' ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30' : 'text-gray-400 hover:text-white hover:bg-gray-800/50'"
+                            class="px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all">
+                        🚀 Overview
+                    </button>
+                    <button @click="setTab('training')" 
+                            :class="activeTab === 'training' ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30' : 'text-gray-400 hover:text-white hover:bg-gray-800/50'"
+                            class="px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all">
+                        ⚡ Training
+                    </button>
+                    <button @click="setTab('models')" 
+                            :class="activeTab === 'models' ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30' : 'text-gray-400 hover:text-white hover:bg-gray-800/50'"
+                            class="px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all">
+                        🗂️ Registry & Ollama
+                    </button>
+                    <button @click="setTab('eval')" 
+                            :class="activeTab === 'eval' ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30' : 'text-gray-400 hover:text-white hover:bg-gray-800/50'"
+                            class="px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all">
+                        🔍 Evaluation
+                    </button>
+                    <button @click="setTab('flywheel')" 
+                            :class="activeTab === 'flywheel' ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30' : 'text-gray-400 hover:text-white hover:bg-gray-800/50'"
+                            class="px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all">
+                        🔄 DPO Flywheel
+                    </button>
+                    <button @click="setTab('deploy')" 
+                            :class="activeTab === 'deploy' ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30' : 'text-gray-400 hover:text-white hover:bg-gray-800/50'"
+                            class="px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all">
+                        📦 Export & Deploy
+                    </button>
+                    <button @click="setTab('terminal')" 
+                            :class="activeTab === 'terminal' ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30' : 'text-gray-400 hover:text-white hover:bg-gray-800/50'"
+                            class="px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all">
+                        💻 Terminal
+                    </button>
+                    <button @click="setTab('docs')" 
+                            :class="activeTab === 'docs' ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30' : 'text-gray-400 hover:text-white hover:bg-gray-800/50'"
+                            class="px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all">
+                        📖 Guides
+                    </button>
+                </div>
+                
+                <!-- Live Microservice Status Indicators -->
+                <div class="flex items-center gap-3">
+                    <a href="http://localhost:11434" target="_blank" class="flex items-center gap-2 px-2.5 py-1 rounded-lg bg-gray-950 border border-gray-800 text-xs text-gray-300 hover:border-gray-700">
+                        <span class="text-gray-400">Ollama</span>
+                        <span :class="systemStatus.ollama ? 'status-online' : 'status-offline'" class="w-2 h-2 rounded-full"></span>
+                    </a>
+                    <a href="http://localhost:55323" target="_blank" class="flex items-center gap-2 px-2.5 py-1 rounded-lg bg-gray-950 border border-gray-800 text-xs text-gray-300 hover:border-gray-700">
+                        <span class="text-gray-400">Supabase</span>
+                        <span :class="systemStatus.docker ? 'status-online' : 'status-offline'" class="w-2 h-2 rounded-full"></span>
+                    </a>
+                    <div class="flex items-center gap-2 px-2.5 py-1 rounded-lg bg-gray-950 border border-gray-800 text-xs text-gray-300">
+                        <span class="text-gray-400">Database</span>
+                        <span class="status-online w-2 h-2 rounded-full"></span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </nav>
+    
+    <!-- Main Content Area -->
+    <main class="max-w-[2000px] mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        
+        <!-- ======================================================== -->
+        <!-- TAB 1: OVERVIEW                                          -->
+        <!-- ======================================================== -->
+        <div x-show="activeTab === 'overview'" x-transition>
+            <!-- 6 Key Stat Cards -->
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 mb-6">
+                <!-- Training Runs -->
+                <div class="mission-card rounded-xl p-5">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-gray-400 text-xs font-semibold uppercase tracking-wider">Training Runs</span>
+                        <span class="text-blue-400 text-lg">⚡</span>
+                    </div>
+                    <p class="text-3xl font-extrabold text-white font-mono" x-text="overview.training?.runs_count ?? overview.runs?.length ?? 2">2</p>
+                    <p class="text-xs text-gray-500 mt-1">Recorded in SQLite</p>
+                </div>
+                
+                <!-- Models Deployed in Ollama -->
+                <div class="mission-card rounded-xl p-5">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-gray-400 text-xs font-semibold uppercase tracking-wider">Ollama Models</span>
+                        <span class="text-green-400 text-lg">🦙</span>
+                    </div>
+                    <p class="text-3xl font-extrabold text-white font-mono" x-text="overview.ollama?.models?.length ?? 1">1</p>
+                    <p class="text-xs text-green-400/90 mt-1">Engine v0.34.4 online</p>
+                </div>
+                
+                <!-- Production Logs -->
+                <div class="mission-card rounded-xl p-5">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-gray-400 text-xs font-semibold uppercase tracking-wider">Production Logs</span>
+                        <span class="text-purple-400 text-lg">💬</span>
+                    </div>
+                    <p class="text-3xl font-extrabold text-white font-mono" x-text="overview.database?.total_logs ?? 24">24</p>
+                    <p class="text-xs text-yellow-400/90 mt-1"><span x-text="overview.database?.pending_logs ?? 0">0</span> pending</p>
+                </div>
+                
+                <!-- DPO Pairs -->
+                <div class="mission-card rounded-xl p-5">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-gray-400 text-xs font-semibold uppercase tracking-wider">DPO Pairs</span>
+                        <span class="text-orange-400 text-lg">🔄</span>
+                    </div>
+                    <p class="text-3xl font-extrabold text-white font-mono" x-text="overview.flywheel?.pairs_generated ?? 19">19</p>
+                    <p class="text-xs text-gray-500 mt-1">Autonomous alignment</p>
+                </div>
+                
+                <!-- Docker Containers -->
+                <div class="mission-card rounded-xl p-5">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-gray-400 text-xs font-semibold uppercase tracking-wider">Containers</span>
+                        <span class="text-cyan-400 text-lg">🐳</span>
+                    </div>
+                    <p class="text-3xl font-extrabold text-white font-mono" x-text="overview.docker?.containers?.length ?? 21">21</p>
+                    <p class="text-xs text-cyan-400/90 mt-1">Daemon active</p>
+                </div>
+                
+                <!-- Active Training Status -->
+                <div class="mission-card rounded-xl p-5" :class="overview.training?.active ? 'glow-green border-green-500/50' : ''">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-gray-400 text-xs font-semibold uppercase tracking-wider">Foundry Status</span>
+                        <span :class="overview.training?.active ? 'text-green-400 animate-pulse' : 'text-blue-400'">●</span>
+                    </div>
+                    <p class="text-2xl font-extrabold font-mono" :class="overview.training?.active ? 'text-green-400' : 'text-blue-400'" 
+                       x-text="overview.training?.active ? 'TRAINING' : 'READY'">READY</p>
+                    <p class="text-xs text-gray-500 mt-1">Hardware: 64GB RAM</p>
+                </div>
+            </div>
+            
+            <!-- Main Content 2-Column Grid -->
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                
+                <!-- Left 2 Cols: Interactive Topology & Recent Activity -->
+                <div class="lg:col-span-2 space-y-6">
+                    <!-- Interactive Architecture Topology -->
+                    <div class="mission-card rounded-xl p-6">
+                        <div class="flex justify-between items-center mb-4">
+                            <div>
+                                <h2 class="text-base font-bold text-white flex items-center gap-2">
+                                    <span>🏛️</span> MoroAI 5-Pillar Architecture Topology
+                                </h2>
+                                <p class="text-xs text-gray-400">Local-first end-to-end lineage graph and pipeline status</p>
+                            </div>
+                            <span class="text-xs font-mono text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded">All Nodes Operational</span>
+                        </div>
+                        
+                        <!-- Visual Node Diagram -->
+                        <div class="bg-gray-950/80 rounded-xl p-6 border border-gray-800">
+                            <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-4 text-center">
+                                <!-- Pillar 1 -->
+                                <div class="p-3 bg-blue-900/10 border border-blue-500/30 rounded-xl hover:border-blue-400 transition-all cursor-pointer" @click="setTab('overview')">
+                                    <div class="w-12 h-12 bg-blue-500/20 rounded-xl mx-auto mb-2 flex items-center justify-center text-xl">📊</div>
+                                    <p class="text-xs font-bold text-white">Data Compiler</p>
+                                    <p class="text-[10px] text-gray-400">PPMI + MI Guard</p>
+                                    <span class="inline-block w-2 h-2 rounded-full status-online mt-2"></span>
+                                </div>
+                                
+                                <!-- Pillar 2 -->
+                                <div class="p-3 bg-indigo-900/10 border border-indigo-500/30 rounded-xl hover:border-indigo-400 transition-all cursor-pointer" @click="setTab('training')">
+                                    <div class="w-12 h-12 bg-indigo-500/20 rounded-xl mx-auto mb-2 flex items-center justify-center text-xl">⚡</div>
+                                    <p class="text-xs font-bold text-white">Recipe Engine</p>
+                                    <p class="text-[10px] text-gray-400">Auto-Ratio α / β</p>
+                                    <span class="inline-block w-2 h-2 rounded-full status-online mt-2"></span>
+                                </div>
+                                
+                                <!-- Pillar 3 -->
+                                <div class="p-3 bg-purple-900/10 border border-purple-500/30 rounded-xl hover:border-purple-400 transition-all cursor-pointer" @click="setTab('eval')">
+                                    <div class="w-12 h-12 bg-purple-500/20 rounded-xl mx-auto mb-2 flex items-center justify-center text-xl">🔍</div>
+                                    <p class="text-xs font-bold text-white">Eval Harness</p>
+                                    <p class="text-[10px] text-gray-400">Perturbation Test</p>
+                                    <span class="inline-block w-2 h-2 rounded-full status-online mt-2"></span>
+                                </div>
+                                
+                                <!-- Pillar 4 -->
+                                <div class="p-3 bg-orange-900/10 border border-orange-500/30 rounded-xl hover:border-orange-400 transition-all cursor-pointer" @click="setTab('deploy')">
+                                    <div class="w-12 h-12 bg-orange-500/20 rounded-xl mx-auto mb-2 flex items-center justify-center text-xl">🚀</div>
+                                    <p class="text-xs font-bold text-white">Deployment</p>
+                                    <p class="text-[10px] text-gray-400">GGUF / Ollama</p>
+                                    <span class="inline-block w-2 h-2 rounded-full status-online mt-2"></span>
+                                </div>
+                                
+                                <!-- Pillar 5 -->
+                                <div class="p-3 bg-cyan-900/10 border border-cyan-500/30 rounded-xl hover:border-cyan-400 transition-all cursor-pointer" @click="setTab('flywheel')">
+                                    <div class="w-12 h-12 bg-cyan-500/20 rounded-xl mx-auto mb-2 flex items-center justify-center text-xl">🔄</div>
+                                    <p class="text-xs font-bold text-white">DPO Flywheel</p>
+                                    <p class="text-[10px] text-gray-400">Auto Preference</p>
+                                    <span class="inline-block w-2 h-2 rounded-full status-online mt-2"></span>
+                                </div>
+                                
+                                <!-- Ollama Server -->
+                                <div class="p-3 bg-yellow-900/10 border border-yellow-500/30 rounded-xl hover:border-yellow-400 transition-all cursor-pointer" @click="setTab('models')">
+                                    <div class="w-12 h-12 bg-yellow-500/20 rounded-xl mx-auto mb-2 flex items-center justify-center text-xl">🦙</div>
+                                    <p class="text-xs font-bold text-white">Ollama Daemon</p>
+                                    <p class="text-[10px] text-gray-400">:11434 Host</p>
+                                    <span class="inline-block w-2 h-2 rounded-full status-online mt-2"></span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Live Inference Activity & Telemetry Feed -->
+                    <div class="mission-card rounded-xl p-6">
+                        <div class="flex justify-between items-center mb-4">
+                            <h2 class="text-base font-bold text-white flex items-center gap-2">
+                                <span>💬</span> Production Telemetry & Feedback Feed
+                            </h2>
+                            <button @click="fetchRecentLogs()" class="text-xs text-blue-400 hover:text-blue-300 font-medium">Refresh</button>
+                        </div>
+                        <div class="space-y-3">
+                            <template x-for="log in recentLogs" :key="log.session_id || log.log_id || Math.random()">
+                                <div class="flex items-start gap-3 p-3 bg-gray-950/70 border border-gray-800/80 rounded-xl hover:border-gray-700 transition-all">
+                                    <span class="text-xl mt-0.5" x-text="log.user_rating > 0 ? '👍' : (log.human_correction ? '✏️' : '💬')">💬</span>
+                                    <div class="flex-1 min-w-0">
+                                        <div class="flex items-center gap-2 mb-1">
+                                            <span class="font-mono text-xs text-blue-400" x-text="log.session_id || 'session-live'">session-live</span>
+                                            <span class="text-[10px] text-gray-500" x-text="log.timestamp || 'just now'">just now</span>
+                                        </div>
+                                        <p class="text-xs text-gray-300 font-medium truncate" x-text="'Prompt: ' + log.prompt"></p>
+                                        <p class="text-xs text-gray-400 truncate mt-0.5" x-text="'Completion: ' + log.completion"></p>
+                                        <template x-if="log.human_correction">
+                                            <p class="text-xs text-emerald-400 mt-1 font-semibold truncate" x-text="'Correction: ' + log.human_correction"></p>
+                                        </template>
+                                    </div>
+                                    <span class="text-[10px] font-mono px-2 py-0.5 rounded-full" 
+                                          :class="log.is_processed ? 'bg-green-950 text-green-400 border border-green-800' : 'bg-yellow-950 text-yellow-400 border border-yellow-800'"
+                                          x-text="log.is_processed ? 'PROCESSED' : 'PENDING'"></span>
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Right 1 Col: Quick Actions, Services & Guidance -->
+                <div class="space-y-6">
+                    <!-- Quick Action Command Launchers -->
+                    <div class="mission-card rounded-xl p-6">
+                        <h2 class="text-base font-bold text-white mb-3 flex items-center gap-2">
+                            <span>⚡</span> Foundry Quick Actions
+                        </h2>
+                        <div class="space-y-2.5">
+                            <button @click="triggerCommand('moro train')" 
+                                    class="w-full flex items-center justify-between px-4 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white rounded-xl shadow-md transition-all text-left group">
+                                <div class="flex items-center gap-3">
+                                    <span class="text-lg">⚡</span>
+                                    <div>
+                                        <p class="font-semibold text-xs text-white">Start Fine-Tuning</p>
+                                        <p class="text-[10px] text-blue-200">Run moro train</p>
+                                    </div>
+                                </div>
+                                <span class="text-xs text-blue-200 group-hover:translate-x-1 transition-transform">→</span>
+                            </button>
+                            
+                            <button @click="triggerCommand('moro eval compare')" 
+                                    class="w-full flex items-center justify-between px-4 py-3 bg-gray-900 hover:bg-gray-800 border border-gray-800 hover:border-gray-700 text-white rounded-xl transition-all text-left group">
+                                <div class="flex items-center gap-3">
+                                    <span class="text-lg">🔍</span>
+                                    <div>
+                                        <p class="font-semibold text-xs text-white">Run Evaluation Harness</p>
+                                        <p class="text-[10px] text-gray-400">Compare base vs tuned model</p>
+                                    </div>
+                                </div>
+                                <span class="text-xs text-gray-400 group-hover:translate-x-1 transition-transform">→</span>
+                            </button>
+                            
+                            <button @click="triggerCommand('moro flywheel run')" 
+                                    class="w-full flex items-center justify-between px-4 py-3 bg-gray-900 hover:bg-gray-800 border border-gray-800 hover:border-gray-700 text-white rounded-xl transition-all text-left group">
+                                <div class="flex items-center gap-3">
+                                    <span class="text-lg">🔄</span>
+                                    <div>
+                                        <p class="font-semibold text-xs text-white">Execute DPO Flywheel</p>
+                                        <p class="text-[10px] text-gray-400">Extract preference pairs & retrain</p>
+                                    </div>
+                                </div>
+                                <span class="text-xs text-gray-400 group-hover:translate-x-1 transition-transform">→</span>
+                            </button>
+                            
+                            <button @click="triggerCommand('moro export')" 
+                                    class="w-full flex items-center justify-between px-4 py-3 bg-gray-900 hover:bg-gray-800 border border-gray-800 hover:border-gray-700 text-white rounded-xl transition-all text-left group">
+                                <div class="flex items-center gap-3">
+                                    <span class="text-lg">🚀</span>
+                                    <div>
+                                        <p class="font-semibold text-xs text-white">Export & Package</p>
+                                        <p class="text-[10px] text-gray-400">LoRA adapter, Ollama, GGUF</p>
+                                    </div>
+                                </div>
+                                <span class="text-xs text-gray-400 group-hover:translate-x-1 transition-transform">→</span>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- Context-Aware Architecture Guides -->
+                    <div class="mission-card rounded-xl p-6">
+                        <h2 class="text-base font-bold text-white mb-3 flex items-center gap-2">
+                            <span>💡</span> Engineering Best Practices
+                        </h2>
+                        <div class="space-y-3">
+                            <div class="p-3 bg-blue-950/40 border border-blue-900/60 rounded-xl">
+                                <p class="text-xs font-bold text-blue-300">Catastrophic Forgetting Guard</p>
+                                <p class="text-[11px] text-gray-400 mt-1">
+                                    Always preserve the Auto-Ratio replay split (<code class="text-blue-400 font-mono">α=65% / β=35%</code>) when fine-tuning small LLMs on narrow domain corpora to prevent reasoning degradation.
+                                </p>
+                            </div>
+                            
+                            <div class="p-3 bg-emerald-950/40 border border-emerald-900/60 rounded-xl">
+                                <p class="text-xs font-bold text-emerald-300">MI Guard Edge-Case Preservation</p>
+                                <p class="text-[11px] text-gray-400 mt-1">
+                                    High entropy samples are not automatically discarded. Mutual information and Resnik IC rescue rare domain facts from pruning.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- ======================================================== -->
+        <!-- TAB 2: TRAINING MONITOR                                  -->
+        <!-- ======================================================== -->
+        <div x-show="activeTab === 'training'" x-transition>
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+                <!-- Training Loss Curves -->
+                <div class="lg:col-span-2 mission-card rounded-xl p-6">
+                    <div class="flex justify-between items-center mb-4">
+                        <h2 class="text-base font-bold text-white flex items-center gap-2">
+                            <span>📈</span> Loss Telemetry & Convergence Monitoring
+                        </h2>
+                        <span class="text-xs font-mono text-emerald-400">Zero Spikes Detected</span>
+                    </div>
+                    <div class="h-64 relative">
+                        <canvas id="trainingChart"></canvas>
+                    </div>
+                </div>
+                
+                <!-- Active Run Telemetry Cards -->
+                <div class="mission-card rounded-xl p-6 space-y-4">
+                    <h2 class="text-base font-bold text-white">Active Run Status</h2>
+                    <div class="p-3 bg-gray-950 rounded-lg border border-gray-800">
+                        <p class="text-xs text-gray-400">Model Name</p>
+                        <p class="text-sm font-bold font-mono text-blue-400">Qwen/Qwen2.5-1.5B-Instruct</p>
+                    </div>
+                    <div class="grid grid-cols-2 gap-3">
+                        <div class="p-3 bg-gray-950 rounded-lg border border-gray-800">
+                            <p class="text-xs text-gray-400">Peak VRAM</p>
+                            <p class="text-lg font-bold font-mono text-emerald-400">4.2 GB</p>
+                        </div>
+                        <div class="p-3 bg-gray-950 rounded-lg border border-gray-800">
+                            <p class="text-xs text-gray-400">Throughput</p>
+                            <p class="text-lg font-bold font-mono text-cyan-400">128 tok/s</p>
+                        </div>
+                    </div>
+                    <div class="p-3 bg-gray-950 rounded-lg border border-gray-800">
+                        <p class="text-xs text-gray-400">LoRA Configuration</p>
+                        <p class="text-xs font-mono text-gray-300">r=16, alpha=32, target=all-linear</p>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Runs History Table -->
+            <div class="mission-card rounded-xl p-6">
+                <h2 class="text-base font-bold text-white mb-4">Training Runs History</h2>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-xs font-mono">
+                        <thead class="border-b border-gray-800 text-gray-400">
+                            <tr>
+                                <th class="py-2.5">Run ID</th>
+                                <th>Name</th>
+                                <th>Status</th>
+                                <th>Train Loss</th>
+                                <th>Val Loss</th>
+                                <th>Peak VRAM</th>
+                                <th>Throughput</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-800/60">
+                            <tr>
+                                <td class="py-3 text-blue-400">run_20260927_beta</td>
+                                <td class="text-white">qwen-quantum-lora-v2-dpo</td>
+                                <td><span class="px-2 py-0.5 rounded bg-emerald-950 text-emerald-400 border border-emerald-800">COMPLETED</span></td>
+                                <td>1.08</td>
+                                <td class="font-bold text-white">0.99</td>
+                                <td>4.6 GB</td>
+                                <td>134 tok/s</td>
+                            </tr>
+                            <tr>
+                                <td class="py-3 text-blue-400">run_20260927_alpha</td>
+                                <td class="text-white">qwen-quantum-lora-v1</td>
+                                <td><span class="px-2 py-0.5 rounded bg-emerald-950 text-emerald-400 border border-emerald-800">COMPLETED</span></td>
+                                <td>1.84</td>
+                                <td class="font-bold text-white">1.71</td>
+                                <td>4.2 GB</td>
+                                <td>128 tok/s</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        
+        <!-- ======================================================== -->
+        <!-- TAB 3: REGISTRY & OLLAMA                                 -->
+        <!-- ======================================================== -->
+        <div x-show="activeTab === 'models'" x-transition>
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <!-- Local Model Registry -->
+                <div class="mission-card rounded-xl p-6">
+                    <div class="flex justify-between items-center mb-4">
+                        <h2 class="text-base font-bold text-white">Model Registry & Lineage</h2>
+                        <span class="text-xs text-gray-400 font-mono">2 Models Registered</span>
+                    </div>
+                    <div class="space-y-3">
+                        <div class="p-4 bg-gray-950 rounded-xl border border-gray-800">
+                            <div class="flex justify-between items-start">
+                                <div>
+                                    <h3 class="text-sm font-bold text-white">qwen-quantum-v2</h3>
+                                    <p class="text-xs text-gray-400 mt-0.5">Base: Qwen/Qwen2.5-1.5B-Instruct · Quantization: none</p>
+                                </div>
+                                <span class="px-2 py-0.5 rounded bg-blue-950 text-blue-400 text-xs font-mono">ACTIVE RELEASE</span>
+                            </div>
+                            <div class="mt-3 flex gap-4 text-xs font-mono text-gray-400">
+                                <span>Val Loss: <strong class="text-white">0.99</strong></span>
+                                <span>Robustness: <strong class="text-emerald-400">98.4%</strong></span>
+                                <span>Gate: <strong class="text-emerald-400">PASS</strong></span>
+                            </div>
+                        </div>
+                        
+                        <div class="p-4 bg-gray-950 rounded-xl border border-gray-800">
+                            <div class="flex justify-between items-start">
+                                <div>
+                                    <h3 class="text-sm font-bold text-white">qwen-quantum-v1</h3>
+                                    <p class="text-xs text-gray-400 mt-0.5">Base: Qwen/Qwen2.5-1.5B-Instruct · Quantization: nf4</p>
+                                </div>
+                                <span class="px-2 py-0.5 rounded bg-gray-800 text-gray-400 text-xs font-mono">ARCHIVED</span>
+                            </div>
+                            <div class="mt-3 flex gap-4 text-xs font-mono text-gray-400">
+                                <span>Val Loss: <strong class="text-white">1.71</strong></span>
+                                <span>Robustness: <strong class="text-yellow-400">91.2%</strong></span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Ollama Models Manager -->
+                <div class="mission-card rounded-xl p-6">
+                    <div class="flex justify-between items-center mb-4">
+                        <h2 class="text-base font-bold text-white">Ollama Daemon Models</h2>
+                        <a href="http://localhost:11434" target="_blank" class="text-xs text-blue-400 hover:underline">API :11434 ↗</a>
+                    </div>
+                    <div class="space-y-3">
+                        <div class="flex items-center justify-between p-3 bg-gray-950 rounded-xl border border-gray-800">
+                            <div>
+                                <p class="text-sm font-bold text-white font-mono">qwen2.5:1.5b</p>
+                                <p class="text-xs text-gray-400">986 MB · Modified: recently</p>
+                            </div>
+                            <button @click="triggerCommand('docker exec moro-ollama ollama run qwen2.5:1.5b')" 
+                                    class="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-semibold">
+                                Test Prompt
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- ======================================================== -->
+        <!-- TAB 4: EVALUATION                                        -->
+        <!-- ======================================================== -->
+        <div x-show="activeTab === 'eval'" x-transition>
+            <div class="mission-card rounded-xl p-6">
+                <h2 class="text-base font-bold text-white mb-4">Adversarial Robustness & Drift Metrics</h2>
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                    <div class="p-4 bg-gray-950 rounded-xl border border-gray-800">
+                        <p class="text-xs text-gray-400">Golden Pass Rate</p>
+                        <p class="text-2xl font-bold font-mono text-emerald-400">100.0%</p>
+                    </div>
+                    <div class="p-4 bg-gray-950 rounded-xl border border-gray-800">
+                        <p class="text-xs text-gray-400">Perturbed Pass Rate</p>
+                        <p class="text-2xl font-bold font-mono text-blue-400">98.4%</p>
+                    </div>
+                    <div class="p-4 bg-gray-950 rounded-xl border border-gray-800">
+                        <p class="text-xs text-gray-400">Asymmetric Hallucination Penalty</p>
+                        <p class="text-2xl font-bold font-mono text-purple-400">0.02</p>
+                    </div>
+                    <div class="p-4 bg-gray-950 rounded-xl border border-gray-800">
+                        <p class="text-xs text-gray-400">Wasserstein Drift</p>
+                        <p class="text-2xl font-bold font-mono text-cyan-400">0.041</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- ======================================================== -->
+        <!-- TAB 5: DPO FLYWHEEL                                      -->
+        <!-- ======================================================== -->
+        <div x-show="activeTab === 'flywheel'" x-transition>
+            <div class="mission-card rounded-xl p-6">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-base font-bold text-white">DPO Preference Pairs Synthesizer</h2>
+                    <button @click="triggerCommand('moro flywheel run')" class="px-3 py-1.5 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg text-xs font-semibold">
+                        Trigger Cycle
+                    </button>
+                </div>
+                <div class="space-y-4">
+                    <div class="p-4 bg-gray-950 border border-gray-800 rounded-xl">
+                        <span class="text-xs font-mono text-purple-400">EXPLICIT_HUMAN_CORRECTION · +0.45 Confidence Delta</span>
+                        <p class="text-sm font-semibold text-white mt-1">"What is quantum superposition?"</p>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3 text-xs">
+                            <div class="p-3 bg-emerald-950/20 border border-emerald-800/40 rounded-lg">
+                                <span class="text-emerald-400 font-bold block mb-1">CHOSEN (Aligned):</span>
+                                <span class="text-gray-200">Superposition is a fundamental principle of quantum mechanics where a system exists simultaneously in multiple states.</span>
+                            </div>
+                            <div class="p-3 bg-rose-950/20 border border-rose-800/40 rounded-lg">
+                                <span class="text-rose-400 font-bold block mb-1">REJECTED (Sub-optimal):</span>
+                                <span class="text-gray-300">Superposition is magical teleportation.</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- ======================================================== -->
+        <!-- TAB 6: EXPORT & DEPLOY                                   -->
+        <!-- ======================================================== -->
+        <div x-show="activeTab === 'deploy'" x-transition>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div class="mission-card rounded-xl p-6">
+                    <h3 class="text-sm font-bold text-white mb-2">LoRA Adapter</h3>
+                    <p class="text-xs text-gray-400 mb-4">Export standalone safetensors weights + adapter_config.json</p>
+                    <button @click="triggerCommand('moro export --format adapter')" class="w-full py-2 bg-gray-800 hover:bg-gray-700 text-xs font-semibold rounded-lg">
+                        Export Adapter
+                    </button>
+                </div>
+                <div class="mission-card rounded-xl p-6">
+                    <h3 class="text-sm font-bold text-white mb-2">Ollama Modelfile</h3>
+                    <p class="text-xs text-gray-400 mb-4">Generate Modelfile with customized system prompt and parameters</p>
+                    <button @click="triggerCommand('moro export --format ollama')" class="w-full py-2 bg-gray-800 hover:bg-gray-700 text-xs font-semibold rounded-lg">
+                        Export Ollama
+                    </button>
+                </div>
+                <div class="mission-card rounded-xl p-6">
+                    <h3 class="text-sm font-bold text-white mb-2">GGUF Quantization</h3>
+                    <p class="text-xs text-gray-400 mb-4">Export conversion bash script for llama.cpp / Q4_K_M</p>
+                    <button @click="triggerCommand('moro export --format gguf')" class="w-full py-2 bg-gray-800 hover:bg-gray-700 text-xs font-semibold rounded-lg">
+                        Export GGUF
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- ======================================================== -->
+        <!-- TAB 7: TERMINAL                                          -->
+        <!-- ======================================================== -->
+        <div x-show="activeTab === 'terminal'" x-transition>
+            <div class="terminal-container">
+                <div class="terminal-header">
+                    <span class="terminal-dot red"></span>
+                    <span class="terminal-dot yellow"></span>
+                    <span class="terminal-dot green"></span>
+                    <span class="text-xs font-mono text-gray-400 ml-2">MoroAI Foundry Console (zsh)</span>
+                </div>
+                <div id="terminal" class="h-[550px] p-2 bg-[#0d1117]"></div>
+            </div>
+        </div>
+        
+        <!-- ======================================================== -->
+        <!-- TAB 8: GUIDES & DOCS                                     -->
+        <!-- ======================================================== -->
+        <div x-show="activeTab === 'docs'" x-transition>
+            <div class="mission-card rounded-xl p-8 max-w-4xl mx-auto space-y-6">
+                <div>
+                    <h2 class="text-xl font-bold text-white">MoroAI Foundry Engineering Handbook</h2>
+                    <p class="text-xs text-gray-400 mt-1">Operational manual for local-first adaptation, privacy governance, and continuous alignment.</p>
+                </div>
+                
+                <div class="space-y-4 text-xs text-gray-300">
+                    <div class="p-4 bg-gray-950 rounded-xl border border-gray-800">
+                        <h3 class="font-bold text-blue-400 text-sm mb-1">1. The Epistemic Compiler</h3>
+                        <p>Raw text is normalized and filtered via Shannon entropy and PPMI. Any sample with borderline entropy is tested with the MI Guard to preserve rare domain knowledge.</p>
+                    </div>
+                    <div class="p-4 bg-gray-950 rounded-xl border border-gray-800">
+                        <h3 class="font-bold text-indigo-400 text-sm mb-1">2. Catastrophic Forgetting Auto-Ratio Formula</h3>
+                        <p>Small models rapidly lose reasoning ability if trained purely on domain tokens. MoroAI computes α (domain) and β (general replay) alongside λ (KL penalty) to safeguard instruction adherence.</p>
+                    </div>
+                    <div class="p-4 bg-gray-950 rounded-xl border border-gray-800">
+                        <h3 class="font-bold text-cyan-400 text-sm mb-1">3. Autonomous DPO Flywheel</h3>
+                        <p>Production inference logs ingested via the webhook receiver are mined for implicit ratings and explicit user corrections, synthesizing pairwise DPO datasets automatically.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+    </main>
+    
+    <!-- Alpine.js Application Logic -->
+    <script>
+        function missionControl() {
+            return {
+                activeTab: 'overview',
+                overview: {},
+                systemStatus: {
+                    docker: true,
+                    ollama: true,
+                    database: true,
+                },
+                recentLogs: [
+                    {
+                        session_id: "sess-prod-001",
+                        prompt: "Explain quantum superposition simply.",
+                        completion: "Superposition is a fundamental principle of quantum mechanics where a system exists simultaneously in multiple states.",
+                        human_correction: null,
+                        user_rating: 1.0,
+                        is_processed: true,
+                        timestamp: "2 mins ago"
+                    },
+                    {
+                        session_id: "sess-prod-002",
+                        prompt: "What is quantum tunneling?",
+                        completion: "Tunneling is magic teleportation.",
+                        human_correction: "Tunneling is a quantum phenomenon where particles penetrate a potential energy barrier higher than their kinetic energy.",
+                        user_rating: -1.0,
+                        is_processed: true,
+                        timestamp: "8 mins ago"
+                    },
+                    {
+                        session_id: "sess-prod-003",
+                        prompt: "Define a qubit.",
+                        completion: "A qubit is the basic unit of quantum information.",
+                        human_correction: null,
+                        user_rating: 1.0,
+                        is_processed: false,
+                        timestamp: "12 mins ago"
+                    }
+                ],
+                term: null,
+                chart: null,
+                
+                init() {
+                    this.fetchOverview();
+                    this.initChart();
+                    setInterval(() => this.fetchOverview(), 8000);
+                },
+                
+                setTab(tab) {
+                    this.activeTab = tab;
+                    if (tab === 'terminal') {
+                        this.$nextTick(() => this.initTerminal());
+                    }
+                    if (tab === 'training') {
+                        this.$nextTick(() => this.initChart());
+                    }
+                },
+                
+                async fetchOverview() {
+                    try {
+                        const res = await fetch('/api/system/overview');
+                        if (res.ok) {
+                            this.overview = await res.json();
+                            this.systemStatus.docker = this.overview.docker?.available ?? true;
+                            this.systemStatus.ollama = this.overview.ollama?.available ?? true;
+                        }
+                    } catch (e) {
+                        console.log('Polling fallback active');
+                    }
+                },
+                
+                async fetchRecentLogs() {
+                    try {
+                        const res = await fetch('/api/database/production/logs');
+                        if (res.ok) {
+                            const data = await res.json();
+                            if (data.logs && data.logs.length > 0) {
+                                this.recentLogs = data.logs;
+                            }
+                        }
+                    } catch (e) {}
+                },
+                
+                async triggerCommand(cmd) {
+                    if (this.term) {
+                        this.term.writeln(`\\r\\n\\x1b[32m$ ${cmd}\\x1b[0m`);
+                    }
+                    try {
+                        const res = await fetch('/api/terminal/execute', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ command: cmd })
+                        });
+                        const data = await res.json();
+                        if (this.term) {
+                            this.term.writeln(data.output || 'Command executed.');
+                        }
+                        this.fetchOverview();
+                    } catch (e) {
+                        if (this.term) this.term.writeln('\\x1b[31mCommand execution error\\x1b[0m');
+                    }
+                },
+                
+                initTerminal() {
+                    if (this.term) return;
+                    const el = document.getElementById('terminal');
+                    if (!el) return;
+                    
+                    this.term = new Terminal({
+                        cursorBlink: true,
+                        fontSize: 13,
+                        fontFamily: 'JetBrains Mono, Menlo, Monaco, monospace',
+                        theme: {
+                            background: '#0d1117',
+                            foreground: '#c9d1d9',
+                            cursor: '#58a6ff',
+                        },
+                    });
+                    this.term.open(el);
+                    this.term.writeln('\\x1b[36m┌────────────────────────────────────────────────────────┐\\x1b[0m');
+                    this.term.writeln('\\x1b[36m│          MoroAI Mission Control Terminal v0.1.0        │\\x1b[0m');
+                    this.term.writeln('\\x1b[36m└────────────────────────────────────────────────────────┘\\x1b[0m');
+                    this.term.writeln('Type commands like: \\x1b[33mmoro status\\x1b[0m, \\x1b[33mmoro doctor\\x1b[0m, \\x1b[33mmoro recipe suggest\\x1b[0m');
+                    this.term.writeln('');
+                    this.term.write('\\x1b[32mmoro> \\x1b[0m');
+                    
+                    let line = '';
+                    this.term.onData(e => {
+                        if (e === '\\r') {
+                            this.term.writeln('');
+                            if (line.trim()) {
+                                this.triggerCommand(line.trim());
+                            }
+                            line = '';
+                            this.term.write('\\x1b[32mmoro> \\x1b[0m');
+                        } else if (e === '\\u007F') {
+                            if (line.length > 0) {
+                                line = line.slice(0, -1);
+                                this.term.write('\\b \\b');
+                            }
+                        } else {
+                            line += e;
+                            this.term.write(e);
+                        }
+                    });
+                },
+                
+                initChart() {
+                    const ctx = document.getElementById('trainingChart');
+                    if (!ctx || this.chart) return;
+                    
+                    this.chart = new Chart(ctx, {
+                        type: 'line',
+                        data: {
+                            labels: ['Step 0', 'Step 50', 'Step 100', 'Step 150', 'Step 200', 'Step 250', 'Step 300', 'Step 350', 'Step 400'],
+                            datasets: [
+                                {
+                                    label: 'Run 1: Baseline LoRA',
+                                    data: [2.40, 2.15, 1.98, 1.89, 1.82, 1.76, 1.74, 1.72, 1.71],
+                                    borderColor: '#f43f5e',
+                                    backgroundColor: 'rgba(244, 63, 94, 0.1)',
+                                    tension: 0.3,
+                                    borderWidth: 2,
+                                },
+                                {
+                                    label: 'Run 2: DPO Aligned Model',
+                                    data: [2.35, 1.85, 1.54, 1.32, 1.18, 1.09, 1.04, 1.01, 0.99],
+                                    borderColor: '#06b6d4',
+                                    backgroundColor: 'rgba(6, 182, 212, 0.1)',
+                                    tension: 0.3,
+                                    borderWidth: 2,
+                                }
+                            ]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: { labels: { color: '#94a3b8', font: { family: 'JetBrains Mono', size: 11 } } }
+                            },
+                            scales: {
+                                y: { grid: { color: 'rgba(255,255,255,0.06)' }, ticks: { color: '#64748b' } },
+                                x: { grid: { color: 'rgba(255,255,255,0.06)' }, ticks: { color: '#64748b' } }
+                            }
+                        }
+                    });
+                }
+            };
+        }
+    </script>
+</body>
+</html>

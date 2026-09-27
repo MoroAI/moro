@@ -224,6 +224,8 @@ __marimo__/
 # Generated data
 data/normalized/
 data/splits/
+data/dpo/
+data/*.db*
 runs/
 releases/
 

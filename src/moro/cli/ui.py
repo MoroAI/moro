@@ -22,10 +22,17 @@ def ui_command(
         f"[bold cyan]http://{host}:{port}[/bold cyan]\n"
     )
     console.print("Press [bold red]Ctrl+C[/bold red] to stop.\n")
-    server = start_server(host=host, port=port)
     try:
-        server.serve_forever()
-    except KeyboardInterrupt:
-        console.print("\n[yellow]Dashboard stopped.[/yellow]")
-    finally:
-        server.server_close()
+        import uvicorn
+
+        from moro.dashboard.mission_control import app as mission_app
+        uvicorn.run(mission_app, host=host, port=port, log_level="info")
+    except ImportError:
+        server = start_server(host=host, port=port)
+        try:
+            server.serve_forever()
+        except KeyboardInterrupt:
+            console.print("\n[yellow]Dashboard stopped.[/yellow]")
+        finally:
+            server.server_close()
+
