@@ -86,13 +86,14 @@ def diagnose_command(
             console.print("Run [bold]moro train[/bold] to create a run.")
             raise typer.Exit(code=0)
 
-        resolved_run_id = run_row["id"]
-        status = run_row["status"]
-        error_text = run_row["error"] or ""
+        run_data = dict(run_row)
+        resolved_run_id = run_data["id"]
+        status = run_data["status"]
+        error_text = run_data.get("error") or ""
 
         # Supplement with log scan if available
-        if scan_logs and run_row.get("output_dir"):
-            output_dir = Path(run_row["output_dir"])
+        if scan_logs and run_data.get("output_dir"):
+            output_dir = Path(run_data["output_dir"])
             if not output_dir.is_absolute():
                 output_dir = root / output_dir
             log_error = _extract_error_from_log(output_dir)

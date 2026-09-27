@@ -55,40 +55,62 @@ def install_hooks(
 
     pre_commit_config = root / ".pre-commit-config.yaml"
     if not pre_commit_config.exists():
-        console.print(
-            "[bold red]Error:[/bold red] .pre-commit-config.yaml not found in project root.\n"
-            "Expected at: " + str(pre_commit_config) + "\n"
-            "This file should have been created during moro init."
+        default_config = (
+            "repos:\n"
+            "  - repo: local\n"
+            "    hooks:\n"
+            "      - id: moro-safety-check\n"
+            "        name: MoroAI Safety & Secret Scanner\n"
+            "        entry: python scripts/hooks/pre_commit_safety_check.py\n"
+            "        language: system\n"
+            "        pass_filenames: false\n"
+            "        always_run: true\n"
         )
-        raise typer.Exit(code=1)
+        pre_commit_config.write_text(default_config, encoding="utf-8")
+        console.print(f"[green]Created:[/green] {pre_commit_config.name}")
 
-    console.print("[cyan]Installing pre-commit framework…[/cyan]")
-    pip_result = subprocess.run(
-        [sys.executable, "-m", "pip", "install", "pre-commit", "--quiet"],
-        capture_output=True,
-        text=True,
-    )
-    if pip_result.returncode != 0:
-        console.print(
-            f"[bold yellow]Warning:[/bold yellow] Could not auto-install pre-commit:\n"
-            f"{pip_result.stderr}\n"
-            "Please run: pip install pre-commit"
-        )
+    scripts_dir = root / "scripts" / "hooks"
+    safety_script = scripts_dir / "pre_commit_safety_check.py"
+    if not safety_script.exists():
+        scripts_dir.mkdir(parents=True, exist_ok=True)
+        # Create minimal self-contained scanner if not already copied
+        src_script = Path(__file__).resolve().parents[3] / "scripts" / "hooks" / "pre_commit_safety_check.py"
+        if src_script.exists():
+            safety_script.write_text(src_script.read_text(encoding="utf-8"), encoding="utf-8")
 
     console.print("[cyan]Installing git hooks…[/cyan]")
-    install_result = subprocess.run(
-        ["pre-commit", "install", "--hook-type", "pre-commit"],
-        capture_output=True,
-        text=True,
-        cwd=str(root),
-    )
+    installed = False
 
-    if install_result.returncode != 0:
+    try:
+        install_result = subprocess.run(
+            ["pre-commit", "install", "--hook-type", "pre-commit"],
+            capture_output=True,
+            text=True,
+            cwd=str(root),
+        )
+        if install_result.returncode == 0:
+            installed = True
+    except Exception:
+        pass
+
+    # Direct fallback if pre-commit command is unavailable
+    if not installed:
+        git_hooks_dir = root / ".git" / "hooks"
+        if git_hooks_dir.exists():
+            direct_hook = git_hooks_dir / "pre-commit"
+            direct_hook.write_text(
+                "#!/bin/sh\n"
+                "python scripts/hooks/pre_commit_safety_check.py\n",
+                encoding="utf-8",
+            )
+            direct_hook.chmod(0o755)
+            installed = True
+
+    if not installed:
         console.print(
             Panel(
-                f"[bold red]Hook installation failed.[/bold red]\n\n"
-                f"{install_result.stderr or install_result.stdout}\n\n"
-                "Try running manually:\n  pre-commit install",
+                "[bold red]Hook installation failed.[/bold red]\n\n"
+                "Could not find .git directory or pre-commit command.",
                 border_style="red",
             )
         )
@@ -202,16 +224,25 @@ def uninstall_hooks() -> None:
         console.print(f"[bold red]Error:[/bold red] {exc}")
         raise typer.Exit(code=1)
 
-    result = subprocess.run(
-        ["pre-commit", "uninstall"],
-        capture_output=True,
-        text=True,
-        cwd=str(root),
-    )
-    if result.returncode == 0:
+    uninstalled = False
+    try:
+        result = subprocess.run(
+            ["pre-commit", "uninstall"],
+            capture_output=True,
+            text=True,
+            cwd=str(root),
+        )
+        if result.returncode == 0:
+            uninstalled = True
+    except Exception:
+        pass
+
+    direct_hook = root / ".git" / "hooks" / "pre-commit"
+    if direct_hook.exists():
+        direct_hook.unlink()
+        uninstalled = True
+
+    if uninstalled:
         console.print("[green]✓[/green] Pre-commit hooks uninstalled.")
     else:
-        console.print(
-            f"[bold yellow]Warning:[/bold yellow] Could not uninstall hooks automatically.\n"
-            f"Remove .git/hooks/pre-commit manually.\n{result.stderr}"
-        )
+        console.print("[dim]No pre-commit hook found to uninstall.[/dim]")

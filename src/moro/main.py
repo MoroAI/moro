@@ -16,6 +16,7 @@ from moro.cli.recipe import app as recipe_app
 from moro.cli.runs import app as runs_app
 from moro.cli.status import status_command
 from moro.cli.train import train_command
+from moro.cli.ui import ui_command
 
 app = typer.Typer(
     name="moro",
@@ -70,6 +71,9 @@ app.add_typer(guard_app, name="guard")
 
 # ── Continuous Learning Flywheel ──────────────────────────────────────────────
 app.add_typer(flywheel_app, name="flywheel")
+
+# ── Mission Control Web Dashboard ─────────────────────────────────────────────
+app.command(name="ui", help="Launch the MoroAI Mission Control Web Dashboard.")(ui_command)
 
 # ── Version ──────────────────────────────────────────────────────────────────
 @app.command(name="version", help="Show MoroAI version.")
