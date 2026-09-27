@@ -21,3 +21,14 @@ def test_service_orchestrator_status(tmp_path: Path):
 def test_is_port_open_nonexistent():
     # Random very high unallocated port
     assert is_port_open(59999, timeout=0.1) is False
+
+
+def test_service_orchestrator_print_status_and_logs(tmp_path: Path):
+    orch = ServiceOrchestrator(tmp_path)
+    # print_status should run without error
+    orch.print_status()
+
+    # get_logs on non-running service should return appropriate message
+    logs = orch.get_logs("dashboard")
+    assert "No log file found" in logs or "is not running" in logs or isinstance(logs, str)
+

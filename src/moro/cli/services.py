@@ -90,6 +90,30 @@ def services_stop_command(
             console.print(f"[dim]Service {s} is not currently running or stopped.[/dim]")
 
 
+@app.command("restart")
+def services_restart_command(
+    service: str = typer.Argument(..., help="Service name to restart (dashboard, ollama, webhook)."),
+) -> None:
+    """Restart a specific service."""
+    orchestrator = ServiceOrchestrator()
+    with console.status(f"[cyan]Restarting {service}…[/cyan]"):
+        ok = orchestrator.restart_service(service)
+    if ok:
+        console.print(f"[bold green]✓[/bold green] Service [bold]{service}[/bold] restarted.")
+    else:
+        console.print(f"[bold yellow]⚠[/bold yellow] Failed to restart service [bold]{service}[/bold].")
+
+
+@app.command("supervise")
+def services_supervise_command() -> None:
+    """Start the service supervisor (monitors and auto-restarts crashed services)."""
+    orchestrator = ServiceOrchestrator()
+    console.print("[bold cyan]Starting Service Supervisor[/bold cyan]")
+    console.print("[dim]Press Ctrl+C to stop[/dim]\n")
+    orchestrator.start_all()
+    orchestrator.supervise()
+
+
 @app.command("logs")
 def services_logs_command(
     service: str = typer.Argument(..., help="Service name (dashboard, ollama, webhook)."),
@@ -99,3 +123,7 @@ def services_logs_command(
     orchestrator = ServiceOrchestrator()
     logs = orchestrator.get_logs(service, tail=tail)
     console.print(Panel(logs, title=f"Logs: {service}", border_style="cyan"))
+
+
+services_app = app
+

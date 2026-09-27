@@ -453,16 +453,87 @@ async def system_overview() -> dict:
     }
 
 
+@app.get("/api/state/nodes")
+async def state_nodes(node_type: str | None = None, limit: int = 50) -> dict:
+    """Query state graph nodes."""
+    from moro.state.manager import StateManager
+    from moro.state.schema import NodeType
+
+    project_root = get_project_root()
+    state_manager = StateManager(project_root / ".moro" / "state.db")
+    node_type_enum = NodeType(node_type) if node_type else None
+    nodes = state_manager.query_nodes(node_type=node_type_enum, limit=limit)
+    return {"nodes": nodes}
+
+
+@app.get("/api/state/nodes/{node_id}/lineage")
+async def state_lineage(node_id: str) -> dict:
+    """Get the complete lineage of a node."""
+    from moro.state.manager import StateManager
+
+    project_root = get_project_root()
+    state_manager = StateManager(project_root / ".moro" / "state.db")
+    lineage = state_manager.trace_lineage(node_id)
+    return lineage
+
+
 @app.get("/api/registry/models")
 async def registry_models_api() -> dict:
     database: DatabaseConnector = _connectors.get("database", DatabaseConnector(get_project_root()))  # type: ignore
     return {"models": database.get_registered_models()}
 
 
+@app.post("/api/registry/models/{model_id}/promote")
+async def registry_promote_model(model_id: str) -> dict:
+    """Promote a model to production."""
+    from moro.state.manager import StateManager
+
+    project_root = get_project_root()
+    state_manager = StateManager(project_root / ".moro" / "state.db")
+    success = state_manager.promote_model_to_production(model_id)
+    if not success:
+        raise HTTPException(status_code=500, detail="Failed to promote model")
+    return {"status": "success", "model_id": model_id}
+
+
 @app.get("/api/state/lineage")
 async def state_lineage_api() -> dict:
     database: DatabaseConnector = _connectors.get("database", DatabaseConnector(get_project_root()))  # type: ignore
     return {"lineage": database.get_state_lineage()}
+
+
+@app.get("/api/services/status")
+async def services_status_api() -> dict:
+    """Get status of all background services."""
+    from moro.services.orchestrator import ServiceOrchestrator
+
+    orchestrator = ServiceOrchestrator(get_project_root())
+    return {"services": orchestrator.get_status()}
+
+
+@app.post("/api/services/{service_name}/start")
+async def services_start_api(service_name: str) -> dict:
+    """Start a specific service."""
+    from moro.services.orchestrator import ServiceOrchestrator
+
+    orchestrator = ServiceOrchestrator(get_project_root())
+    success = orchestrator.start_service(service_name)
+    if not success:
+        raise HTTPException(status_code=500, detail=f"Failed to start {service_name}")
+    return {"status": "success", "service": service_name}
+
+
+@app.post("/api/services/{service_name}/stop")
+async def services_stop_api(service_name: str) -> dict:
+    """Stop a specific service."""
+    from moro.services.orchestrator import ServiceOrchestrator
+
+    orchestrator = ServiceOrchestrator(get_project_root())
+    success = orchestrator.stop_service(service_name)
+    if not success:
+        raise HTTPException(status_code=500, detail=f"Failed to stop {service_name}")
+    return {"status": "success", "service": service_name}
+
 
 
 @app.get("/api/docker/containers")
