@@ -1,6 +1,7 @@
 import typer
 
 from moro import __version__
+from moro.cli.analytics import analytics_app
 from moro.cli.data import app as data_app
 from moro.cli.deploy import deploy_command
 from moro.cli.diagnose import diagnose_command
@@ -83,6 +84,9 @@ app.add_typer(registry_app, name="registry")
 
 # ── Service Orchestrator ─────────────────────────────────────────────────────
 app.add_typer(services_app, name="services")
+
+# ── Experiment Tracking & Visual Analytics ────────────────────────────────────
+app.add_typer(analytics_app, name="analytics")
 
 # ── Mission Control Web Dashboard ─────────────────────────────────────────────
 app.command(name="ui", help="Launch the MoroAI Mission Control Web Dashboard.")(ui_command)

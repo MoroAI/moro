@@ -1,0 +1,38 @@
+project:
+  name: moro-workspace
+  privacy_mode: local_only
+  seed: 42
+
+dataset:
+  source: ./examples/support.jsonl
+  format: auto
+  deduplicate: true
+  pii_scan: false
+  max_seq_length: 1024
+  min_quality_score: 0.0
+  validation_ratio: 0.1
+  eval_ratio: 0.1
+
+model:
+  name: Qwen/Qwen2.5-1.5B-Instruct
+  quantization: nf4
+  trust_remote_code: false
+
+adapter:
+  type: lora
+  r: 16
+  lora_alpha: 32
+  lora_dropout: 0.05
+  target_modules:
+    - q_proj
+    - v_proj
+
+training:
+  learning_rate: 0.0002
+  batch_size: 4
+  gradient_accumulation_steps: 2
+  epochs: 3.0
+  warmup_ratio: 0.05
+  weight_decay: 0.01
+  optimizer: adamw_8bit
+  output_dir: runs

@@ -456,3 +456,51 @@ def test_moro_full_lifecycle_master_e2e(tmp_path: Path, monkeypatch):
     res_fw_hist = runner.invoke(app, ["flywheel", "history", "--db", str(flywheel_db)])
     assert res_fw_hist.exit_code == 0
     assert "completed" in res_fw_hist.stdout
+
+    # ---------------------------------------------------------
+    # 16. moro analytics (list, show, trend, recommend)
+    # ---------------------------------------------------------
+    from moro.analytics.tracker import ExperimentTracker
+
+    analytics_tracker = ExperimentTracker(project_dir / ".moro" / "analytics.db")
+    exp_master = analytics_tracker.create_experiment(
+        name="master_lifecycle_run",
+        base_model="Qwen/Qwen2.5-1.5B",
+    )
+    analytics_tracker.start_experiment(exp_master, {"learning_rate": 2e-4, "lora_r": 16})
+    analytics_tracker.complete_experiment(
+        exp_master,
+        final_train_loss=1.25,
+        final_eval_loss=1.35,
+        eval_pass_rate=0.88,
+        eval_delta=0.08,
+    )
+
+    exp_master2 = analytics_tracker.create_experiment(
+        name="master_lifecycle_run_2",
+        base_model="Qwen/Qwen2.5-1.5B",
+    )
+    analytics_tracker.start_experiment(exp_master2, {"learning_rate": 1e-4, "lora_r": 8})
+    analytics_tracker.complete_experiment(
+        exp_master2,
+        final_train_loss=1.45,
+        final_eval_loss=1.55,
+        eval_pass_rate=0.80,
+        eval_delta=0.03,
+    )
+
+    res_an_list = runner.invoke(app, ["analytics", "list"])
+    assert res_an_list.exit_code == 0
+    assert "MoroAI Experiments" in res_an_list.stdout
+
+    res_an_show = runner.invoke(app, ["analytics", "show", exp_master])
+    assert res_an_show.exit_code == 0
+    assert exp_master in res_an_show.stdout
+
+    res_an_trend = runner.invoke(app, ["analytics", "trend"])
+    assert res_an_trend.exit_code == 0
+    assert "Model Quality Trend" in res_an_trend.stdout
+
+    res_an_rec = runner.invoke(app, ["analytics", "recommend"])
+    assert res_an_rec.exit_code == 0
+    assert "Experiment Recommendations" in res_an_rec.stdout

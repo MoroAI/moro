@@ -19,6 +19,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 
+from moro.analytics.tracker import ExperimentTracker
+from moro.analytics.visualizations import VisualAnalyticsEngine
 from moro.core.project import find_project_root
 
 # ===================================================================
@@ -670,6 +672,116 @@ async def terminal_execute(payload: CommandPayload) -> dict:
         return {"output": "Command timed out after 15 seconds."}
     except Exception as exc:
         return {"output": f"Execution error: {exc}"}
+
+
+# ===================================================================
+# EXPERIMENT TRACKING & ANALYTICS API ENDPOINTS
+# ===================================================================
+
+def _get_analytics_tracker() -> ExperimentTracker:
+    root = get_project_root()
+    return ExperimentTracker(root / ".moro" / "analytics.db")
+
+
+def _get_analytics_viz_engine() -> VisualAnalyticsEngine:
+    return VisualAnalyticsEngine(_get_analytics_tracker())
+
+
+@app.get("/api/analytics/experiments")
+async def analytics_experiments(status: str | None = None, limit: int = 50) -> dict:
+    """List tracked experiments."""
+    tracker = _get_analytics_tracker()
+    experiments = tracker.list_experiments(status=status, limit=limit)
+    return {"experiments": experiments}
+
+
+@app.get("/api/analytics/experiments/{experiment_id}")
+async def analytics_experiment_detail(experiment_id: str) -> dict:
+    """Get detailed experiment information."""
+    tracker = _get_analytics_tracker()
+    experiment = tracker.get_experiment(experiment_id)
+    if not experiment:
+        raise HTTPException(status_code=404, detail="Experiment not found")
+
+    hyperparams = tracker.get_hyperparameters(experiment_id)
+    metrics = tracker.get_metrics(experiment_id)
+
+    return {
+        "experiment": experiment,
+        "hyperparameters": hyperparams,
+        "metrics_count": len(metrics),
+    }
+
+
+@app.get("/api/analytics/experiments/{experiment_id}/metrics")
+async def analytics_experiment_metrics(experiment_id: str) -> dict:
+    """Get time-series metrics for an experiment."""
+    tracker = _get_analytics_tracker()
+    metrics = tracker.get_metrics(experiment_id)
+    return {"metrics": metrics}
+
+
+@app.get("/api/analytics/compare")
+async def analytics_compare(experiment_ids: str) -> dict:
+    """Compare multiple experiments side-by-side."""
+    tracker = _get_analytics_tracker()
+    ids = [i.strip() for i in experiment_ids.split(",") if i.strip()]
+    if not ids:
+        raise HTTPException(status_code=400, detail="No experiment IDs provided")
+    return tracker.compare_experiments(ids)
+
+
+@app.get("/api/analytics/viz/loss-curves")
+async def analytics_loss_curves(experiment_ids: str, smoothing: int = 10) -> dict:
+    """Generate loss curve visualization data."""
+    viz_engine = _get_analytics_viz_engine()
+    ids = [i.strip() for i in experiment_ids.split(",") if i.strip()]
+    return viz_engine.generate_loss_curve_data(ids, smoothing_window=smoothing)
+
+
+@app.get("/api/analytics/viz/quality-trend")
+async def analytics_quality_trend(base_model: str | None = None, limit: int = 20) -> dict:
+    """Generate quality trend visualization data."""
+    viz_engine = _get_analytics_viz_engine()
+    return viz_engine.generate_quality_trend_data(base_model, limit)
+
+
+@app.get("/api/analytics/viz/hyperparameter-heatmap")
+async def analytics_heatmap(
+    x_param: str = "learning_rate",
+    y_param: str = "lora_r",
+    metric: str = "eval_delta",
+) -> dict:
+    """Generate hyperparameter heatmap data."""
+    viz_engine = _get_analytics_viz_engine()
+    return viz_engine.generate_hyperparameter_heatmap(x_param, y_param, metric)
+
+
+@app.get("/api/analytics/viz/resource-utilization/{experiment_id}")
+async def analytics_resource_utilization(experiment_id: str) -> dict:
+    """Generate resource utilization visualization data."""
+    viz_engine = _get_analytics_viz_engine()
+    return viz_engine.generate_resource_utilization_data(experiment_id)
+
+
+@app.get("/api/analytics/viz/output-comparison")
+async def analytics_output_comparison(
+    experiment_ids: str,
+    category: str | None = None,
+    limit: int = 10,
+) -> dict:
+    """Generate model output comparison data."""
+    viz_engine = _get_analytics_viz_engine()
+    ids = [i.strip() for i in experiment_ids.split(",") if i.strip()]
+    return viz_engine.generate_output_comparison(ids, prompt_category=category, limit=limit)
+
+
+@app.get("/api/analytics/recommendations")
+async def analytics_recommendations(recent: int = 10) -> dict:
+    """Get recommendations for next experiment."""
+    tracker = _get_analytics_tracker()
+    recommendations = tracker.generate_recommendations(recent_experiments=recent)
+    return {"recommendations": recommendations}
 
 
 # ===================================================================

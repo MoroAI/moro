@@ -4,6 +4,7 @@ from pathlib import Path
 import typer
 from rich.console import Console
 
+from moro.analytics.tracker import ExperimentTracker
 from moro.config.loader import load_config
 from moro.core.errors import ConfigError, DatasetError, DependencyError, TrainingError
 from moro.core.hashing import config_snapshot_hash
@@ -42,6 +43,8 @@ def train_command(
     """Run fine-tuning with the current project config."""
     conn = None
     run_id = None
+    exp_id = None
+    tracker = None
     try:
         if resume:
             raise ConfigError("Checkpoint resume is not implemented; --resume cannot be used yet.")
@@ -117,6 +120,38 @@ def train_command(
         console.print(f"  Model: {cfg.model.name}")
 
         try:
+            tracker = ExperimentTracker(root / ".moro" / "analytics.db")
+            exp_id = tracker.create_experiment(
+                name=run_name or f"run_{run_id}",
+                base_model=cfg.model.name,
+                dataset_id=dataset_row.get("version_id") if isinstance(dataset_row, dict) else getattr(dataset_row, "version_id", None),
+                dataset_name=str(train_path),
+                state_node_id=run_id,
+            )
+            tracker.start_experiment(
+                experiment_id=exp_id,
+                hyperparameters={
+                    "learning_rate": getattr(cfg.training, "learning_rate", None),
+                    "batch_size": getattr(cfg.training, "batch_size", None),
+                    "gradient_accumulation_steps": getattr(cfg.training, "gradient_accumulation_steps", None),
+                    "epochs": getattr(cfg.training, "epochs", None),
+                    "warmup_ratio": getattr(cfg.training, "warmup_ratio", None),
+                    "weight_decay": getattr(cfg.training, "weight_decay", None),
+                    "lora_r": getattr(cfg.training, "lora_r", None),
+                    "lora_alpha": getattr(cfg.training, "lora_alpha", None),
+                    "lora_dropout": getattr(cfg.training, "lora_dropout", None),
+                    "target_modules": getattr(cfg.training, "target_modules", []),
+                    "optimizer": getattr(cfg.training, "optimizer", "adamw"),
+                    "max_seq_length": getattr(cfg.training, "max_seq_length", 2048),
+                    "seed": getattr(cfg.training, "seed", 42),
+                },
+                gpu_name=None,
+                gpu_vram_gb=est_vram,
+            )
+        except Exception:
+            pass
+
+        try:
             output_dir.mkdir(parents=True, exist_ok=True)
             (output_dir / "config.json").write_text(cfg.model_dump_json(indent=2), encoding="utf-8")
             from moro.core.hashing import sha256_file
@@ -148,6 +183,11 @@ def train_command(
         except (Exception, KeyboardInterrupt) as exc:
             status = "cancelled" if isinstance(exc, KeyboardInterrupt) else "failed"
             storage_db.update_run_status(conn, run_id, status, error=str(exc) or "Interrupted")
+            if tracker and exp_id:
+                try:
+                    tracker.fail_experiment(exp_id, error_message=str(exc) or "Interrupted")
+                except Exception:
+                    pass
             if isinstance(exc, KeyboardInterrupt):
                 raise typer.Exit(code=130) from exc
             raise
@@ -162,6 +202,11 @@ def train_command(
                     raise TrainingError(f"Non-finite training metric: {metric}")
         except (DatasetError, TrainingError) as exc:
             storage_db.update_run_status(conn, run_id, "failed", error=str(exc))
+            if tracker and exp_id:
+                try:
+                    tracker.fail_experiment(exp_id, error_message=str(exc))
+                except Exception:
+                    pass
             raise
         (output_dir / "training_report.json").write_text(json.dumps(result, indent=2, default=str))
 
@@ -175,10 +220,23 @@ def train_command(
             peak_vram_gb=result.get("peak_vram_gb"),
             tokens_per_sec=result.get("tokens_per_sec"),
         )
+        if tracker and exp_id:
+            try:
+                tracker.complete_experiment(
+                    experiment_id=exp_id,
+                    final_train_loss=result.get("train_loss"),
+                    final_eval_loss=result.get("validation_loss"),
+                    peak_vram_gb=result.get("peak_vram_gb"),
+                    tokens_per_second=result.get("tokens_per_sec"),
+                )
+            except Exception:
+                pass
 
         console.print(
             f"\n[bold green]✓[/bold green] Training complete! Run ID: [bold]{run_id}[/bold]"
         )
+        if exp_id:
+            console.print(f"  [cyan]📊 Experiment tracked:[/cyan] [bold]{exp_id}[/bold]")
         if result.get("train_loss"):
             console.print(f"  Train loss:     {result['train_loss']}")
         if result.get("validation_loss"):

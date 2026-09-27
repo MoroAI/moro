@@ -123,6 +123,11 @@
                             class="px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all">
                         🔍 Evaluation
                     </button>
+                    <button @click="setTab('analytics')" 
+                            :class="activeTab === 'analytics' ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30' : 'text-gray-400 hover:text-white hover:bg-gray-800/50'"
+                            class="px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all">
+                        📊 Analytics
+                    </button>
                     <button @click="setTab('flywheel')" 
                             :class="activeTab === 'flywheel' ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30' : 'text-gray-400 hover:text-white hover:bg-gray-800/50'"
                             class="px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all">
@@ -597,6 +602,252 @@
         </div>
         
         <!-- ======================================================== -->
+        <!-- TAB: EXPERIMENT TRACKING & VISUAL ANALYTICS              -->
+        <!-- ======================================================== -->
+        <div x-show="activeTab === 'analytics'" x-transition>
+            <!-- Analytics Header & Toolbar -->
+            <div class="mission-card rounded-xl p-6 mb-6">
+                <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-4">
+                    <div>
+                        <h2 class="text-lg font-bold text-white flex items-center gap-2">
+                            <span>📊 Experiment Tracking & Visual Analytics</span>
+                            <span class="text-xs bg-blue-500/20 text-blue-400 border border-blue-500/30 px-2 py-0.5 rounded-full font-mono font-normal" x-text="(analyticsExperiments?.length || 0) + ' Runs Tracked'">0 Runs Tracked</span>
+                        </h2>
+                        <p class="text-xs text-gray-400 mt-1">Multi-run comparison, statistical correlation, quality trends, and actionable next-experiment recommendations.</p>
+                    </div>
+                    <div class="flex items-center gap-2.5">
+                        <select x-model="analyticsFilterStatus" @change="fetchAnalyticsData()" class="bg-gray-900 border border-gray-700 rounded-lg px-3 py-1.5 text-xs text-gray-300 focus:outline-none focus:border-blue-500">
+                            <option value="">All Statuses</option>
+                            <option value="completed">Completed</option>
+                            <option value="running">Running</option>
+                            <option value="failed">Failed</option>
+                        </select>
+                        <button @click="fetchAnalyticsData()" class="px-3 py-1.5 bg-gray-800 hover:bg-gray-700 border border-gray-700 text-gray-300 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all">
+                            <span>🔄</span> Refresh
+                        </button>
+                        <button @click="compareSelectedExperiments()" :disabled="selectedExpIds.length < 1" class="px-4 py-1.5 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg text-xs font-semibold shadow-md shadow-blue-600/30 transition-all flex items-center gap-1.5">
+                            <span>⚖️</span> Compare Selected (<span x-text="selectedExpIds.length"></span>)
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Experiments Table -->
+                <div class="overflow-x-auto border border-gray-800/80 rounded-lg">
+                    <table class="min-w-full divide-y divide-gray-800 text-left">
+                        <thead class="bg-gray-950/80">
+                            <tr>
+                                <th class="px-4 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider w-10">
+                                    <input type="checkbox" @change="toggleSelectAllExps($event)" class="rounded bg-gray-900 border-gray-700 text-blue-600 focus:ring-0">
+                                </th>
+                                <th class="px-4 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Experiment</th>
+                                <th class="px-4 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Status</th>
+                                <th class="px-4 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Base Model</th>
+                                <th class="px-4 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Eval Delta</th>
+                                <th class="px-4 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Train Loss</th>
+                                <th class="px-4 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Duration</th>
+                                <th class="px-4 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Created</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-800/60 bg-gray-900/40">
+                            <template x-for="exp in analyticsExperiments" :key="exp.experiment_id">
+                                <tr class="hover:bg-gray-800/40 transition-colors">
+                                    <td class="px-4 py-3">
+                                        <input type="checkbox" :value="exp.experiment_id" :checked="selectedExpIds.includes(exp.experiment_id)" @change="toggleExpSelection(exp.experiment_id)" class="rounded bg-gray-900 border-gray-700 text-blue-600 focus:ring-0">
+                                    </td>
+                                    <td class="px-4 py-3">
+                                        <div class="font-medium text-sm text-white font-mono" x-text="exp.experiment_name"></div>
+                                        <div class="text-[11px] text-gray-500 font-mono" x-text="exp.experiment_id"></div>
+                                    </td>
+                                    <td class="px-4 py-3">
+                                        <span class="px-2 py-0.5 rounded-full text-[11px] font-semibold tracking-wide"
+                                              :class="{
+                                                  'bg-emerald-950 text-emerald-400 border border-emerald-800': exp.status === 'completed',
+                                                  'bg-rose-950 text-rose-400 border border-rose-800': exp.status === 'failed',
+                                                  'bg-blue-950 text-blue-400 border border-blue-800 animate-pulse': exp.status === 'running',
+                                                  'bg-yellow-950 text-yellow-400 border border-yellow-800': exp.status === 'pending'
+                                              }"
+                                              x-text="exp.status"></span>
+                                    </td>
+                                    <td class="px-4 py-3 text-xs text-gray-300 font-mono" x-text="exp.base_model || '-'"></td>
+                                    <td class="px-4 py-3 text-xs font-semibold font-mono"
+                                          :class="exp.eval_delta > 0 ? 'text-emerald-400' : (exp.eval_delta < 0 ? 'text-rose-400' : 'text-gray-400')"
+                                          x-text="exp.eval_delta !== null && exp.eval_delta !== undefined ? (exp.eval_delta > 0 ? '+' : '') + (exp.eval_delta * 100).toFixed(1) + '%' : '-'"></td>
+                                    <td class="px-4 py-3 text-xs text-gray-300 font-mono" x-text="exp.final_train_loss ? Number(exp.final_train_loss).toFixed(4) : '-'"></td>
+                                    <td class="px-4 py-3 text-xs text-gray-400 font-mono" x-text="formatDuration(exp.duration_seconds)"></td>
+                                    <td class="px-4 py-3 text-xs text-gray-400" x-text="formatDate(exp.created_at)"></td>
+                                </tr>
+                            </template>
+                            <template x-if="!analyticsExperiments || analyticsExperiments.length === 0">
+                                <tr>
+                                    <td colspan="8" class="px-4 py-8 text-center text-xs text-gray-500">
+                                        No experiments tracked yet. Run <code class="text-blue-400 font-mono">moro train</code> to view tracking metrics.
+                                    </td>
+                                </tr>
+                            </template>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Experiment Comparison Drawer / View (if comparison active) -->
+            <div x-show="analyticsComparison" class="mission-card rounded-xl p-6 mb-6 border border-blue-500/40 bg-blue-950/20" x-transition>
+                <div class="flex justify-between items-center mb-4">
+                    <div class="flex items-center gap-3">
+                        <span class="text-xl">🏆</span>
+                        <div>
+                            <h3 class="text-md font-bold text-white">Multi-Run Comparison Matrix</h3>
+                            <p class="text-xs text-gray-400" x-text="'Winner: ' + (analyticsComparison?.best_experiment_id || 'Tie')"></p>
+                        </div>
+                    </div>
+                    <button @click="analyticsComparison = null" class="text-gray-400 hover:text-white text-xs">✕ Close</button>
+                </div>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <!-- Metrics Side-by-Side -->
+                    <div class="p-4 bg-gray-950/70 rounded-lg border border-gray-800">
+                        <h4 class="text-xs font-semibold text-blue-400 uppercase tracking-wider mb-3">Metrics Comparison</h4>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-xs text-left">
+                                <thead class="text-gray-400 border-b border-gray-800">
+                                    <tr>
+                                        <th class="pb-2">Metric</th>
+                                        <template x-for="(id, idx) in (analyticsComparison?.metrics_comparison?.experiment_ids || [])" :key="id">
+                                            <th class="pb-2 font-mono" :class="id === analyticsComparison?.best_experiment_id ? 'text-emerald-400 font-bold' : 'text-gray-300'" x-text="'Exp ' + (idx + 1) + (id === analyticsComparison?.best_experiment_id ? ' 🏆' : '')"></th>
+                                        </template>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-gray-800/40 font-mono">
+                                    <tr>
+                                        <td class="py-2 text-gray-400">Final Loss</td>
+                                        <template x-for="val in (analyticsComparison?.metrics_comparison?.final_train_loss || [])">
+                                            <td class="py-2 text-white" x-text="val ? Number(val).toFixed(4) : '-'"></td>
+                                        </template>
+                                    </tr>
+                                    <tr>
+                                        <td class="py-2 text-gray-400">Eval Pass Rate</td>
+                                        <template x-for="val in (analyticsComparison?.metrics_comparison?.eval_pass_rate || [])">
+                                            <td class="py-2 text-emerald-400" x-text="val !== null && val !== undefined ? (Number(val) * 100).toFixed(1) + '%' : '-'"></td>
+                                        </template>
+                                    </tr>
+                                    <tr>
+                                        <td class="py-2 text-gray-400">Eval Delta</td>
+                                        <template x-for="val in (analyticsComparison?.metrics_comparison?.eval_delta || [])">
+                                            <td class="py-2" :class="val > 0 ? 'text-emerald-400' : 'text-rose-400'" x-text="val !== null && val !== undefined ? (val > 0 ? '+' : '') + (Number(val) * 100).toFixed(1) + '%' : '-'"></td>
+                                        </template>
+                                    </tr>
+                                    <tr>
+                                        <td class="py-2 text-gray-400">Duration</td>
+                                        <template x-for="val in (analyticsComparison?.metrics_comparison?.duration_seconds || [])">
+                                            <td class="py-2 text-gray-300" x-text="formatDuration(val)"></td>
+                                        </template>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Hyperparameter Diffs -->
+                    <div class="p-4 bg-gray-950/70 rounded-lg border border-gray-800">
+                        <h4 class="text-xs font-semibold text-purple-400 uppercase tracking-wider mb-3">Hyperparameter Variances</h4>
+                        <template x-if="Object.keys(analyticsComparison?.hyperparameter_differences || {}).length > 0">
+                            <div class="space-y-2 text-xs font-mono">
+                                <template x-for="(vals, param) in analyticsComparison.hyperparameter_differences" :key="param">
+                                    <div class="flex justify-between items-center py-1.5 border-b border-gray-800/40">
+                                        <span class="text-gray-400 font-sans" x-text="param"></span>
+                                        <span class="text-purple-300" x-text="vals.join('  vs  ')"></span>
+                                    </div>
+                                </template>
+                            </div>
+                        </template>
+                        <template x-if="!analyticsComparison?.hyperparameter_differences || Object.keys(analyticsComparison?.hyperparameter_differences).length === 0">
+                            <p class="text-xs text-gray-500 py-4">No configuration differences detected across compared experiments.</p>
+                        </template>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Visualizations Grid -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+                <!-- Loss Curves -->
+                <div class="mission-card rounded-xl p-6">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-sm font-bold text-white flex items-center gap-2">
+                            <span>📈 Overlaid Loss Trajectories</span>
+                        </h3>
+                        <span class="text-[11px] text-gray-400">Step Moving Avg (Window: 10)</span>
+                    </div>
+                    <div class="h-64 relative">
+                        <canvas id="lossCurvesChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- Quality Trend -->
+                <div class="mission-card rounded-xl p-6">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-sm font-bold text-white flex items-center gap-2">
+                            <span>🏆 Model Quality Progression</span>
+                        </h3>
+                        <span class="text-[11px] text-gray-400">Eval Pass Rate & Delta</span>
+                    </div>
+                    <div class="h-64 relative">
+                        <canvas id="qualityTrendChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- Hyperparameter Effectiveness -->
+                <div class="mission-card rounded-xl p-6">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-sm font-bold text-white flex items-center gap-2">
+                            <span>🔬 Hyperparameter Effectiveness Matrix</span>
+                        </h3>
+                        <span class="text-[11px] text-gray-400">Learning Rate vs LoRA Rank</span>
+                    </div>
+                    <div id="heatmapContainer" class="h-64 flex flex-col items-center justify-center border border-gray-800/60 rounded-lg p-4 bg-gray-950/40">
+                        <div class="text-center space-y-2">
+                            <div class="inline-flex p-3 bg-blue-500/10 rounded-full text-blue-400 text-xl">🧮</div>
+                            <p class="text-xs text-gray-300 font-medium">Correlation & Heatmap Matrix</p>
+                            <p class="text-[11px] text-gray-500 max-w-sm">Evaluates statistical Pearson coefficients between hyperparameters (learning rate, LoRA rank, warmup) and benchmark outcomes.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Autonomous Recommendations -->
+                <div class="mission-card rounded-xl p-6">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-sm font-bold text-white flex items-center gap-2">
+                            <span>💡 Next Experiment Recommendations</span>
+                        </h3>
+                        <span class="text-[11px] bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded-full font-mono">Live Engine</span>
+                    </div>
+                    <div class="space-y-3 max-h-64 overflow-y-auto pr-1">
+                        <template x-for="rec in analyticsRecommendations" :key="rec.description">
+                            <div class="p-3.5 bg-gray-950/80 rounded-xl border border-gray-800 hover:border-gray-700 transition-all">
+                                <div class="flex items-start gap-3">
+                                    <span class="text-lg" x-text="getRecIcon(rec.rec_type)"></span>
+                                    <div class="flex-1">
+                                        <div class="flex justify-between items-start">
+                                            <p class="text-xs font-semibold text-gray-200" x-text="rec.description"></p>
+                                            <span class="text-[10px] font-mono px-1.5 py-0.5 bg-blue-900/40 text-blue-300 border border-blue-800/50 rounded ml-2" x-text="((rec.confidence || 0) * 100).toFixed(0) + '% Conf.'"></span>
+                                        </div>
+                                        <p class="text-[11px] text-gray-400 mt-1" x-text="rec.reasoning"></p>
+                                        <template x-if="rec.suggested_config">
+                                            <div class="mt-2 text-[10px] font-mono bg-gray-900 p-1.5 rounded text-cyan-300 border border-gray-800" x-text="'Suggested: ' + JSON.stringify(rec.suggested_config)"></div>
+                                        </template>
+                                    </div>
+                                </div>
+                            </div>
+                        </template>
+                        <template x-if="!analyticsRecommendations || analyticsRecommendations.length === 0">
+                            <div class="p-8 text-center text-xs text-gray-500">
+                                Tracking runs to formulate autonomous experiment recommendations…
+                            </div>
+                        </template>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- ======================================================== -->
         <!-- TAB 5: DPO FLYWHEEL                                      -->
         <!-- ======================================================== -->
         <div x-show="activeTab === 'flywheel'" x-transition>
@@ -741,10 +992,18 @@
                 ],
                 term: null,
                 chart: null,
+                analyticsExperiments: [],
+                selectedExpIds: [],
+                analyticsComparison: null,
+                analyticsRecommendations: [],
+                analyticsFilterStatus: "",
+                lossCurvesChartInstance: null,
+                qualityTrendChartInstance: null,
                 
                 init() {
                     this.fetchOverview();
                     this.initChart();
+                    this.fetchAnalyticsData();
                     setInterval(() => this.fetchOverview(), 8000);
                 },
                 
@@ -755,6 +1014,186 @@
                     }
                     if (tab === 'training') {
                         this.$nextTick(() => this.initChart());
+                    }
+                    if (tab === 'analytics') {
+                        this.fetchAnalyticsData();
+                        this.$nextTick(() => {
+                            this.renderLossCurves();
+                            this.renderQualityTrend();
+                        });
+                    }
+                },
+
+                toggleExpSelection(id) {
+                    const idx = this.selectedExpIds.indexOf(id);
+                    if (idx > -1) {
+                        this.selectedExpIds.splice(idx, 1);
+                    } else {
+                        this.selectedExpIds.push(id);
+                    }
+                },
+
+                toggleSelectAllExps(event) {
+                    if (event.target.checked) {
+                        this.selectedExpIds = this.analyticsExperiments.map(e => e.experiment_id);
+                    } else {
+                        this.selectedExpIds = [];
+                    }
+                },
+
+                formatDuration(sec) {
+                    if (sec === null || sec === undefined) return "-";
+                    if (sec < 60) return sec.toFixed(0) + "s";
+                    return (sec / 60).toFixed(1) + "m";
+                },
+
+                formatDate(iso) {
+                    if (!iso) return "-";
+                    return iso.slice(0, 10);
+                },
+
+                getRecIcon(type) {
+                    const icons = {
+                        "hyperparameter_change": "⚙️",
+                        "dataset_change": "📊",
+                        "architecture_change": "🏗️",
+                        "stop_training": "🛑",
+                        "start_training": "🚀"
+                    };
+                    return icons[type] || "💡";
+                },
+
+                async fetchAnalyticsData() {
+                    try {
+                        const statusParam = this.analyticsFilterStatus ? `?status=${this.analyticsFilterStatus}` : '';
+                        const [expRes, recRes] = await Promise.all([
+                            fetch(`/api/analytics/experiments${statusParam}`),
+                            fetch('/api/analytics/recommendations')
+                        ]);
+                        if (expRes.ok) {
+                            const data = await expRes.json();
+                            this.analyticsExperiments = data.experiments || [];
+                            // If none selected yet, default select first 2 completed
+                            if (this.selectedExpIds.length === 0 && this.analyticsExperiments.length > 0) {
+                                this.selectedExpIds = this.analyticsExperiments.slice(0, 2).map(e => e.experiment_id);
+                            }
+                        }
+                        if (recRes.ok) {
+                            const recData = await recRes.json();
+                            this.analyticsRecommendations = recData.recommendations || [];
+                        }
+                    } catch (e) {
+                        console.error("Analytics fetch error:", e);
+                    }
+                },
+
+                async compareSelectedExperiments() {
+                    if (this.selectedExpIds.length < 1) return;
+                    try {
+                        const ids = this.selectedExpIds.join(',');
+                        const res = await fetch(`/api/analytics/compare?experiment_ids=${ids}`);
+                        if (res.ok) {
+                            this.analyticsComparison = await res.json();
+                            this.renderLossCurves(this.selectedExpIds);
+                        }
+                    } catch (e) {
+                        console.error("Compare error:", e);
+                    }
+                },
+
+                async renderLossCurves(expIds = null) {
+                    const ids = expIds || this.selectedExpIds;
+                    if (!ids || ids.length === 0) return;
+                    const ctx = document.getElementById('lossCurvesChart');
+                    if (!ctx) return;
+
+                    try {
+                        const res = await fetch(`/api/analytics/viz/loss-curves?experiment_ids=${ids.join(',')}`);
+                        if (!res.ok) return;
+                        const viz = await res.json();
+
+                        if (this.lossCurvesChartInstance) {
+                            this.lossCurvesChartInstance.destroy();
+                        }
+
+                        const datasets = (viz.datasets || []).map(ds => ({
+                            label: ds.label,
+                            data: ds.data,
+                            borderColor: ds.color || '#3b82f6',
+                            backgroundColor: ds.color ? ds.color + '22' : 'rgba(59, 130, 246, 0.1)',
+                            borderDash: ds.dashed ? [5, 5] : [],
+                            tension: 0.3,
+                            borderWidth: 2,
+                            pointRadius: 2,
+                        }));
+
+                        this.lossCurvesChartInstance = new Chart(ctx, {
+                            type: 'line',
+                            data: {
+                                labels: viz.labels || [],
+                                datasets: datasets,
+                            },
+                            options: {
+                                responsive: true,
+                                maintainAspectRatio: false,
+                                plugins: {
+                                    legend: { labels: { color: '#94a3b8', font: { family: 'JetBrains Mono', size: 11 } } }
+                                },
+                                scales: {
+                                    y: { grid: { color: 'rgba(255,255,255,0.06)' }, ticks: { color: '#64748b' } },
+                                    x: { grid: { color: 'rgba(255,255,255,0.06)' }, ticks: { color: '#64748b' } }
+                                }
+                            }
+                        });
+                    } catch (e) {
+                        console.error("Loss curves chart error:", e);
+                    }
+                },
+
+                async renderQualityTrend() {
+                    const ctx = document.getElementById('qualityTrendChart');
+                    if (!ctx) return;
+
+                    try {
+                        const res = await fetch('/api/analytics/viz/quality-trend');
+                        if (!res.ok) return;
+                        const viz = await res.json();
+                        if (viz.error) return;
+
+                        if (this.qualityTrendChartInstance) {
+                            this.qualityTrendChartInstance.destroy();
+                        }
+
+                        const datasets = (viz.datasets || []).map(ds => ({
+                            label: ds.label,
+                            data: ds.data,
+                            borderColor: ds.color,
+                            backgroundColor: ds.color + '22',
+                            tension: 0.2,
+                            borderWidth: 2,
+                            pointRadius: 4,
+                        }));
+
+                        this.qualityTrendChartInstance = new Chart(ctx, {
+                            type: 'line',
+                            data: {
+                                labels: viz.labels || [],
+                                datasets: datasets,
+                            },
+                            options: {
+                                responsive: true,
+                                maintainAspectRatio: false,
+                                plugins: {
+                                    legend: { labels: { color: '#94a3b8', font: { family: 'JetBrains Mono', size: 11 } } }
+                                },
+                                scales: {
+                                    y: { grid: { color: 'rgba(255,255,255,0.06)' }, ticks: { color: '#64748b' } },
+                                    x: { grid: { color: 'rgba(255,255,255,0.06)' }, ticks: { color: '#64748b' } }
+                                }
+                            }
+                        });
+                    } catch (e) {
+                        console.error("Quality trend chart error:", e);
                     }
                 },
                 
