@@ -3,16 +3,20 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
-class ProjectConfig(BaseModel):
+class StrictConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
+
+
+class ProjectConfig(StrictConfig):
     name: str = Field(..., min_length=1, max_length=128)
     privacy_mode: Literal["local_only", "allow_external"] = "local_only"
     seed: int = Field(default=42, ge=0)
 
 
-class DatasetConfig(BaseModel):
+class DatasetConfig(StrictConfig):
     source: Path
     format: Literal["auto", "jsonl", "csv", "txt", "markdown"] = "auto"
     deduplicate: bool = True
@@ -22,6 +26,12 @@ class DatasetConfig(BaseModel):
     validation_ratio: float = Field(default=0.1, ge=0.0, le=0.5)
     eval_ratio: float = Field(default=0.1, ge=0.0, le=0.5)
 
+    @model_validator(mode="after")
+    def validate_split_ratios(self):
+        if self.validation_ratio + self.eval_ratio >= 1:
+            raise ValueError("validation_ratio + eval_ratio must be less than 1")
+        return self
+
     @field_validator("source")
     @classmethod
     def validate_source(cls, v: Path) -> Path:
@@ -30,14 +40,14 @@ class DatasetConfig(BaseModel):
         return Path(v)
 
 
-class ModelConfig(BaseModel):
-    name: str
+class ModelConfig(StrictConfig):
+    name: str = Field(min_length=1, pattern=r"\S")
     revision: str | None = None
     quantization: Literal["none", "int8", "nf4"] = "nf4"
     trust_remote_code: bool = False
 
 
-class AdapterConfig(BaseModel):
+class AdapterConfig(StrictConfig):
     type: Literal["lora"] = "lora"
     r: int = Field(default=16, ge=1, le=256)
     alpha: int = Field(default=32, ge=1, le=512)
@@ -46,7 +56,7 @@ class AdapterConfig(BaseModel):
     bias: Literal["none", "all", "lora_only"] = "none"
 
 
-class TrainingConfig(BaseModel):
+class TrainingConfig(StrictConfig):
     output_dir: Path = Path("runs")
     batch_size: int = Field(default=1, ge=1)
     gradient_accumulation_steps: int = Field(default=16, ge=1)
@@ -70,18 +80,18 @@ class TrainingConfig(BaseModel):
         return Path(v)
 
 
-class EvalSuiteRef(BaseModel):
+class EvalSuiteRef(StrictConfig):
     path: Path
     name: str | None = None
 
 
-class EvalConfig(BaseModel):
+class EvalConfig(StrictConfig):
     suites: list[EvalSuiteRef] = Field(default_factory=list)
     base_model: str | None = None
     max_samples: int | None = Field(default=None, ge=1)
 
 
-class ReleaseRequirements(BaseModel):
+class ReleaseRequirements(StrictConfig):
     model_config = ConfigDict(extra="forbid")
 
     min_pass_rate: float | None = Field(default=None, ge=0, le=1)
@@ -91,7 +101,7 @@ class ReleaseRequirements(BaseModel):
     safety_pass: bool = True
 
 
-class ReleaseConfig(BaseModel):
+class ReleaseConfig(StrictConfig):
     model_config = ConfigDict(extra="forbid")
 
     export: list[Literal["adapter", "merged", "gguf", "ollama"]] = Field(
@@ -100,7 +110,7 @@ class ReleaseConfig(BaseModel):
     require: ReleaseRequirements | None = None
 
 
-class MoroConfig(BaseModel):
+class MoroConfig(StrictConfig):
     project: ProjectConfig
     dataset: DatasetConfig
     model: ModelConfig

@@ -18,16 +18,19 @@ def test_unchanged_scientific_notation_snapshot_can_export(recorded_run, rate):
     config.training.learning_rate = rate
     (directory / "config.json").write_text(config.model_dump_json(indent=2))
     conn = db.get_connection(root)
-    conn.execute("UPDATE runs SET config_hash = ? WHERE id = ?",
-                 (sha256_text(config.model_dump_json()), run))
+    conn.execute(
+        "UPDATE runs SET config_hash = ? WHERE id = ?", (sha256_text(config.model_dump_json()), run)
+    )
     conn.commit()
     conn.close()
     result = runner.invoke(app, ["export", "--run-id", run])
     assert result.exit_code == 0, result.output
 
 
-@pytest.mark.parametrize("tag", ["../../../../escaped", "a/b", "a\\b", ".", "..", "", "a b",
-                                 "a\nb", "/absolute", "x" * 129])
+@pytest.mark.parametrize(
+    "tag",
+    ["../../../../escaped", "a/b", "a\\b", ".", "..", "", "a b", "a\nb", "/absolute", "x" * 129],
+)
 def test_unsafe_deployment_tags_rejected(recorded_run, tag):
     root, _, run, _ = recorded_run
     result = runner.invoke(app, ["deploy", "--run-id", run, "--tag", tag])

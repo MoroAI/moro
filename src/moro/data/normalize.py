@@ -85,7 +85,7 @@ def _make_row_id(messages: list[DatasetMessage]) -> str:
 
 
 def _normalize_single_row(raw: dict[str, Any]) -> list[DatasetMessage]:
-    system_text = str(raw.get("system", "")).strip()
+    system_text = _text(raw.get("system", ""))
 
     # 1) Native messages format
     if "messages" in raw and isinstance(raw["messages"], list):
@@ -95,13 +95,13 @@ def _normalize_single_row(raw: dict[str, Any]) -> list[DatasetMessage]:
         return messages
 
     # 2) Alpaca instruction/input/output
-    instruction = str(raw.get("instruction", "")).strip()
+    instruction = _text(raw.get("instruction", ""))
     output = _extract_completion(raw)
 
     if instruction:
         if not output:
             raise ValueError("instruction row is missing output/completion")
-        instruction_input = str(raw.get("input", "")).strip()
+        instruction_input = _text(raw.get("input", ""))
         user_content = f"{instruction}\n\n{instruction_input}" if instruction_input else instruction
         messages: list[DatasetMessage] = []
         if system_text:
@@ -141,7 +141,7 @@ def _parse_messages_list(messages_raw: list[Any]) -> list[DatasetMessage]:
         if not isinstance(msg, dict):
             raise ValueError("Each message must be a dict")
         role = str(msg.get("role", "")).strip().lower()
-        content = str(msg.get("content", "")).strip()
+        content = _text(msg.get("content", ""))
         if role not in VALID_ROLES:
             raise ValueError(f"Invalid message role: {role!r}")
         if not content:
@@ -153,14 +153,22 @@ def _parse_messages_list(messages_raw: list[Any]) -> list[DatasetMessage]:
 def _extract_prompt(raw: dict[str, Any]) -> str:
     for key in ("prompt", "question", "query", "input"):
         v = raw.get(key)
-        if v is not None and str(v).strip():
-            return str(v).strip()
+        if v is not None and _text(v):
+            return _text(v)
     return ""
 
 
 def _extract_completion(raw: dict[str, Any]) -> str:
     for key in ("completion", "output", "response", "answer", "completion_text", "target"):
         v = raw.get(key)
-        if v is not None and str(v).strip():
-            return str(v).strip()
+        if v is not None and _text(v):
+            return _text(v)
     return ""
+
+
+def _text(value) -> str:
+    if value is None:
+        return ""
+    if not isinstance(value, str):
+        raise ValueError("Message content must be a string")
+    return value.strip()

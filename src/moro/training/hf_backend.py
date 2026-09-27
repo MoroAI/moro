@@ -3,6 +3,10 @@ Hugging Face QLoRA training backend.
 
 Wraps: transformers + peft + trl + bitsandbytes + accelerate.
 Supports NF4 4-bit quantization + LoRA adapters.
+
+Includes the 5-Step Memory Governor OOM Auto-Recovery Protocol:
+if trainer.train() raises a CUDA OOM RuntimeError, the config is
+automatically downgraded and a single retry is attempted.
 """
 
 from __future__ import annotations
@@ -14,6 +18,7 @@ from pathlib import Path
 from moro.config.models import MoroConfig
 from moro.core.errors import DependencyError, TrainingError
 from moro.training.backend import TrainingBackend
+from moro.training.recovery import apply_oom_recovery_protocol, summarize_recovery
 
 
 def _require_imports(config: MoroConfig) -> None:
@@ -263,7 +268,100 @@ class HuggingFaceBackend(TrainingBackend):
         if cuda:
             torch.cuda.reset_peak_memory_stats()
         start = time.time()
-        trainer_result = trainer.train()
+
+        # ── OOM Auto-Recovery: attempt training with current config ──────────
+        oom_recovered = False
+        recovery_actions: list[str] = []
+
+        try:
+            trainer_result = trainer.train()
+        except RuntimeError as exc:
+            exc_str = str(exc).lower()
+            is_oom = "out of memory" in exc_str or "cuda oom" in exc_str or "alloc" in exc_str
+            if not is_oom:
+                raise TrainingError(f"Training failed: {exc}") from exc
+
+            # OOM detected — apply recovery protocol
+            import rich.console as _rc
+            _console = _rc.Console()
+            _console.print(
+                "\n[bold red]⚠️  CUDA Out-Of-Memory detected![/bold red]\n"
+                "Activating Memory Governor Auto-Recovery Protocol...\n"
+            )
+
+            recovered_config, recovery_actions = apply_oom_recovery_protocol(config)
+            _console.print(f"[yellow]{summarize_recovery(recovery_actions)}[/yellow]\n")
+
+            # Free existing model from GPU
+            del model
+            if cuda:
+                torch.cuda.empty_cache()
+
+            # Re-run training with recovered config (single retry)
+            oom_recovered = True
+            _console.print("[cyan]Retrying training with recovered configuration...[/cyan]\n")
+
+            # Rebuild LoRA config with recovered settings
+            recovered_lora_config = LoraConfig(
+                task_type=TaskType.CAUSAL_LM,
+                r=recovered_config.adapter.r,
+                lora_alpha=recovered_config.adapter.alpha,
+                target_modules=(
+                    recovered_config.adapter.target_modules
+                    if recovered_config.adapter.target_modules != "auto"
+                    else None
+                ),
+                lora_dropout=recovered_config.adapter.dropout,
+                bias=recovered_config.adapter.bias,
+            )
+            recovered_model = AutoModelForCausalLM.from_pretrained(
+                reference, revision=config.model.revision, **model_options
+            )
+            recovered_model.config.use_cache = False
+            if quantized:
+                recovered_model = prepare_model_for_kbit_training(
+                    recovered_model,
+                    use_gradient_checkpointing=recovered_config.training.gradient_checkpointing,
+                )
+            recovered_model = get_peft_model(recovered_model, recovered_lora_config)
+
+            recovered_training_args = SFTConfig(
+                output_dir=str(output_dir),
+                num_train_epochs=recovered_config.training.epochs,
+                max_steps=recovered_config.training.max_steps or -1,
+                per_device_train_batch_size=recovered_config.training.batch_size,
+                gradient_accumulation_steps=recovered_config.training.gradient_accumulation_steps,
+                learning_rate=recovered_config.training.learning_rate,
+                optim=recovered_config.training.optimizer,
+                gradient_checkpointing=recovered_config.training.gradient_checkpointing,
+                warmup_ratio=recovered_config.training.warmup_ratio,
+                logging_steps=recovered_config.training.logging_steps,
+                save_steps=recovered_config.training.save_steps,
+                save_total_limit=2,
+                bf16=bf16,
+                fp16=fp16,
+                report_to="none",
+                run_name=run_id,
+                seed=config.project.seed,
+                data_seed=config.project.seed,
+                max_length=recovered_config.dataset.max_seq_length,
+                packing=False,
+                eval_strategy="epoch" if val_dataset is not None else "no",
+                per_device_eval_batch_size=recovered_config.training.batch_size,
+                gradient_checkpointing_kwargs={"use_reentrant": False},
+                push_to_hub=False,
+            )
+            recovered_trainer = SFTTrainer(
+                model=recovered_model,
+                args=recovered_training_args,
+                train_dataset=train_dataset,
+                eval_dataset=val_dataset,
+                processing_class=tokenizer,
+            )
+            if cuda:
+                torch.cuda.reset_peak_memory_stats()
+            trainer_result = recovered_trainer.train()
+            trainer = recovered_trainer  # use recovered trainer for eval
         elapsed = time.time() - start
 
         # Save adapter
@@ -300,4 +398,7 @@ class HuggingFaceBackend(TrainingBackend):
             "tokens_per_sec": tokens_per_sec,
             "adapter_path": str(adapter_dir),
             "elapsed_seconds": round(elapsed, 1),
+            "oom_recovered": oom_recovered,
+            "recovery_actions": recovery_actions,
         }
+

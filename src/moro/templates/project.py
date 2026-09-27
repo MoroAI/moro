@@ -3,6 +3,9 @@ DEFAULT_GITIGNORE = """\
 .moro/
 
 # Generated data and outputs
+data/raw/*
+!data/raw/.gitkeep
+data/versions/
 data/normalized/
 data/splits/
 runs/
@@ -16,6 +19,13 @@ __pycache__/
 .venv/
 venv/
 .env
+.env.*
+
+# Model weights
+*.safetensors
+*.gguf
+adapter_model*.bin
+pytorch_model*.bin
 """
 
 

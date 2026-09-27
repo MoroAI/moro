@@ -88,6 +88,7 @@ def test_training_failure_is_recorded(tmp_path, sample_jsonl, monkeypatch, failu
         output = Path(row["output_dir"])
         assert json.loads((output / "dataset.json").read_text())["sha256"]
         assert (output / "config.json").exists()
+        assert row["config_hash"].startswith("config-json-v1:")
     finally:
         conn.close()
 

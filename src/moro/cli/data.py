@@ -7,7 +7,7 @@ from rich.table import Table
 from moro.core.errors import ConfigError, DatasetError, ProjectError
 from moro.core.project import load_project_config, require_project_root
 from moro.data import clean, ingest, normalize, privacy, report, splitter
-from moro.data.splitter import write_split
+from moro.data.versions import publish_snapshot, select_snapshot, source_fingerprint
 from moro.storage import db as storage_db
 
 app = typer.Typer(name="data", help="Dataset operations.")
@@ -30,6 +30,7 @@ def build_command(
         None,
         "--limit",
         help="Process only this many rows (for debugging).",
+        min=1,
     ),
 ) -> None:
     """Normalize, clean, score, and split the dataset."""
@@ -52,12 +53,18 @@ def build_command(
 
         console.print(f"[cyan]→[/cyan]  Reading from: [bold]{source}[/bold]")
 
+        if not force:
+            cached = select_snapshot(root, cfg, limit)
+            if cached:
+                console.print(
+                    f"Dataset unchanged; using {cached[0]['version_id']}. Use --force to rebuild."
+                )
+                return
+        fingerprint = source_fingerprint(source)
+
         # 1. Ingest
         with console.status("[cyan]Ingesting raw data…[/cyan]"):
-            raw_rows = ingest.read_raw_rows(source, cfg.dataset.format)
-
-        if limit:
-            raw_rows = raw_rows[:limit]
+            raw_rows = ingest.read_raw_rows(source, cfg.dataset.format, limit)
 
         console.print(f"[cyan]→[/cyan]  Ingested [bold]{len(raw_rows)}[/bold] raw rows")
 
@@ -105,16 +112,6 @@ def build_command(
                 seed=cfg.project.seed,
             )
 
-        # 6. Write outputs
-        norm_path = root / "data" / "normalized" / "dataset.jsonl"
-        splits_dir = root / "data" / "splits"
-
-        with console.status("[cyan]Writing dataset files…[/cyan]"):
-            write_split(clean_valid, norm_path)
-            write_split(train_rows, splits_dir / "train.jsonl")
-            write_split(val_rows, splits_dir / "validation.jsonl")
-            write_split(eval_rows, splits_dir / "eval.jsonl")
-
         # 7. Compute stats
         stats = report.compute_stats(
             rows=clean_valid,
@@ -127,36 +124,19 @@ def build_command(
             pii_scan=cfg.dataset.pii_scan,
         )
 
-        # 8. Save stats report
-        reports_dir = root / ".moro" / "reports"
-        reports_dir.mkdir(parents=True, exist_ok=True)
-        report_path = reports_dir / "dataset_report.json"
-        report_path.write_text(stats.model_dump_json(indent=2), encoding="utf-8")
-
-        # 9. Persist dataset version in DB
-
-        conn = storage_db.get_connection(root)
-        project_id = storage_db.get_or_create_project(
-            conn, cfg.project.name, cfg.project.privacy_mode
+        destination, manifest = publish_snapshot(
+            root,
+            cfg,
+            source,
+            fingerprint,
+            limit,
+            clean_valid,
+            (train_rows, val_rows, eval_rows),
+            stats,
+            all_invalid,
         )
-
-        # Find or create dataset source record
-        src_row = conn.execute(
-            "SELECT id FROM dataset_sources WHERE project_id = ? ORDER BY imported_at DESC LIMIT 1",
-            (project_id,),
-        ).fetchone()
-
-        if src_row:
-            source_id = src_row["id"]
-            # Count existing versions
-            count = conn.execute(
-                "SELECT COUNT(*) FROM dataset_versions WHERE source_id = ?", (source_id,)
-            ).fetchone()[0]
-            version = f"v{count + 1}"
-            storage_db.add_dataset_version(
-                conn, project_id, source_id, version, str(norm_path), stats.model_dump()
-            )
-        conn.close()
+        report_path = destination / "report.json"
+        console.print(f"Dataset version: {manifest['dataset_version_id']}")
 
         console.print(
             f"\n[bold green]✓[/bold green] Dataset built successfully! "
@@ -191,7 +171,22 @@ def report_command(
     """Show dataset quality report."""
     try:
         root = require_project_root()
-        report_path = root / ".moro" / "reports" / "dataset_report.json"
+        cfg = load_project_config()
+        conn = storage_db.get_connection(root)
+        try:
+            row = conn.execute(
+                """SELECT s.manifest_path FROM dataset_snapshots s
+                JOIN dataset_versions v ON s.version_id=v.id JOIN projects p ON p.id=v.project_id
+                WHERE p.name=? ORDER BY v.created_at DESC, v.id DESC LIMIT 1""",
+                (cfg.project.name,),
+            ).fetchone()
+        finally:
+            conn.close()
+        report_path = (
+            (root / row["manifest_path"]).parent / "report.json"
+            if row
+            else root / ".moro/reports/dataset_report.json"
+        )
 
         if not report_path.exists():
             console.print(
@@ -242,7 +237,101 @@ def report_command(
             for w in stats.warnings:
                 console.print(f"  [yellow]⚠[/yellow]  {w}")
 
+    except typer.Exit:
+        raise
     except (ProjectError,) as exc:
+        console.print(f"[bold red]Error:[/bold red] {exc}")
+        raise typer.Exit(code=1)
+    except Exception as exc:
+        console.print(f"[bold red]Unexpected error:[/bold red] {exc}")
+        raise typer.Exit(code=1)
+
+
+@app.command("inspect")
+def inspect_command(
+    split: str = typer.Option(
+        "train",
+        "--split",
+        help="Which split to inspect: train, validation, eval, dataset.",
+    ),
+    n: int = typer.Option(5, "--n", min=1, max=100, help="Number of rows to show."),
+    offset: int = typer.Option(0, "--offset", min=0, help="Row offset to start from."),
+    format: str = typer.Option("table", "--format", help="Output format: table or json."),
+) -> None:
+    """Inspect sample rows from the latest built dataset split."""
+    import json as _json
+
+    try:
+        root = require_project_root()
+        cfg = load_project_config()
+
+        conn = storage_db.get_connection(root)
+        try:
+            row = conn.execute(
+                """SELECT s.manifest_path FROM dataset_snapshots s
+                JOIN dataset_versions v ON s.version_id=v.id
+                JOIN projects p ON p.id=v.project_id
+                WHERE p.name=? ORDER BY v.created_at DESC, v.id DESC LIMIT 1""",
+                (cfg.project.name,),
+            ).fetchone()
+        finally:
+            conn.close()
+
+        if not row:
+            console.print(
+                "[bold red]No built dataset found.[/bold red] "
+                "Run [bold]moro data build[/bold] first."
+            )
+            raise typer.Exit(code=1)
+
+        dataset_dir = (root / row["manifest_path"]).parent
+        filename = f"{split}.jsonl" if split != "dataset" else "dataset.jsonl"
+        split_path = dataset_dir / filename
+
+        if not split_path.exists():
+            console.print(f"[red]Split file not found: {split_path}[/red]")
+            raise typer.Exit(code=1)
+
+        rows_data = []
+        with split_path.open("r", encoding="utf-8") as f:
+            for i, line in enumerate(f):
+                if i < offset:
+                    continue
+                if len(rows_data) >= n:
+                    break
+                rows_data.append(_json.loads(line.strip()))
+
+        total_count = sum(1 for _ in open(split_path, encoding="utf-8"))
+
+        if format == "json":
+            typer.echo(_json.dumps(rows_data, indent=2, ensure_ascii=False))
+            return
+
+        console.print(
+            f"\n[bold]Dataset:[/bold] {split} split · "
+            f"showing rows {offset + 1}–{offset + len(rows_data)} of {total_count}\n"
+        )
+
+        for i, row_data in enumerate(rows_data, start=offset + 1):
+            messages = row_data.get("messages", [])
+            console.print(f"[bold cyan]── Row {i} ──────────────────────────────[/bold cyan]")
+            for msg in messages:
+                role = msg.get("role", "?")
+                content = msg.get("content", "")
+                # Truncate long content for readability
+                if len(content) > 300:
+                    content = content[:297] + "…"
+                role_color = {
+                    "system": "dim",
+                    "user": "green",
+                    "assistant": "blue",
+                }.get(role, "white")
+                console.print(f"  [{role_color}][{role}][/{role_color}] {content}")
+            console.print()
+
+    except typer.Exit:
+        raise
+    except (ProjectError, DatasetError) as exc:
         console.print(f"[bold red]Error:[/bold red] {exc}")
         raise typer.Exit(code=1)
     except Exception as exc:

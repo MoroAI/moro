@@ -6,6 +6,7 @@ from moro.core.project import load_project_config, require_project_root
 from moro.export.eligibility import resolve_export_run
 from moro.export.gates import check_release_requirements, write_gate_report
 from moro.export.ollama import generate_ollama_package
+from moro.export.paths import deployment_directory
 
 console = Console()
 
@@ -27,12 +28,10 @@ def deploy_command(
         if target != "ollama":
             raise ExportError(f"Unsupported deployment target: {target}")
         selected = resolve_export_run(root, cfg.project.name, run_id)
-        gate = check_release_requirements(root, selected, cfg)
         resolved_run_id = selected.id
         adapter_path = selected.adapter_path
-
-        version = tag or "latest"
-        out_dir = root / "releases" / f"{resolved_run_id}_{version}"
+        out_dir = deployment_directory(root, resolved_run_id, tag)
+        gate = check_release_requirements(root, selected, cfg)
 
         if target == "ollama":
             console.print(

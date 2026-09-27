@@ -1,6 +1,7 @@
 import random
 from pathlib import Path
 
+from moro.core.errors import DatasetError
 from moro.data.models import DatasetRow
 
 
@@ -16,6 +17,15 @@ def split_rows(
 
     Returns (train_rows, validation_rows, eval_rows).
     """
+    if (
+        not 0 <= validation_ratio < 1
+        or not 0 <= eval_ratio < 1
+        or validation_ratio + eval_ratio >= 1
+    ):
+        raise DatasetError("Split ratios must be nonnegative and sum to less than one.")
+    required = 1 + int(validation_ratio > 0) + int(eval_ratio > 0)
+    if rows and len(rows) < required:
+        raise DatasetError(f"Need at least {required} rows for nonempty requested splits.")
     if not rows:
         return [], [], []
 

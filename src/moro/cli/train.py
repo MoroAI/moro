@@ -6,9 +6,10 @@ from rich.console import Console
 
 from moro.config.loader import load_config
 from moro.core.errors import ConfigError, DatasetError, DependencyError, TrainingError
-from moro.core.hashing import sha256_text
+from moro.core.hashing import config_snapshot_hash
 from moro.core.paths import CONFIG_FILE
 from moro.core.project import require_project_root
+from moro.data.versions import select_snapshot, verify_snapshot
 from moro.storage import db as storage_db
 from moro.training.hf_backend import HuggingFaceBackend
 
@@ -48,10 +49,12 @@ def train_command(
         cfg_file = config_path or (root / CONFIG_FILE)
         cfg = load_config(cfg_file)
 
-        # Locate training dataset
-        train_path = root / "data" / "splits" / "train.jsonl"
-        if not train_path.exists():
-            raise DatasetError("Training split not found. Run [bold]moro data build[/bold] first.")
+        snapshot = select_snapshot(root, cfg)
+        if snapshot is None:
+            raise DatasetError("No immutable dataset matches current inputs. Run moro data build.")
+        dataset_row, dataset_manifest = snapshot
+        dataset_directory = (root / dataset_row["manifest_path"]).parent
+        train_path = dataset_directory / "train.jsonl"
 
         backend = HuggingFaceBackend()
 
@@ -62,6 +65,10 @@ def train_command(
 
         for w in warnings:
             console.print(f"[yellow]⚠[/yellow]  {w}")
+
+        validation_path = dataset_directory / "validation.jsonl"
+        if validation_path.stat().st_size:
+            backend.validate(cfg, validation_path)
 
         # Estimate memory
         est_vram = backend.estimate_memory(cfg)
@@ -80,8 +87,11 @@ def train_command(
             conn, cfg.project.name, cfg.project.privacy_mode
         )
 
-        config_hash = sha256_text(cfg.model_dump_json())
-        output_dir = root / "runs" / "pending"
+        config_hash = config_snapshot_hash(cfg.model_dump_json())
+        output_base = cfg.training.output_dir
+        if not output_base.is_absolute():
+            output_base = root / output_base
+        output_dir = output_base / "pending"
 
         run_id = storage_db.create_run(
             conn=conn,
@@ -91,11 +101,12 @@ def train_command(
             quantization=cfg.model.quantization,
             output_dir=str(output_dir),
             run_name=run_name,
+            dataset_version_id=dataset_row["version_id"],
         )
         storage_db.update_run_status(conn, run_id, "running")
 
         # Rename output dir to use run_id
-        output_dir = root / "runs" / run_id
+        output_dir = output_base / run_id
         conn.execute(
             "UPDATE runs SET output_dir = ? WHERE id = ?",
             (str(output_dir), run_id),
@@ -111,7 +122,16 @@ def train_command(
             from moro.core.hashing import sha256_file
 
             (output_dir / "dataset.json").write_text(
-                json.dumps({"path": str(train_path), "sha256": sha256_file(train_path)}, indent=2),
+                json.dumps(
+                    {
+                        "path": str(train_path),
+                        "sha256": sha256_file(train_path),
+                        "dataset_version_id": dataset_row["version_id"],
+                        "manifest_sha256": dataset_row["manifest_sha256"],
+                        "files": dataset_manifest["files"],
+                    },
+                    indent=2,
+                ),
                 encoding="utf-8",
             )
 
@@ -131,6 +151,19 @@ def train_command(
             if isinstance(exc, KeyboardInterrupt):
                 raise typer.Exit(code=130) from exc
             raise
+
+        try:
+            verify_snapshot(root, dataset_row)
+            import math
+
+            for metric in ("train_loss", "validation_loss", "peak_vram_gb", "tokens_per_sec"):
+                value = result.get(metric)
+                if value is not None and not math.isfinite(value):
+                    raise TrainingError(f"Non-finite training metric: {metric}")
+        except (DatasetError, TrainingError) as exc:
+            storage_db.update_run_status(conn, run_id, "failed", error=str(exc))
+            raise
+        (output_dir / "training_report.json").write_text(json.dumps(result, indent=2, default=str))
 
         # Update run record
         storage_db.update_run_status(

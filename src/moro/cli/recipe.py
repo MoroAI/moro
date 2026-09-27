@@ -1,7 +1,10 @@
+import shutil
+from datetime import datetime, timezone
 from pathlib import Path
 
 import typer
 from rich.console import Console
+from rich.panel import Panel
 from rich.table import Table
 
 from moro.config.loader import load_config
@@ -10,6 +13,8 @@ from moro.core.paths import CONFIG_FILE, find_project_root
 from moro.hardware.detector import detect_hardware
 from moro.hardware.profile import HardwareProfile
 from moro.recipes.engine import suggest_recipe
+from moro.recipes.mixing import calculate_mixing_strategy
+from moro.recipes.rules import infer_parameter_billions
 
 app = typer.Typer(name="recipe", help="Recipe suggestion.")
 console = Console()
@@ -119,7 +124,93 @@ def suggest_command(
         for w in suggestion.warnings:
             console.print(f"  [yellow]⚠[/yellow]  {w}")
 
+    # ── Catastrophic Forgetting Guard — Data Mixing Strategy ──────────────────
+    param_b = suggestion.parameter_billions
+    if param_b is not None and param_b > 0:
+        # Default jargon_divergence: 0.6 (moderately specialized).
+        # Users can tune this via --jargon-divergence in a future flag.
+        mixing = calculate_mixing_strategy(
+            model_size_billions=param_b,
+            jargon_divergence=0.6,
+        )
+        mix_table = Table(title="Catastrophic Forgetting Guard", show_header=True)
+        mix_table.add_column("Parameter", style="cyan")
+        mix_table.add_column("Value", justify="right")
+        mix_table.add_row("Domain data ratio (α)", f"{mixing.domain_ratio:.1%}")
+        mix_table.add_row("General replay ratio (β)", f"{mixing.replay_ratio:.1%}")
+        mix_table.add_row("KL penalty λ", f"{mixing.kl_penalty_lambda:.4f}")
+        mix_table.add_row("Model size", f"{param_b:.1f}B")
+        console.print()
+        console.print(mix_table)
+        console.print(
+            f"[dim]  {mixing.reasoning}[/dim]"
+        )
+
     console.print(
-        "\n[dim]Apply this recipe by updating your moro.yaml, then run "
-        "[bold]moro train[/bold][/dim]"
+        "\n[dim]Apply this recipe: [bold]moro recipe apply[/bold] then [bold]moro train[/bold][/dim]"
     )
+
+
+@app.command("apply")
+def apply_command(
+    config_path: Path | None = typer.Option(None, "--config", help="Use an explicit moro.yaml."),
+    model: str | None = typer.Option(None, "--model", help="Override the suggested model name."),
+    target_vram: float | None = typer.Option(None, "--target-vram", min=0, help="Override VRAM budget in GB."),
+    max_seq_length: int | None = typer.Option(None, "--max-seq-length", min=16, max=32768),
+    yes: bool = typer.Option(False, "--yes", "-y", help="Skip confirmation prompt."),
+) -> None:
+    """Apply the suggested recipe to moro.yaml (backs up the original first)."""
+    root = find_project_root()
+    cfg_file = config_path or (root / CONFIG_FILE if root else None)
+    if not cfg_file or not cfg_file.exists():
+        raise typer.BadParameter("moro.yaml not found. Run moro init or specify --config.")
+    try:
+        config = load_config(cfg_file)
+    except ConfigError as exc:
+        raise typer.BadParameter(str(exc)) from exc
+    with console.status("[cyan]Detecting hardware…[/cyan]"):
+        raw = detect_hardware()
+    hardware = HardwareProfile.model_validate(raw)
+    try:
+        suggestion = suggest_recipe(
+            hardware=hardware,
+            config=config,
+            model_name=model,
+            target_vram=target_vram,
+            max_seq_length=max_seq_length,
+        )
+    except ValueError as exc:
+        raise typer.BadParameter(str(exc)) from exc
+
+    import yaml
+
+    patch = suggestion.config_patch
+
+    # Preview what will change
+    console.print("[bold]Recipe to apply:[/bold]")
+    console.print(yaml.safe_dump(patch, sort_keys=False).rstrip())
+
+    if not yes:
+        confirm = typer.confirm("\nApply these changes to moro.yaml?", default=False)
+        if not confirm:
+            console.print("[yellow]Aborted.[/yellow]")
+            raise typer.Exit(code=0)
+
+    # Back up current config
+    timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    backup_path = cfg_file.with_suffix(f".{timestamp}.bak.yaml")
+    shutil.copy2(cfg_file, backup_path)
+    console.print(f"[dim]Backup written: {backup_path}[/dim]")
+
+    # Load current YAML, deep-merge the patch, write back
+    current = yaml.safe_load(cfg_file.read_text(encoding="utf-8")) or {}
+    for section, values in patch.items():
+        if section not in current:
+            current[section] = {}
+        if isinstance(values, dict):
+            current[section].update(values)
+        else:
+            current[section] = values
+    cfg_file.write_text(yaml.safe_dump(current, sort_keys=False, allow_unicode=True), encoding="utf-8")
+    console.print(f"[green]✓[/green] [bold]{cfg_file}[/bold] updated.")
+    console.print("\n[bold]Next steps:[/bold] Run [bold]moro train[/bold]")

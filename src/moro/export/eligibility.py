@@ -11,7 +11,7 @@ from pydantic import ValidationError
 
 from moro.config.models import MoroConfig
 from moro.core.errors import ExportError
-from moro.core.hashing import sha256_text
+from moro.core.hashing import matches_config_snapshot
 from moro.storage import db
 
 
@@ -20,6 +20,7 @@ class ExportRun:
     id: str
     directory: Path
     config: MoroConfig
+    dataset_version_id: str | None = None
 
     @property
     def adapter_path(self) -> Path:
@@ -80,17 +81,15 @@ def resolve_export_run(root: Path, project_name: str, run_id: str | None) -> Exp
     try:
         raw_config = (directory / "config.json").read_text("utf-8")
         config = MoroConfig.model_validate_json(raw_config)
+        hash_matches = matches_config_snapshot(raw_config, row["config_hash"])
     except (OSError, ValueError, ValidationError) as exc:
         raise ExportError(f"Run configuration snapshot is missing or invalid: {exc}") from exc
-    if (
-        sha256_text(json.dumps(json.loads(raw_config), ensure_ascii=False, separators=(",", ":")))
-        != row["config_hash"]
-    ):
+    if not hash_matches:
         raise ExportError("Run configuration snapshot does not match its recorded hash.")
     if config.model.name != row["model_name"] or config.model.quantization != row["quantization"]:
         raise ExportError("Run model identity conflicts with its configuration snapshot.")
     if not config.model.name.strip():
         raise ExportError("Run configuration snapshot has an empty model name.")
-    result = ExportRun(row["id"], directory, config)
+    result = ExportRun(row["id"], directory, config, row["dataset_version_id"])
     validate_adapter(result.adapter_path)
     return result

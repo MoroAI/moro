@@ -108,6 +108,17 @@ def ensure_schema(conn: sqlite3.Connection) -> None:
         """
     )
     conn.commit()
+    # Additive, idempotent migration; legacy versions remain explicitly unverified.
+    schema_version = conn.execute("PRAGMA user_version").fetchone()[0]
+    if schema_version > 1:
+        raise RuntimeError("Database schema is newer than this Moro version.")
+    with conn:
+        conn.execute("""CREATE TABLE IF NOT EXISTS dataset_snapshots (
+            version_id TEXT PRIMARY KEY REFERENCES dataset_versions(id),
+            build_key TEXT NOT NULL, manifest_path TEXT NOT NULL,
+            manifest_sha256 TEXT NOT NULL
+        )""")
+        conn.execute("PRAGMA user_version=1")
 
 
 # ---------------------------------------------------------------------------

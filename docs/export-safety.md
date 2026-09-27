@@ -32,10 +32,19 @@ nonempty `adapter_model.safetensors` or `adapter_model.bin` weights. Linked adap
 files are rejected. These are structural checks for the current unsharded training
 output, not tensor deserialization, base-model compatibility checks, or proof of
 quality. No model download or GPU is needed for these checks. Configuration hashing
-uses the saved JSON fields without inserting new schema defaults; broader schema
-evolution will still require a migration strategy.
+uses the saved JSON fields without inserting new schema defaults. New runs use
+`config-json-v1:` hashes from a shared canonical serializer (sorted keys, compact
+UTF-8 JSON, finite numeric values). Legacy unprefixed hashes recognize the original
+Pydantic and stdlib JSON encodings, including scientific-notation learning rates.
+Unknown hash versions fail verification. Duplicate keys and non-finite values are
+rejected. Broader schema evolution will still require a migration strategy.
 
 Unsupported deployment targets, including the GGUF placeholder, now return failure.
+
+Deployment tags must be 1–128 ASCII letters, digits, dots, underscores, or hyphens,
+starting with a letter or digit. Deployment rejects symlinks at the releases,
+run/tag output, and Ollama-package directories and checks project containment before
+writing. This is not a defense against concurrent filesystem replacement.
 
 These guarantees do not cover the entire release lifecycle.
 Manifest/model-card publication, concurrent writers, abrupt process termination,

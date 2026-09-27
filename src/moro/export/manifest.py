@@ -139,8 +139,10 @@ def generate_model_card(
         lines += [
             "## Evaluation",
             "",
-            f"- Pass rate: {eval_summary.get('pass_rate', 'N/A')}",
-            f"- Avg score: {eval_summary.get('avg_score', 'N/A')}",
+            f"- Gate status: {eval_summary.get('gate_status', 'not recorded')}",
+            "```json",
+            json.dumps(eval_summary, indent=2),
+            "```",
             "",
         ]
 

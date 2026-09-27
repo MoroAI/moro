@@ -7,10 +7,12 @@ from moro.cli.diagnose import diagnose_command
 from moro.cli.doctor import doctor_command
 from moro.cli.eval import app as eval_app
 from moro.cli.export import export_command
+from moro.cli.hooks import hooks_app
 from moro.cli.import_data import import_command
 from moro.cli.init import init_command
 from moro.cli.recipe import app as recipe_app
 from moro.cli.status import status_command
+from moro.cli.runs import app as runs_app
 from moro.cli.train import train_command
 
 app = typer.Typer(
@@ -48,6 +50,7 @@ app.add_typer(recipe_app, name="recipe")
 
 # ── Training ─────────────────────────────────────────────────────────────────
 app.command(name="train", help="Run fine-tuning.")(train_command)
+app.add_typer(runs_app, name="runs")
 
 # ── Evaluation ───────────────────────────────────────────────────────────────
 app.add_typer(eval_app, name="eval")
@@ -59,6 +62,8 @@ app.command(name="deploy", help="Prepare local deployment artifacts.")(deploy_co
 # ── Diagnostics ──────────────────────────────────────────────────────────────
 app.command(name="diagnose", help="Diagnose failures and suggest fixes.")(diagnose_command)
 
+# ── Repository governance ─────────────────────────────────────────────────────
+app.add_typer(hooks_app, name="hooks")
 
 # ── Version ──────────────────────────────────────────────────────────────────
 @app.command(name="version", help="Show MoroAI version.")
