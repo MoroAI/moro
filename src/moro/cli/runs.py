@@ -1,7 +1,7 @@
 """Run inspection commands; comparisons describe metrics, not model quality."""
 
 import json
-from datetime import datetime, timezone
+from datetime import datetime
 
 import typer
 from rich.console import Console

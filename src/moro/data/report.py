@@ -45,6 +45,37 @@ def compute_stats(
     sorted_quality = sorted(quality_scores)
     q_p50_idx = len(sorted_quality) // 2
 
+    # Epistemic classification aggregation
+    classification_counts: dict[str, int] = {}
+    mi_guard_count = 0
+    entropies: list[float] = []
+    ppmis: list[float] = []
+    noisy_outlier_count = 0
+    boilerplate_count = 0
+    rare_edge_case_count = 0
+
+    for r in rows:
+        cls_name = r.metadata.classification
+        classification_counts[cls_name] = classification_counts.get(cls_name, 0) + 1
+        if cls_name == "NOISY_OUTLIER":
+            noisy_outlier_count += 1
+        elif cls_name == "LOW_INFO_BOILERPLATE":
+            boilerplate_count += 1
+        elif cls_name == "RARE_HIGH_VALUE_EDGE_CASE":
+            rare_edge_case_count += 1
+
+        if r.metadata.mi_guard_override:
+            mi_guard_count += 1
+
+        if r.metadata.info_metrics:
+            if r.metadata.info_metrics.zlib_entropy > 0:
+                entropies.append(r.metadata.info_metrics.zlib_entropy)
+            if r.metadata.info_metrics.max_ppmi > 0:
+                ppmis.append(r.metadata.info_metrics.max_ppmi)
+
+    avg_entropy = round(statistics.mean(entropies), 4) if entropies else 0.0
+    avg_ppmi = round(statistics.mean(ppmis), 4) if ppmis else 0.0
+
     return DatasetStats(
         rows_total=len(rows) + invalid_count + exact_dup_count + near_dup_count,
         rows_valid=len(rows),
@@ -63,4 +94,11 @@ def compute_stats(
         quality_score_p50=round(float(sorted_quality[q_p50_idx]), 4),
         privacy_warning_count=privacy_warning_count,
         warnings=warnings,
+        classification_counts=classification_counts,
+        mi_guard_count=mi_guard_count,
+        avg_zlib_entropy=avg_entropy,
+        avg_ppmi=avg_ppmi,
+        noisy_outlier_count=noisy_outlier_count,
+        boilerplate_count=boilerplate_count,
+        rare_edge_case_count=rare_edge_case_count,
     )

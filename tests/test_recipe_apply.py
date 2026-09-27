@@ -23,7 +23,6 @@ def _make_project_config(tmp_path: Path, project_name: str = "test-proj") -> Pat
 
 def test_recipe_apply_creates_backup(tmp_path: Path, monkeypatch):
     """recipe apply backs up the original moro.yaml before writing."""
-    from moro.recipes.engine import RecipeSuggestion
 
     cfg_path = _make_project_config(tmp_path)
 
@@ -35,7 +34,6 @@ def test_recipe_apply_creates_backup(tmp_path: Path, monkeypatch):
         "training": {"batch_size": 1, "gradient_accumulation_steps": 16},
     }
 
-    import datetime
     timestamp = "20260101T000000Z"
 
     backup_path = cfg_path.with_suffix(f".{timestamp}.bak.yaml")

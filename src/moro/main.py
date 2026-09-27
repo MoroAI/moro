@@ -7,12 +7,14 @@ from moro.cli.diagnose import diagnose_command
 from moro.cli.doctor import doctor_command
 from moro.cli.eval import app as eval_app
 from moro.cli.export import export_command
+from moro.cli.flywheel import app as flywheel_app
+from moro.cli.guard import app as guard_app
 from moro.cli.hooks import hooks_app
 from moro.cli.import_data import import_command
 from moro.cli.init import init_command
 from moro.cli.recipe import app as recipe_app
-from moro.cli.status import status_command
 from moro.cli.runs import app as runs_app
+from moro.cli.status import status_command
 from moro.cli.train import train_command
 
 app = typer.Typer(
@@ -62,8 +64,12 @@ app.command(name="deploy", help="Prepare local deployment artifacts.")(deploy_co
 # ── Diagnostics ──────────────────────────────────────────────────────────────
 app.command(name="diagnose", help="Diagnose failures and suggest fixes.")(diagnose_command)
 
-# ── Repository governance ─────────────────────────────────────────────────────
+# ── Repository governance & DevSecOps ─────────────────────────────────────────
 app.add_typer(hooks_app, name="hooks")
+app.add_typer(guard_app, name="guard")
+
+# ── Continuous Learning Flywheel ──────────────────────────────────────────────
+app.add_typer(flywheel_app, name="flywheel")
 
 # ── Version ──────────────────────────────────────────────────────────────────
 @app.command(name="version", help="Show MoroAI version.")

@@ -25,6 +25,8 @@ class DatasetConfig(StrictConfig):
     min_quality_score: float = Field(default=0.0, ge=0.0, le=1.0)
     validation_ratio: float = Field(default=0.1, ge=0.0, le=0.5)
     eval_ratio: float = Field(default=0.1, ge=0.0, le=0.5)
+    replay_ratio: float = Field(default=0.0, ge=0.0, le=0.5)
+    domain_glossary: Path | None = None
 
     @model_validator(mode="after")
     def validate_split_ratios(self):

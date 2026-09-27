@@ -109,18 +109,14 @@ def test_mi_guard_preserves_high_ppmi_row():
     We verify that the PPMI proxy works correctly and the MI Guard logic is
     consistent — noisy rows with strong domain signal get mi_guard_override=True.
     """
-    from collections import Counter
 
     from moro.data.quality import (
         calculate_domain_ppmi,
-        calculate_zlib_entropy,
         classify_row,
-        score_row_epistemic,
     )
 
     # Construct a row where ALL words are in the domain glossary (100% overlap → high PPMI)
     domain_terms = ["lisinopril", "pharmacokinetics", "bioavailability", "plasma", "renally", "gfr"]
-    user_text = f"What is {domain_terms[0]} {domain_terms[1]}?"
     # Force a high-overlap text by using only domain terms
     asst_text = " ".join(domain_terms * 5)  # 30 domain terms → very high PPMI
 

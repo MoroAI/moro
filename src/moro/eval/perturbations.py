@@ -23,7 +23,6 @@ from __future__ import annotations
 
 import random
 import re
-from typing import Optional
 
 # Domain-sounding but irrelevant distractor sentences
 # These sound plausible in medical/legal/regulatory contexts but add no information
@@ -106,7 +105,7 @@ class PerturbationEngine:
     def swap_entities(
         self,
         text: str,
-        entities: Optional[list[str]] = None,
+        entities: list[str] | None = None,
     ) -> str:
         """
         Swap key named entities to test contrastive understanding.
@@ -147,7 +146,7 @@ class PerturbationEngine:
     def generate_perturbations(
         self,
         original_prompt: str,
-        entities: Optional[list[str]] = None,
+        entities: list[str] | None = None,
     ) -> dict[str, str]:
         """
         Generate the full suite of 4 perturbations for a single eval case.

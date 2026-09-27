@@ -3,8 +3,6 @@
 import json
 from pathlib import Path
 
-import pytest
-
 
 def _write_split(path: Path, rows: list[dict]) -> None:
     with path.open("w", encoding="utf-8") as f:

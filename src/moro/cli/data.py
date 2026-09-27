@@ -77,13 +77,18 @@ def build_command(
             f"[red]{len(invalid_rows)} invalid[/red]"
         )
 
-        # 3. Clean + deduplicate
-        with console.status("[cyan]Cleaning and deduplicating…[/cyan]"):
+        # 3. Clean + deduplicate (with epistemic scoring & MI Guard)
+        glossary_path = root / "domain_glossary.txt"
+        if not glossary_path.exists() and hasattr(cfg.dataset, "domain_glossary") and cfg.dataset.domain_glossary:
+            glossary_path = root / cfg.dataset.domain_glossary
+
+        with console.status("[cyan]Cleaning, scoring epistemically, and deduplicating…[/cyan]"):
             clean_valid, clean_invalid, exact_dups, near_dups = clean.clean_rows(
                 valid_rows,
                 max_seq_length=cfg.dataset.max_seq_length,
                 min_quality_score=cfg.dataset.min_quality_score,
                 deduplicate=cfg.dataset.deduplicate,
+                domain_glossary_path=glossary_path if glossary_path.exists() else None,
             )
             all_invalid = invalid_rows + clean_invalid
 
@@ -229,6 +234,16 @@ def report_command(
         table.add_row("Min quality score", f"{stats.min_quality_score:.4f}")
         table.add_row("P50 quality score", f"{stats.quality_score_p50:.4f}")
         table.add_row("PII warnings", str(stats.privacy_warning_count))
+
+        if stats.classification_counts or stats.mi_guard_count > 0:
+            table.add_row("─" * 20, "─" * 20)
+            table.add_row("MI Guard saved rows", f"[bold green]{stats.mi_guard_count}[/bold green]")
+            if stats.avg_zlib_entropy > 0:
+                table.add_row("Avg zlib entropy", f"{stats.avg_zlib_entropy:.4f}")
+            if stats.avg_ppmi > 0:
+                table.add_row("Avg domain PPMI", f"{stats.avg_ppmi:.4f}")
+            for cls_name, count in sorted(stats.classification_counts.items()):
+                table.add_row(f"Class: {cls_name}", str(count))
 
         console.print(table)
 

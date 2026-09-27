@@ -4,7 +4,6 @@ from pathlib import Path
 
 from moro.diagnose.analyzer import analyze_error
 
-
 # ──────────────────────────────────────────────────────────────────────────────
 # Analyzer pattern tests
 # ──────────────────────────────────────────────────────────────────────────────
@@ -69,6 +68,7 @@ def test_log_scanner_finds_traceback(tmp_path: Path):
 
 def test_log_scanner_finds_training_report(tmp_path: Path):
     import json as _json
+
     from moro.cli.diagnose import _extract_error_from_log
 
     output_dir = tmp_path / "run_def"

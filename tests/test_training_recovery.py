@@ -1,15 +1,16 @@
 """Tests for the OOM Auto-Recovery Protocol."""
 
-import pytest
 
 from moro.training.recovery import apply_oom_recovery_protocol, summarize_recovery
 
 
 def _make_config():
     """Create a minimal MoroConfig-like object for testing."""
-    from moro.config.models import MoroConfig
+    import tempfile
+
     import yaml
-    import tempfile, os
+
+    from moro.config.models import MoroConfig
     # Create a temporary file to use as dataset source
     tmpfile = tempfile.NamedTemporaryFile(suffix=".jsonl", delete=False)
     tmpfile.close()

@@ -362,6 +362,7 @@ class HuggingFaceBackend(TrainingBackend):
                 torch.cuda.reset_peak_memory_stats()
             trainer_result = recovered_trainer.train()
             trainer = recovered_trainer  # use recovered trainer for eval
+            model = recovered_model  # save recovered adapter
         elapsed = time.time() - start
 
         # Save adapter

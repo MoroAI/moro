@@ -1,11 +1,10 @@
 """Tests for eval compare module."""
 
-import pytest
+from datetime import datetime, timezone
 from pathlib import Path
 
 from moro.eval.compare import _compute_delta, compare_eval
-from moro.eval.models import CaseScore, EvalResult, EvalSuite, EvalCase, EvalMessage, EvalExpect
-from datetime import datetime, timezone
+from moro.eval.models import CaseScore, EvalResult
 
 
 def _make_result(

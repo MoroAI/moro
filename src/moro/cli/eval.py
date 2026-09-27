@@ -125,141 +125,6 @@ def eval_run_command(
         raise typer.Exit(code=1)
 
 
-@app.command("perturb")
-def perturb_command(
-    suite_path: Path = typer.Argument(
-        ...,
-        help="Path to the eval suite YAML file (same format as moro eval run).",
-        exists=True,
-    ),
-    seed: int = typer.Option(42, "--seed", help="Random seed for reproducible perturbations."),
-    json_output: bool = typer.Option(False, "--json", help="Output robustness report as JSON."),
-) -> None:
-    """
-    Run adversarial perturbation testing on an eval suite.
-
-    Generates 4 algorithmic variants of each eval prompt (distractor injection,
-    typo noise, negation constraint, entity swap) and computes a Robustness Score
-    showing how stable the model is under real-world noise.
-
-    A Robustness Score < 0.85 indicates the model is pattern-matching keywords
-    rather than genuinely understanding the domain — it will fail in production.
-    """
-    import yaml
-
-    from moro.eval.perturbations import PerturbationEngine
-    from moro.eval.robustness import (
-        CaseRobustnessResult,
-        compute_robustness_report,
-    )
-    from moro.eval.loader import load_eval_suite
-    from moro.eval.scorers import score_response
-
-    try:
-        suite = load_eval_suite(suite_path)
-    except Exception as exc:
-        console.print(f"[bold red]Failed to load eval suite:[/bold red] {exc}")
-        raise typer.Exit(code=1)
-
-    engine = PerturbationEngine(seed=seed)
-    case_results: list[CaseRobustnessResult] = []
-
-    PERTURBATION_NAMES = [
-        "distractor_injection",
-        "typo_noise",
-        "negation_constraint",
-        "entity_swap",
-    ]
-
-    with console.status("[cyan]Running adversarial perturbation tests…[/cyan]"):
-        for case in suite.cases:
-            original_prompt = (
-                case.prompt if hasattr(case, "prompt") else case.messages[-1].get("content", "")
-            )
-            perturbations = engine.generate_perturbations(original_prompt)
-
-            # Simulate pass/fail via the deterministic scorers on expected output
-            # In a real deployment, this would call the model adapter
-            expected = getattr(case, "expected_output", "")
-            criteria = getattr(case, "criteria", [])
-
-            # Base score (original prompt)
-            base_passed = bool(score_response(original_prompt, expected, criteria))
-
-            # Perturbed scores
-            perturbed_results: dict[str, bool] = {}
-            for ptype, perturbed_prompt in perturbations.items():
-                if ptype == "original":
-                    continue
-                perturbed_results[ptype] = bool(
-                    score_response(perturbed_prompt, expected, criteria)
-                )
-
-            case_results.append(
-                CaseRobustnessResult(
-                    case_id=getattr(case, "id", original_prompt[:40]),
-                    base_passed=base_passed,
-                    perturbed_results=perturbed_results,
-                )
-            )
-
-    report = compute_robustness_report(case_results)
-
-    if json_output:
-        import dataclasses
-        import json as _json
-
-        output = {
-            "total_cases": report.total_cases,
-            "avg_raw_robustness": report.avg_raw_robustness,
-            "avg_strict_robustness": report.avg_strict_robustness,
-            "robustness_grade": report.robustness_grade,
-            "total_vulnerabilities": report.total_vulnerabilities,
-            "most_vulnerable_perturbation": report.most_vulnerable_perturbation,
-            "perturbation_failure_counts": report.perturbation_failure_counts,
-        }
-        typer.echo(_json.dumps(output, indent=2))
-        return
-
-    # Rich table output
-    table = Table(title="Adversarial Robustness Report", show_header=True)
-    table.add_column("Metric", style="cyan", no_wrap=True)
-    table.add_column("Value", justify="right")
-
-    table.add_row("Total eval cases", str(report.total_cases))
-    table.add_row("Avg raw robustness", f"{report.avg_raw_robustness:.1%}")
-    table.add_row("Avg strict robustness", f"{report.avg_strict_robustness:.1%}")
-    table.add_row("Robustness grade", report.robustness_grade)
-    table.add_row("Total vulnerabilities", str(report.total_vulnerabilities))
-    table.add_row(
-        "Most vulnerable perturbation",
-        report.most_vulnerable_perturbation or "none",
-    )
-    console.print(table)
-
-    if report.perturbation_failure_counts:
-        fail_table = Table(title="Failures by Perturbation Type", show_header=True)
-        fail_table.add_column("Perturbation Type", style="yellow")
-        fail_table.add_column("Failures", justify="right", style="red")
-        for ptype, count in sorted(
-            report.perturbation_failure_counts.items(), key=lambda x: -x[1]
-        ):
-            fail_table.add_row(ptype, str(count))
-        console.print(fail_table)
-
-    if report.avg_strict_robustness < 0.85:
-        console.print(
-            "\n[bold yellow]⚠  Robustness grade below B (85%).[/bold yellow]\n"
-            "The model shows keyword-pattern brittleness. Consider:\n"
-            "  • Adding more diverse training examples\n"
-            "  • Including perturbed variants in your training data\n"
-            "  • Reviewing the failed perturbation types above"
-        )
-    else:
-        console.print(
-            f"\n[bold green]✓ Robustness grade: {report.robustness_grade}[/bold green]\n"
-            "The model demonstrates stable performance under adversarial noise."
-        )
 @app.command("report")
 def eval_report_command(
     eval_id: str = typer.Argument(..., help="Eval run ID to show."),
@@ -445,6 +310,159 @@ def compare_command(
                 "\n[bold yellow]⚠  Regressions detected.[/bold yellow] "
                 "Review the cases above before exporting."
             )
+
+    except (EvalError, ExportError, DependencyError) as exc:
+        console.print(f"[bold red]Eval error:[/bold red] {exc}")
+        raise typer.Exit(code=1)
+    except ProjectError as exc:
+        console.print(f"[bold red]Error:[/bold red] {exc}")
+        raise typer.Exit(code=1)
+    except Exception as exc:
+        console.print(f"[bold red]Unexpected error:[/bold red] {exc}")
+        raise typer.Exit(code=1)
+
+
+@app.command("perturb")
+def perturb_command(
+    suite_path: Path = typer.Argument(
+        ...,
+        help="Path to the eval suite YAML file.",
+        exists=True,
+    ),
+    run_id: str | None = typer.Option(
+        None,
+        "--run-id",
+        help="Run ID whose adapter to evaluate under perturbations.",
+    ),
+    base_model: str | None = typer.Option(
+        None,
+        "--base-model",
+        help="Base model path/name to evaluate under perturbations.",
+    ),
+    output: Path | None = typer.Option(
+        None,
+        "--output",
+        "-o",
+        help="Export generated perturbed cases as a new eval suite YAML.",
+    ),
+    seed: int = typer.Option(42, "--seed", help="Random seed for deterministic perturbations."),
+    max_samples: int | None = typer.Option(None, "--max-samples", help="Limit cases evaluated."),
+    json_output: bool = typer.Option(False, "--json", help="Output results as JSON."),
+) -> None:
+    """Run adversarial robustness testing with deterministic perturbations."""
+    try:
+        root = require_project_root()
+        cfg = load_project_config()
+
+        from moro.eval.robustness import create_perturbed_suite, evaluate_robustness
+
+        if output:
+            create_perturbed_suite(suite_path, output, seed=seed, max_samples=max_samples)
+            if not json_output:
+                console.print(f"[bold green]✓[/bold green] Perturbed eval suite exported to: [bold]{output}[/bold]")
+            if not base_model and not run_id:
+                if json_output:
+                    typer.echo(json.dumps({"exported_suite": str(output), "seed": seed}))
+                return
+
+        # Model evaluation path
+        if base_model and run_id:
+            raise EvalError("Choose --base-model or --run-id, not both.")
+
+        if base_model:
+            model_path = base_model
+        elif run_id:
+            selected = resolve_export_run(root, cfg.project.name, run_id)
+            model_path = str(selected.adapter_path)
+            run_id = selected.id
+        else:
+            try:
+                selected = resolve_export_run(root, cfg.project.name, None)
+                model_path = str(selected.adapter_path)
+                run_id = selected.id
+            except Exception:
+                model_path = cfg.model.name
+
+        if not json_output:
+            console.print(f"[cyan]→[/cyan]  Adversarial testing on: [bold]{model_path}[/bold]")
+            console.print(f"[cyan]→[/cyan]  Suite: [bold]{suite_path}[/bold] (seed: {seed})")
+
+        with console.status("[cyan]Running adversarial perturbations…[/cyan]"):
+            report = evaluate_robustness(
+                suite_path=suite_path,
+                model_path=model_path,
+                seed=seed,
+                max_samples=max_samples,
+                local_only=cfg.project.privacy_mode == "local_only",
+                revision=cfg.model.revision if not run_id and model_path == cfg.model.name else None,
+            )
+
+        if json_output:
+            payload = {
+                "total_cases": report.total_cases,
+                "avg_raw_robustness": report.avg_raw_robustness,
+                "avg_strict_robustness": report.avg_strict_robustness,
+                "total_vulnerabilities": report.total_vulnerabilities,
+                "most_vulnerable_perturbation": report.most_vulnerable_perturbation,
+                "robustness_grade": report.robustness_grade,
+                "perturbation_failure_counts": report.perturbation_failure_counts,
+                "cases": [
+                    {
+                        "case_id": c.case_id,
+                        "base_passed": c.base_passed,
+                        "raw_robustness": c.raw_robustness,
+                        "strict_robustness": c.strict_robustness,
+                        "vulnerability_count": c.vulnerability_count,
+                        "failed_perturbations": c.failed_perturbations,
+                    }
+                    for c in report.case_results
+                ],
+            }
+            typer.echo(json.dumps(payload, indent=2))
+            return
+
+        # Rich Display
+        grade_color = (
+            "green"
+            if "A" in report.robustness_grade or "B" in report.robustness_grade
+            else "yellow"
+            if "C" in report.robustness_grade
+            else "red"
+        )
+        console.print(
+            Panel(
+                f"[bold]Robustness Grade:[/bold] [{grade_color}]{report.robustness_grade}[/{grade_color}]\n"
+                f"[bold]Strict Robustness:[/bold] {report.avg_strict_robustness * 100:.1f}%\n"
+                f"[bold]Raw Robustness:[/bold] {report.avg_raw_robustness * 100:.1f}%\n"
+                f"[bold]Total Regressions/Vulnerabilities:[/bold] [red]{report.total_vulnerabilities}[/red]\n"
+                f"[bold]Most Fragile Under:[/bold] [yellow]{report.most_vulnerable_perturbation or 'None'}[/yellow]",
+                title="Adversarial Robustness Summary",
+                border_style=grade_color,
+            )
+        )
+
+        table = Table(title="Per-Case Adversarial Breakdown", show_header=True)
+        table.add_column("Case ID", style="cyan")
+        table.add_column("Base", justify="center")
+        table.add_column("Raw Rob.", justify="right")
+        table.add_column("Strict Rob.", justify="right")
+        table.add_column("Vulns", justify="center")
+        table.add_column("Failed Perturbations", style="dim")
+
+        for c in report.case_results:
+            b_icon = "[green]✓[/green]" if c.base_passed else "[red]✗[/red]"
+            v_color = "green" if c.vulnerability_count == 0 else "red"
+            failed_str = ", ".join(c.failed_perturbations) if c.failed_perturbations else "[green]none[/green]"
+            table.add_row(
+                c.case_id,
+                b_icon,
+                f"{c.raw_robustness * 100:.0f}%",
+                f"{c.strict_robustness * 100:.0f}%",
+                f"[{v_color}]{c.vulnerability_count}[/{v_color}]",
+                failed_str,
+            )
+
+        console.print(table)
 
     except (EvalError, ExportError, DependencyError) as exc:
         console.print(f"[bold red]Eval error:[/bold red] {exc}")

@@ -1,20 +1,17 @@
 """Tests for the epistemic quality engine (IT metrics)."""
 
-import math
-import pytest
 
+from collections import Counter
+
+from moro.data.models import DatasetMessage, DatasetRow
 from moro.data.quality import (
-    approximate_token_count,
     calculate_domain_ppmi,
     calculate_resnik_ic,
     calculate_zlib_entropy,
     classify_row,
-    compute_basic_quality_breakdown,
     score_row,
     score_row_epistemic,
 )
-from moro.data.models import DatasetMessage, DatasetRow
-from collections import Counter
 
 
 def _make_row(user: str, asst: str) -> DatasetRow:
@@ -47,7 +44,8 @@ class TestZlibEntropy:
 
     def test_random_text_high_entropy(self):
         """Random character string should have high compression ratio."""
-        import string, random
+        import random
+        import string
         rng = random.Random(42)
         random_text = "".join(rng.choices(string.printable, k=200))
         entropy = calculate_zlib_entropy(random_text)
@@ -60,11 +58,11 @@ class TestZlibEntropy:
             "The patient presents with acute chest pain radiating to the left arm. "
             "ECG shows ST elevation in leads II, III, and aVF. "
             "Troponin levels are elevated at 2.5 ng/mL. "
-            "Immediate PCI is indicated per STEMI protocol."
-        )
+            "Immediate PCI is indicated per STEMI protocol. "
+        ) * 3
         entropy = calculate_zlib_entropy(text)
         # This should be in the Goldilocks band (good domain text)
-        assert 0.15 < entropy < 0.65, f"Expected Goldilocks entropy, got {entropy}"
+        assert 0.15 < entropy < 0.45, f"Expected Goldilocks entropy, got {entropy}"
 
     def test_returns_float_in_range(self):
         for text in ["hello world", "a" * 100, "xyz123!@#"]:

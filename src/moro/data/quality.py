@@ -27,18 +27,15 @@ import math
 import re
 import zlib
 from collections import Counter
-from typing import Optional
 
 from moro.data.models import (
     DatasetMessage,
     DatasetRow,
     DatasetRowMetadata,
-    DomainQualityScores,
     InformationTheoreticMetrics,
     QualityScoreBreakdown,
     RowClassification,
 )
-
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Information-Theoretic Metric Proxies

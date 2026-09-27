@@ -1,16 +1,13 @@
 """Tests for the Adversarial Perturbation Engine and Robustness Scorer."""
 
-import pytest
 
 from moro.eval.perturbations import PerturbationEngine
 from moro.eval.robustness import (
     CaseRobustnessResult,
     RobustnessReport,
-    compute_case_robustness,
     compute_robustness_report,
     compute_robustness_score,
 )
-
 
 # ──────────────────────────────────────────────────────────────────────────────
 # PerturbationEngine Tests
@@ -75,10 +72,9 @@ class TestPerturbationEngine:
         engine2 = PerturbationEngine(seed=2)
         r1 = engine1.inject_distractor(self.prompt)
         r2 = engine2.inject_distractor(self.prompt)
-        # Not guaranteed to differ but statistically certain with different seeds
-        # (at minimum, the same prompt returns the same perturbed form per seed)
-        assert r1 == engine1.inject_distractor(self.prompt)  # consistent
-        assert r2 == engine2.inject_distractor(self.prompt)  # consistent
+        # Fresh engines with same seeds reproduce results
+        assert r1 == PerturbationEngine(seed=1).inject_distractor(self.prompt)
+        assert r2 == PerturbationEngine(seed=2).inject_distractor(self.prompt)
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -177,7 +173,7 @@ class TestRobustnessScorer:
 
     def test_robustness_grade_thresholds(self):
         def _grade(score):
-            from moro.eval.robustness import RobustnessReport, CaseRobustnessResult
+            from moro.eval.robustness import CaseRobustnessResult
             case = CaseRobustnessResult(
                 case_id="x",
                 base_passed=True,
@@ -193,3 +189,74 @@ class TestRobustnessScorer:
         assert "C" in _grade(0.75)
         assert "D" in _grade(0.60)
         assert "F" in _grade(0.40)
+
+
+class TestPerturbedSuiteAndEvaluation:
+    def test_create_perturbed_suite(self, tmp_path):
+        import yaml
+
+        from moro.eval.robustness import create_perturbed_suite
+
+        suite_path = tmp_path / "eval_suite.yaml"
+        suite_data = {
+            "name": "basic_suite",
+            "cases": [
+                {
+                    "id": "c1",
+                    "messages": [{"role": "user", "content": "What is Drug A dosage?"}],
+                    "expect": {"contains": ["10mg"]},
+                }
+            ],
+        }
+        with open(suite_path, "w") as f:
+            yaml.safe_dump(suite_data, f)
+
+        out_path = tmp_path / "perturbed_suite.yaml"
+        create_perturbed_suite(suite_path, out_path, seed=42)
+
+        assert out_path.exists()
+        with open(out_path) as f:
+            loaded = yaml.safe_load(f)
+        assert len(loaded["cases"]) == 5  # original + 4 perturbations
+        case_ids = [c["id"] for c in loaded["cases"]]
+        assert "c1" in case_ids
+        assert "c1_distractor_injection" in case_ids
+        assert "c1_typo_noise" in case_ids
+        assert "c1_negation_constraint" in case_ids
+        assert "c1_entity_swap" in case_ids
+
+    def test_evaluate_robustness_with_stubs(self, tmp_path):
+        import yaml
+
+        from moro.eval.robustness import evaluate_robustness
+
+        suite_path = tmp_path / "eval_suite.yaml"
+        suite_data = {
+            "name": "basic_suite",
+            "cases": [
+                {
+                    "id": "c1",
+                    "messages": [{"role": "user", "content": "Explain PCI protocol."}],
+                    "expect": {"contains": ["PCI"]},
+                }
+            ],
+        }
+        with open(suite_path, "w") as f:
+            yaml.safe_dump(suite_data, f)
+
+        # Base passes, 3 perturbations pass, typo fails
+        stub_responses = {
+            "c1": "Standard PCI procedure requires heparin.",
+            "c1_distractor_injection": "PCI procedure with distractor.",
+            "c1_typo_noise": "Unknown error in procedure.",  # does not contain PCI -> fails
+            "c1_negation_constraint": "PCI procedure without filler.",
+            "c1_entity_swap": "PCI procedure applied.",
+        }
+
+        report = evaluate_robustness(suite_path, stub_responses=stub_responses)
+        assert report.total_cases == 1
+        assert report.case_results[0].base_passed is True
+        assert report.case_results[0].perturbed_results["typo_noise"] is False
+        assert report.case_results[0].perturbed_results["distractor_injection"] is True
+        assert report.total_vulnerabilities == 1
+        assert report.most_vulnerable_perturbation == "typo_noise"

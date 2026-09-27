@@ -121,7 +121,6 @@ def check_hooks(
     Useful for scanning an existing repository for secrets or PII
     that may have been committed before hooks were installed.
     """
-    import os
 
     try:
         root = require_project_root()

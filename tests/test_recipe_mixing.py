@@ -1,9 +1,7 @@
 """Tests for the Mixing Strategy (Catastrophic Forgetting Guard)."""
 
-import pytest
 
 from moro.recipes.mixing import (
-    MixingStrategy,
     calculate_mixing_strategy,
     estimate_jargon_divergence,
 )

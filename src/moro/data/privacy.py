@@ -64,3 +64,61 @@ def scan_rows(rows: list[DatasetRow]) -> list[DatasetRow]:
     for row in rows:
         row.privacy_flags = scan_row(row)
     return rows
+
+
+_REPLACEMENTS: dict[str, str] = {
+    "email": "[REDACTED_EMAIL]",
+    "phone": "[REDACTED_PHONE]",
+    "api_key": "[REDACTED_API_KEY]",
+    "bearer_token": "[REDACTED_BEARER_TOKEN]",
+    "private_key": "[REDACTED_PRIVATE_KEY]",
+    "aws_key": "[REDACTED_AWS_KEY]",
+    "secret_env": "[REDACTED_SECRET]",
+    "credit_card": "[REDACTED_CREDIT_CARD]",
+    "ssn": "[REDACTED_SSN]",
+}
+
+
+def redact_text(text: str) -> tuple[str, list[str]]:
+    """
+    Scan and replace detected PII and secret patterns with redaction placeholders.
+    Returns (redacted_text, list_of_detected_flags).
+    """
+    detected: list[str] = []
+    result = text
+    for flag_name, pattern in _PATTERNS:
+        if pattern.search(result):
+            detected.append(flag_name)
+            replacement = _REPLACEMENTS.get(flag_name, "[REDACTED]")
+            result = pattern.sub(replacement, result)
+    return result, detected
+
+
+def redact_row(row: DatasetRow) -> tuple[DatasetRow, list[str]]:
+    """
+    Redact PII from all messages in a DatasetRow in-place.
+    Returns (row, list_of_detected_flags).
+    """
+    detected_flags: list[str] = []
+    for msg in row.messages:
+        new_content, flags = redact_text(msg.content)
+        msg.content = new_content
+        for f in flags:
+            if f not in detected_flags:
+                detected_flags.append(f)
+    row.privacy_flags = detected_flags
+    return row, detected_flags
+
+
+def redact_rows(rows: list[DatasetRow]) -> tuple[list[DatasetRow], int]:
+    """
+    Redact PII across all rows.
+    Returns (rows, total_redacted_row_count).
+    """
+    redacted_count = 0
+    for r in rows:
+        _, flags = redact_row(r)
+        if flags:
+            redacted_count += 1
+    return rows, redacted_count
+

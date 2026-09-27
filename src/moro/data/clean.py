@@ -21,13 +21,12 @@ from collections import Counter
 from pathlib import Path
 
 from moro.core.hashing import sha256_text
-from moro.data.models import DatasetRow, DatasetRowMetadata, InvalidRow
+from moro.data.models import DatasetRow, InvalidRow
 from moro.data.quality import (
     approximate_token_count,
     score_row,
     score_row_epistemic,
 )
-
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Global Stats First-Pass

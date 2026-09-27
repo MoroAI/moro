@@ -4,7 +4,6 @@ from pathlib import Path
 
 import typer
 from rich.console import Console
-from rich.panel import Panel
 from rich.table import Table
 
 from moro.config.loader import load_config
@@ -14,7 +13,6 @@ from moro.hardware.detector import detect_hardware
 from moro.hardware.profile import HardwareProfile
 from moro.recipes.engine import suggest_recipe
 from moro.recipes.mixing import calculate_mixing_strategy
-from moro.recipes.rules import infer_parameter_billions
 
 app = typer.Typer(name="recipe", help="Recipe suggestion.")
 console = Console()

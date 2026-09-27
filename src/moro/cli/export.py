@@ -139,7 +139,7 @@ def export_command(
 
             adapter_path = run_dir / "adapter"
             merged_dir = out_dir / "merged"
-            console.print(f"[cyan]→[/cyan]  Merging adapter into base model…")
+            console.print("[cyan]→[/cyan]  Merging adapter into base model…")
             console.print("[dim]  This may take several minutes for large models.[/dim]")
             with console.status("[cyan]Merging weights…[/cyan]"):
                 merged_dir = merge_adapter_into_base(
@@ -149,13 +149,13 @@ def export_command(
                     torch_dtype=dtype,
                 )
             console.print(f"[green]✓[/green] Merged model saved: {merged_dir}")
-            console.print(f"\n[bold]Load with transformers:[/bold]")
-            console.print(f"  from transformers import AutoModelForCausalLM")
+            console.print("\n[bold]Load with transformers:[/bold]")
+            console.print("  from transformers import AutoModelForCausalLM")
             console.print(f'  model = AutoModelForCausalLM.from_pretrained("{merged_dir}")')
 
         elif format == "gguf":
-            from moro.export.merge import merge_adapter_into_base
             from moro.export.gguf import convert_to_gguf_direct, write_gguf_script
+            from moro.export.merge import merge_adapter_into_base
 
             adapter_path = run_dir / "adapter"
             gguf_dir = out_dir / "gguf"
@@ -194,7 +194,7 @@ def export_command(
                 )
                 console.print(f"[green]✓[/green] Conversion script: {script_path}")
                 console.print("\n[bold]To convert:[/bold]")
-                console.print(f"  export LLAMA_CPP_PATH=/path/to/llama.cpp")
+                console.print("  export LLAMA_CPP_PATH=/path/to/llama.cpp")
                 console.print(f"  {script_path}")
 
     except DependencyError as exc:

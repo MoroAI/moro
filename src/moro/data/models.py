@@ -12,7 +12,6 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field, model_validator
 
-
 # ──────────────────────────────────────────────────────────────────────────────
 # Epistemic Quality Sub-Models
 # ──────────────────────────────────────────────────────────────────────────────
@@ -46,6 +45,10 @@ class InformationTheoreticMetrics(BaseModel):
     max_ppmi: float = Field(default=0.0, ge=0.0, description="Domain glossary intersection density (PPMI proxy)")
     resnik_ic: float = Field(default=0.0, ge=0.0, description="Rarest-token IDF (Resnik IC proxy)")
     local_vector_density: float = Field(default=0.5, ge=0.0, le=1.0, description="MinHash Jaccard density (outlier proxy)")
+
+    @property
+    def ppmi_score(self) -> float:
+        return self.max_ppmi
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -97,7 +100,7 @@ class DatasetRowMetadata(BaseModel):
     extra: dict[str, Any] = Field(default_factory=dict)
 
     @model_validator(mode="after")
-    def _validate_mi_guard_consistency(self) -> "DatasetRowMetadata":
+    def _validate_mi_guard_consistency(self) -> DatasetRowMetadata:
         if self.mi_guard_override and self.classification == "NOISY_OUTLIER":
             raise ValueError(
                 "Row cannot be NOISY_OUTLIER when mi_guard_override=True. "
