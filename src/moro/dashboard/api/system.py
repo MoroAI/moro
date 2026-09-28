@@ -214,6 +214,7 @@ async def execute_terminal_command(cmd: TerminalCommand) -> TerminalResponse:
     try:
         result = subprocess.run(
             full_cmd,
+            stdin=subprocess.DEVNULL,
             capture_output=True,
             text=True,
             timeout=120,

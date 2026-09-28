@@ -3,7 +3,14 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import (
+    AliasChoices,
+    BaseModel,
+    ConfigDict,
+    Field,
+    field_validator,
+    model_validator,
+)
 
 
 class StrictConfig(BaseModel):
@@ -52,8 +59,12 @@ class ModelConfig(StrictConfig):
 class AdapterConfig(StrictConfig):
     type: Literal["lora"] = "lora"
     r: int = Field(default=16, ge=1, le=256)
-    alpha: int = Field(default=32, ge=1, le=512)
-    dropout: float = Field(default=0.05, ge=0.0, le=1.0)
+    alpha: int = Field(
+        default=32, ge=1, le=512, validation_alias=AliasChoices("alpha", "lora_alpha")
+    )
+    dropout: float = Field(
+        default=0.05, ge=0.0, le=1.0, validation_alias=AliasChoices("dropout", "lora_dropout")
+    )
     target_modules: Literal["auto"] | list[str] = "auto"
     bias: Literal["none", "all", "lora_only"] = "none"
 
@@ -63,6 +74,7 @@ class TrainingConfig(StrictConfig):
     batch_size: int = Field(default=1, ge=1)
     gradient_accumulation_steps: int = Field(default=16, ge=1)
     learning_rate: float = Field(default=2e-4, gt=0)
+    weight_decay: float = Field(default=0.0, ge=0.0, le=1.0)
     optimizer: Literal[
         "adamw_torch",
         "adamw_8bit",
