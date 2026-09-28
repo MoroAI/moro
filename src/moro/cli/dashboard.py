@@ -30,11 +30,15 @@ dashboard_app = typer.Typer(
 @dashboard_app.callback(invoke_without_command=True)
 def dashboard_default(
     ctx: typer.Context,
-    host: str = typer.Option("127.0.0.1", "--host", "-h", help="Host address to bind the dashboard to."),
+    host: str = typer.Option(
+        "127.0.0.1", "--host", "-h", help="Host address to bind the dashboard to."
+    ),
     port: int = typer.Option(8501, "--port", "-p", help="Port to bind the dashboard to."),
     gateway: bool = typer.Option(False, "--gateway", help="Also start the feedback gateway."),
     gateway_port: int = typer.Option(8000, "--gateway-port", help="Port for the feedback gateway."),
-    open_browser: bool = typer.Option(False, "--open/--no-open", help="Open browser automatically."),
+    open_browser: bool = typer.Option(
+        False, "--open/--no-open", help="Open browser automatically."
+    ),
 ) -> None:
     """Start the Mission Control Dashboard when invoked without subcommand."""
     if ctx.invoked_subcommand is None:
@@ -49,11 +53,15 @@ def dashboard_default(
 
 @dashboard_app.command("serve")
 def dashboard_serve(
-    host: str = typer.Option("127.0.0.1", "--host", "-h", help="Host address to bind the dashboard to."),
+    host: str = typer.Option(
+        "127.0.0.1", "--host", "-h", help="Host address to bind the dashboard to."
+    ),
     port: int = typer.Option(8501, "--port", "-p", help="Port to bind the dashboard to."),
     gateway: bool = typer.Option(False, "--gateway", help="Also start the feedback gateway."),
     gateway_port: int = typer.Option(8000, "--gateway-port", help="Port for the feedback gateway."),
-    open_browser: bool = typer.Option(False, "--open/--no-open", help="Open browser automatically."),
+    open_browser: bool = typer.Option(
+        False, "--open/--no-open", help="Open browser automatically."
+    ),
 ) -> None:
     """
     Start the MoroAI Mission Control Dashboard.
@@ -146,7 +154,9 @@ def dashboard_status(
     try:
         resp = httpx.get(target_url, timeout=3.0)
         if resp.status_code == 200:
-            console.print(f"[bold green]✓ Dashboard is online and healthy[/bold green] at http://{host}:{port}")
+            console.print(
+                f"[bold green]✓ Dashboard is online and healthy[/bold green] at http://{host}:{port}"
+            )
         else:
             console.print(f"[yellow]○ Dashboard returned status code {resp.status_code}[/yellow]")
     except Exception:

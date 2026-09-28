@@ -17,7 +17,12 @@ def test_inspect_reads_train_split(tmp_path: Path):
     """
     split_path = tmp_path / "train.jsonl"
     rows = [
-        {"messages": [{"role": "user", "content": f"Q{i}"}, {"role": "assistant", "content": f"A{i}"}]}
+        {
+            "messages": [
+                {"role": "user", "content": f"Q{i}"},
+                {"role": "assistant", "content": f"A{i}"},
+            ]
+        }
         for i in range(20)
     ]
     _write_split(split_path, rows)

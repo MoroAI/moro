@@ -1,6 +1,5 @@
 """Tests for the Adversarial Perturbation Engine and Robustness Scorer."""
 
-
 from moro.eval.perturbations import PerturbationEngine
 from moro.eval.robustness import (
     CaseRobustnessResult,
@@ -13,6 +12,7 @@ from moro.eval.robustness import (
 # PerturbationEngine Tests
 # ──────────────────────────────────────────────────────────────────────────────
 
+
 class TestPerturbationEngine:
     def setup_method(self):
         self.engine = PerturbationEngine(seed=42)
@@ -20,7 +20,13 @@ class TestPerturbationEngine:
 
     def test_generate_perturbations_returns_all_types(self):
         result = self.engine.generate_perturbations(self.prompt)
-        expected_keys = {"original", "distractor_injection", "typo_noise", "negation_constraint", "entity_swap"}
+        expected_keys = {
+            "original",
+            "distractor_injection",
+            "typo_noise",
+            "negation_constraint",
+            "entity_swap",
+        }
         assert set(result.keys()) == expected_keys
 
     def test_original_is_unchanged(self):
@@ -80,6 +86,7 @@ class TestPerturbationEngine:
 # ──────────────────────────────────────────────────────────────────────────────
 # Robustness Scorer Tests
 # ──────────────────────────────────────────────────────────────────────────────
+
 
 class TestRobustnessScorer:
     def test_perfect_robustness(self):
@@ -159,11 +166,13 @@ class TestRobustnessScorer:
 
     def test_report_aggregation(self):
         case1 = CaseRobustnessResult(
-            case_id="c1", base_passed=True,
+            case_id="c1",
+            base_passed=True,
             perturbed_results={"a": True, "b": True},
         )
         case2 = CaseRobustnessResult(
-            case_id="c2", base_passed=True,
+            case_id="c2",
+            base_passed=True,
             perturbed_results={"a": False, "b": True},
         )
         report = compute_robustness_report([case1, case2])
@@ -174,6 +183,7 @@ class TestRobustnessScorer:
     def test_robustness_grade_thresholds(self):
         def _grade(score):
             from moro.eval.robustness import CaseRobustnessResult
+
             case = CaseRobustnessResult(
                 case_id="x",
                 base_passed=True,

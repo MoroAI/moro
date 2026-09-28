@@ -77,16 +77,18 @@ def _compute_delta(base: EvalResult, adapter: EvalResult) -> dict:
         adapter_case = adapter_by_id[case_id]
         if base_case is None:
             continue
-        case_deltas.append({
-            "case_id": case_id,
-            "base_passed": base_case.passed,
-            "adapter_passed": adapter_case.passed,
-            "base_score": base_case.score,
-            "adapter_score": adapter_case.score,
-            "score_delta": round(adapter_case.score - base_case.score, 4),
-            "regression": base_case.passed and not adapter_case.passed,
-            "improvement": not base_case.passed and adapter_case.passed,
-        })
+        case_deltas.append(
+            {
+                "case_id": case_id,
+                "base_passed": base_case.passed,
+                "adapter_passed": adapter_case.passed,
+                "base_score": base_case.score,
+                "adapter_score": adapter_case.score,
+                "score_delta": round(adapter_case.score - base_case.score, 4),
+                "regression": base_case.passed and not adapter_case.passed,
+                "improvement": not base_case.passed and adapter_case.passed,
+            }
+        )
 
     regressions = [c for c in case_deltas if c["regression"]]
     improvements = [c for c in case_deltas if c["improvement"]]

@@ -62,7 +62,9 @@ def services_start_command(
 ) -> None:
     """Start one or all background services."""
     orchestrator = ServiceOrchestrator()
-    services_to_start = ["dashboard", "ollama", "webhook"] if service.lower() == "all" else [service.lower()]
+    services_to_start = (
+        ["dashboard", "ollama", "webhook"] if service.lower() == "all" else [service.lower()]
+    )
 
     for s in services_to_start:
         with console.status(f"[cyan]Starting {s}…[/cyan]"):
@@ -79,7 +81,9 @@ def services_stop_command(
 ) -> None:
     """Stop one or all background services."""
     orchestrator = ServiceOrchestrator()
-    services_to_stop = ["dashboard", "ollama", "webhook"] if service.lower() == "all" else [service.lower()]
+    services_to_stop = (
+        ["dashboard", "ollama", "webhook"] if service.lower() == "all" else [service.lower()]
+    )
 
     for s in services_to_stop:
         with console.status(f"[cyan]Stopping {s}…[/cyan]"):
@@ -92,7 +96,9 @@ def services_stop_command(
 
 @app.command("restart")
 def services_restart_command(
-    service: str = typer.Argument(..., help="Service name to restart (dashboard, ollama, webhook)."),
+    service: str = typer.Argument(
+        ..., help="Service name to restart (dashboard, ollama, webhook)."
+    ),
 ) -> None:
     """Restart a specific service."""
     orchestrator = ServiceOrchestrator()
@@ -101,7 +107,9 @@ def services_restart_command(
     if ok:
         console.print(f"[bold green]✓[/bold green] Service [bold]{service}[/bold] restarted.")
     else:
-        console.print(f"[bold yellow]⚠[/bold yellow] Failed to restart service [bold]{service}[/bold].")
+        console.print(
+            f"[bold yellow]⚠[/bold yellow] Failed to restart service [bold]{service}[/bold]."
+        )
 
 
 @app.command("supervise")
@@ -126,4 +134,3 @@ def services_logs_command(
 
 
 services_app = app
-

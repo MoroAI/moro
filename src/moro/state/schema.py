@@ -223,8 +223,7 @@ def get_state_db(db_path: Path) -> sqlite3.Connection:
     """Get a connection to an existing state database."""
     if not db_path.exists():
         raise FileNotFoundError(
-            f"State database not found at {db_path}. "
-            "Run 'moro init' to initialize the project."
+            f"State database not found at {db_path}. Run 'moro init' to initialize the project."
         )
 
     conn = sqlite3.connect(str(db_path))

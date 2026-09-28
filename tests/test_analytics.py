@@ -35,13 +35,12 @@ def tracker(analytics_db_path: Path) -> ExperimentTracker:
 # 1. DATABASE SCHEMA & INITIALIZATION
 # ===================================================================
 
+
 def test_initialize_experiment_db(analytics_db_path: Path):
     """Test SQLite initialization and schema creation."""
     conn = initialize_experiment_db(analytics_db_path)
     try:
-        tables = conn.execute(
-            "SELECT name FROM sqlite_master WHERE type='table'"
-        ).fetchall()
+        tables = conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()
         table_names = {row["name"] for row in tables}
 
         expected = {
@@ -68,6 +67,7 @@ def test_initialize_experiment_db(analytics_db_path: Path):
 # ===================================================================
 # 2. EXPERIMENT LIFECYCLE
 # ===================================================================
+
 
 def test_experiment_lifecycle(tracker: ExperimentTracker):
     """Test full lifecycle: create -> start -> log -> complete."""
@@ -179,6 +179,7 @@ def test_experiment_failure(tracker: ExperimentTracker):
 # 3. MULTI-EXPERIMENT COMPARISON & BEST SELECTION
 # ===================================================================
 
+
 def test_compare_experiments(tracker: ExperimentTracker):
     """Test multi-run comparison and automated best experiment identification."""
     # Exp 1: Higher delta, good loss
@@ -225,6 +226,7 @@ def test_compare_experiments(tracker: ExperimentTracker):
 # 4. RECOMMENDATIONS & CORRELATION ANALYSIS
 # ===================================================================
 
+
 def test_recommendations_and_heuristics(tracker: ExperimentTracker):
     """Test autonomous recommendation generation."""
     # Seed 3 experiments with different learning rates
@@ -234,12 +236,16 @@ def test_recommendations_and_heuristics(tracker: ExperimentTracker):
     for i, (lr, delta) in enumerate(zip(lrs, deltas)):
         exp_id = tracker.create_experiment(name=f"run_opt_{i}", base_model="Qwen/Qwen2.5-1.5B")
         tracker.start_experiment(exp_id, {"learning_rate": lr, "lora_r": 16})
-        tracker.complete_experiment(exp_id, final_train_loss=1.5, eval_delta=delta, eval_pass_rate=0.8)
+        tracker.complete_experiment(
+            exp_id, final_train_loss=1.5, eval_delta=delta, eval_pass_rate=0.8
+        )
 
     recs = tracker.generate_recommendations(recent_experiments=5)
     assert len(recs) > 0
 
-    lr_rec = next((r for r in recs if r.get("suggested_config", {}).get("learning_rate") == 2e-4), None)
+    lr_rec = next(
+        (r for r in recs if r.get("suggested_config", {}).get("learning_rate") == 2e-4), None
+    )
     assert lr_rec is not None
     assert lr_rec["rec_type"] == "hyperparameter_change"
 
@@ -260,6 +266,7 @@ def test_failure_pattern_recommendation(tracker: ExperimentTracker):
 # ===================================================================
 # 5. VISUAL ANALYTICS ENGINE
 # ===================================================================
+
 
 def test_visual_analytics_engine(tracker: ExperimentTracker):
     """Test Chart.js data generation."""
@@ -307,23 +314,26 @@ def test_visual_analytics_engine(tracker: ExperimentTracker):
 # 6. TRAINING RUNNER INTEGRATION
 # ===================================================================
 
+
 def test_training_runner_tracks_experiments(tmp_path: Path):
     """Test TrainingRunner automatic lifecycle orchestration."""
     runner = TrainingRunner(tmp_path)
-    exp_id = runner.run_training({
-        "name": "auto_tracked_run",
-        "model_name": "Qwen/Qwen2.5-1.5B",
-        "learning_rate": 2e-4,
-        "batch_size": 2,
-        "epochs": 1.0,
-        "steps_data": [
-            {"step": 10, "train_loss": 2.2, "eval_loss": 2.3},
-            {"step": 20, "train_loss": 1.8, "eval_loss": 1.9},
-        ],
-        "final_train_loss": 1.8,
-        "eval_pass_rate": 0.85,
-        "eval_delta": 0.05,
-    })
+    exp_id = runner.run_training(
+        {
+            "name": "auto_tracked_run",
+            "model_name": "Qwen/Qwen2.5-1.5B",
+            "learning_rate": 2e-4,
+            "batch_size": 2,
+            "epochs": 1.0,
+            "steps_data": [
+                {"step": 10, "train_loss": 2.2, "eval_loss": 2.3},
+                {"step": 20, "train_loss": 1.8, "eval_loss": 1.9},
+            ],
+            "final_train_loss": 1.8,
+            "eval_pass_rate": 0.85,
+            "eval_delta": 0.05,
+        }
+    )
 
     assert exp_id.startswith("exp_")
     exp = runner.tracker.get_experiment(exp_id)
@@ -337,6 +347,7 @@ def test_training_runner_tracks_experiments(tmp_path: Path):
 # ===================================================================
 # 7. CLI COMMANDS
 # ===================================================================
+
 
 def test_analytics_cli_commands(tmp_path: Path, monkeypatch):
     """Test moro analytics list, show, compare, trend, and recommend."""
@@ -381,6 +392,7 @@ def test_analytics_cli_commands(tmp_path: Path, monkeypatch):
 # ===================================================================
 # 8. MISSION CONTROL REST API ENDPOINTS
 # ===================================================================
+
 
 def test_mission_control_analytics_endpoints(tmp_path: Path, monkeypatch):
     """Test dashboard REST API endpoints for analytics."""

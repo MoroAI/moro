@@ -283,6 +283,7 @@ class HuggingFaceBackend(TrainingBackend):
 
             # OOM detected — apply recovery protocol
             import rich.console as _rc
+
             _console = _rc.Console()
             _console.print(
                 "\n[bold red]⚠️  CUDA Out-Of-Memory detected![/bold red]\n"
@@ -402,4 +403,3 @@ class HuggingFaceBackend(TrainingBackend):
             "oom_recovered": oom_recovered,
             "recovery_actions": recovery_actions,
         }
-

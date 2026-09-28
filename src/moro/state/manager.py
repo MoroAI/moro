@@ -450,9 +450,7 @@ class StateManager:
         conn = self._get_conn()
         try:
             # Demote current production model
-            conn.execute(
-                "UPDATE model_registry SET is_production = 0 WHERE is_production = 1"
-            )
+            conn.execute("UPDATE model_registry SET is_production = 0 WHERE is_production = 1")
 
             # Promote new model
             conn.execute(

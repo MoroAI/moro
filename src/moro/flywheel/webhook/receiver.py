@@ -80,13 +80,16 @@ class WebhookRequestHandler(BaseHTTPRequestHandler):
                     total = stats["total_logs"]
                 except Exception:
                     pass
-            self._send_json(200, {
-                "status": "healthy",
-                "database_path": str(config.db_path),
-                "database_exists": db_exists,
-                "pending_logs": pending,
-                "total_logs": total,
-            })
+            self._send_json(
+                200,
+                {
+                    "status": "healthy",
+                    "database_path": str(config.db_path),
+                    "database_exists": db_exists,
+                    "pending_logs": pending,
+                    "total_logs": total,
+                },
+            )
             return
 
         if not self._verify_auth():
@@ -95,7 +98,9 @@ class WebhookRequestHandler(BaseHTTPRequestHandler):
 
         if parsed.path == "/webhook/stats":
             stats = get_db_stats(config.db_path)
-            self._send_json(200, {"status": "success", "database_path": str(config.db_path), **stats})
+            self._send_json(
+                200, {"status": "success", "database_path": str(config.db_path), **stats}
+            )
             return
 
         self._send_json(404, {"error": "Not found"})
@@ -143,12 +148,15 @@ class WebhookRequestHandler(BaseHTTPRequestHandler):
                     ),
                 )
                 conn.commit()
-                self._send_json(200, {
-                    "status": "success",
-                    "log_ids": [log_id],
-                    "count": 1,
-                    "message": "Log ingested successfully",
-                })
+                self._send_json(
+                    200,
+                    {
+                        "status": "success",
+                        "log_ids": [log_id],
+                        "count": 1,
+                        "message": "Log ingested successfully",
+                    },
+                )
             except Exception as exc:
                 self._send_json(500, {"error": f"Failed to write log: {exc}"})
             finally:
@@ -185,12 +193,15 @@ class WebhookRequestHandler(BaseHTTPRequestHandler):
                         ),
                     )
                 conn.commit()
-                self._send_json(200, {
-                    "status": "success",
-                    "log_ids": log_ids,
-                    "count": len(log_ids),
-                    "message": f"Successfully ingested {len(log_ids)} logs",
-                })
+                self._send_json(
+                    200,
+                    {
+                        "status": "success",
+                        "log_ids": log_ids,
+                        "count": len(log_ids),
+                        "message": f"Successfully ingested {len(log_ids)} logs",
+                    },
+                )
             except Exception as exc:
                 self._send_json(500, {"error": f"Failed to batch write logs: {exc}"})
             finally:

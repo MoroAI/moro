@@ -34,6 +34,7 @@ from moro.dashboard.api.training import router as training_router
 # SERVICE CONNECTORS
 # ===================================================================
 
+
 class DockerConnector:
     """Connects to Docker daemon for container management."""
 
@@ -44,6 +45,7 @@ class DockerConnector:
     @property
     def available(self) -> bool:
         import time
+
         now = time.time()
         if self._available is not None and (now - self._last_checked) < 5.0:
             return self._available
@@ -130,11 +132,13 @@ class OllamaConnector:
     @property
     def available(self) -> bool:
         import time
+
         now = time.time()
         if self._available is not None and (now - self._last_checked) < 5.0:
             return self._available
         try:
             import httpx
+
             response = httpx.get(f"{self.base_url}/api/tags", timeout=1.0)
             self._available = response.status_code == 200
         except Exception:
@@ -146,6 +150,7 @@ class OllamaConnector:
         """List all Ollama models."""
         try:
             import httpx
+
             response = httpx.get(f"{self.base_url}/api/tags", timeout=5.0)
             return response.json().get("models", [])
         except Exception:
@@ -155,6 +160,7 @@ class OllamaConnector:
         """Get detailed information about a model."""
         try:
             import httpx
+
             response = httpx.post(
                 f"{self.base_url}/api/show",
                 json={"name": model_name},
@@ -168,6 +174,7 @@ class OllamaConnector:
         """Generate a completion from a model."""
         try:
             import httpx
+
             response = httpx.post(
                 f"{self.base_url}/api/generate",
                 json={"model": model_name, "prompt": prompt, "stream": False},
@@ -194,7 +201,9 @@ class DatabaseConnector:
         conn = sqlite3.connect(self.production_db)
         try:
             total = conn.execute("SELECT COUNT(*) FROM inference_logs").fetchone()[0]
-            pending = conn.execute("SELECT COUNT(*) FROM inference_logs WHERE is_processed = 0").fetchone()[0]
+            pending = conn.execute(
+                "SELECT COUNT(*) FROM inference_logs WHERE is_processed = 0"
+            ).fetchone()[0]
             return {
                 "total_logs": total,
                 "pending_logs": pending,
@@ -295,7 +304,9 @@ class DatabaseConnector:
         conn = sqlite3.connect(registry_db)
         conn.row_factory = sqlite3.Row
         try:
-            rows = conn.execute("SELECT * FROM registered_models ORDER BY updated_at DESC").fetchall()
+            rows = conn.execute(
+                "SELECT * FROM registered_models ORDER BY updated_at DESC"
+            ).fetchall()
             return [dict(r) for r in rows]
         except Exception:
             return []
@@ -316,7 +327,6 @@ class DatabaseConnector:
             return []
         finally:
             conn.close()
-
 
 
 class TrainingMonitor:
@@ -363,7 +373,12 @@ class FlywheelMonitor:
         """Get flywheel status."""
         dpo_dir = self.project_root / "data" / "dpo"
         if not dpo_dir.exists():
-            return {"active": True, "epochs": 3, "pairs_generated": 19, "last_epoch": "epoch_20260927_214131"}
+            return {
+                "active": True,
+                "epochs": 3,
+                "pairs_generated": 19,
+                "last_epoch": "epoch_20260927_214131",
+            }
 
         epochs = list(dpo_dir.glob("dpo_epoch_*.jsonl"))
         total_pairs = 0
@@ -436,6 +451,7 @@ async def startup() -> None:
 # HTML & ASSET ENDPOINTS
 # ===================================================================
 
+
 @app.get("/", response_class=HTMLResponse)
 @app.get("/dashboard", response_class=HTMLResponse)
 async def serve_dashboard() -> str:
@@ -448,6 +464,7 @@ async def serve_dashboard() -> str:
 # ===================================================================
 # REST API ENDPOINTS
 # ===================================================================
+
 
 @app.get("/api/health")
 async def health_check() -> dict:
@@ -570,7 +587,6 @@ async def services_stop_api(service_name: str) -> dict:
     if not success:
         raise HTTPException(status_code=500, detail=f"Failed to stop {service_name}")
     return {"status": "success", "service": service_name}
-
 
 
 @app.get("/api/docker/containers")
@@ -713,6 +729,7 @@ async def terminal_execute(payload: CommandPayload) -> dict:
 # EXPERIMENT TRACKING & ANALYTICS API ENDPOINTS
 # ===================================================================
 
+
 def _get_analytics_tracker() -> ExperimentTracker:
     root = get_project_root()
     return ExperimentTracker(root / ".moro" / "analytics.db")
@@ -823,6 +840,7 @@ async def analytics_recommendations(recent: int = 10) -> dict:
 # WEBSOCKET ENDPOINTS (Real-time streaming)
 # ===================================================================
 
+
 @app.websocket("/ws/system/metrics")
 async def ws_system_metrics(websocket: WebSocket) -> None:
     """WebSocket endpoint for real-time system metrics."""
@@ -830,11 +848,13 @@ async def ws_system_metrics(websocket: WebSocket) -> None:
     try:
         while True:
             overview = await system_overview()
-            await websocket.send_json({
-                "type": "metrics",
-                "timestamp": datetime.now(timezone.utc).isoformat(),
-                "data": overview,
-            })
+            await websocket.send_json(
+                {
+                    "type": "metrics",
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                    "data": overview,
+                }
+            )
             await asyncio.sleep(5)
     except WebSocketDisconnect:
         pass
@@ -846,14 +866,20 @@ async def ws_training_telemetry(websocket: WebSocket) -> None:
     await websocket.accept()
     try:
         while True:
-            training: TrainingMonitor = _connectors.get("training", TrainingMonitor(get_project_root()))  # type: ignore
+            training: TrainingMonitor = _connectors.get(
+                "training", TrainingMonitor(get_project_root())
+            )  # type: ignore
             active = training.get_active_training()
-            telemetry = training.get_telemetry(active["run_id"]) if active and "run_id" in active else []
-            await websocket.send_json({
-                "type": "telemetry",
-                "timestamp": datetime.now(timezone.utc).isoformat(),
-                "data": telemetry,
-            })
+            telemetry = (
+                training.get_telemetry(active["run_id"]) if active and "run_id" in active else []
+            )
+            await websocket.send_json(
+                {
+                    "type": "telemetry",
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                    "data": telemetry,
+                }
+            )
             await asyncio.sleep(2)
     except WebSocketDisconnect:
         pass
@@ -865,13 +891,17 @@ async def ws_logs_stream(websocket: WebSocket) -> None:
     await websocket.accept()
     try:
         while True:
-            database: DatabaseConnector = _connectors.get("database", DatabaseConnector(get_project_root()))  # type: ignore
+            database: DatabaseConnector = _connectors.get(
+                "database", DatabaseConnector(get_project_root())
+            )  # type: ignore
             logs = database.get_recent_logs(5)
-            await websocket.send_json({
-                "type": "logs",
-                "timestamp": datetime.now(timezone.utc).isoformat(),
-                "data": logs,
-            })
+            await websocket.send_json(
+                {
+                    "type": "logs",
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                    "data": logs,
+                }
+            )
             await asyncio.sleep(3)
     except WebSocketDisconnect:
         pass

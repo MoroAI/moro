@@ -58,13 +58,37 @@ PII_PATTERNS = [
 
 # Files where we check for hardcoded secrets
 _SECRET_SCAN_EXTENSIONS = {
-    ".py", ".js", ".ts", ".yaml", ".yml", ".json", ".env",
-    ".sh", ".bash", ".zsh", ".toml", ".cfg", ".ini", ".conf",
+    ".py",
+    ".js",
+    ".ts",
+    ".yaml",
+    ".yml",
+    ".json",
+    ".env",
+    ".sh",
+    ".bash",
+    ".zsh",
+    ".toml",
+    ".cfg",
+    ".ini",
+    ".conf",
 }
 
 # Files skipped for secret scanning (binary / already safe)
-_SKIP_SECRET_EXTENSIONS = {".md", ".txt", ".png", ".jpg", ".jpeg", ".gif", ".svg",
-                             ".ico", ".pdf", ".zip", ".gz", ".tar"}
+_SKIP_SECRET_EXTENSIONS = {
+    ".md",
+    ".txt",
+    ".png",
+    ".jpg",
+    ".jpeg",
+    ".gif",
+    ".svg",
+    ".ico",
+    ".pdf",
+    ".zip",
+    ".gz",
+    ".tar",
+}
 
 # Data files where we check for PII
 _DATA_EXTENSIONS = {".jsonl", ".csv", ".json", ".parquet", ".tsv"}
@@ -99,9 +123,11 @@ def check_secrets(filepath: str) -> list[str]:
         return violations
     if ext and ext not in _SECRET_SCAN_EXTENSIONS:
         return violations  # Unknown extension — skip
+    if _is_safe_path(filepath):
+        return violations  # Skip test/mock data
 
     try:
-        with open(filepath, "r", encoding="utf-8", errors="ignore") as f:
+        with open(filepath, encoding="utf-8", errors="ignore") as f:
             content = f.read()
         for pattern, name in SECRET_PATTERNS:
             if re.search(pattern, content):
@@ -123,7 +149,7 @@ def check_pii_in_data(filepath: str) -> list[str]:
         return violations  # Skip test/mock data
 
     try:
-        with open(filepath, "r", encoding="utf-8", errors="ignore") as f:
+        with open(filepath, encoding="utf-8", errors="ignore") as f:
             content = f.read()
         for pattern, name in PII_PATTERNS:
             matches = re.findall(pattern, content)

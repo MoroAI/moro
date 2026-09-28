@@ -169,7 +169,8 @@ class TrainingRunner:
                         eval_loss=step_info.get("eval_loss"),
                         grad_norm=step_info.get("grad_norm"),
                         learning_rate=step_info.get("learning_rate"),
-                        vram_allocated_gb=step_info.get("vram_allocated_gb") or self._get_vram_allocated(),
+                        vram_allocated_gb=step_info.get("vram_allocated_gb")
+                        or self._get_vram_allocated(),
                         tokens_per_second=step_info.get("tokens_per_second"),
                         is_anomaly=step_info.get("is_anomaly", False),
                         anomaly_type=step_info.get("anomaly_type"),

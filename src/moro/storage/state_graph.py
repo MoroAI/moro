@@ -95,9 +95,7 @@ class StateGraphManager:
         conn = sqlite3.connect(self.db_path)
         conn.row_factory = sqlite3.Row
         try:
-            row = conn.execute(
-                "SELECT * FROM lineage_nodes WHERE id = ?", (node_id,)
-            ).fetchone()
+            row = conn.execute("SELECT * FROM lineage_nodes WHERE id = ?", (node_id,)).fetchone()
             if not row:
                 return None
             data = dict(row)
@@ -134,9 +132,7 @@ class StateGraphManager:
         conn = sqlite3.connect(self.db_path)
         conn.row_factory = sqlite3.Row
         try:
-            rows = conn.execute(
-                "SELECT * FROM lineage_nodes ORDER BY created_at ASC"
-            ).fetchall()
+            rows = conn.execute("SELECT * FROM lineage_nodes ORDER BY created_at ASC").fetchall()
             nodes = []
             edges = []
             for r in rows:

@@ -68,6 +68,7 @@ class DataCompiler:
             # Ensure train.jsonl exists in compiled dir
             if not train_file.exists() or train_file.resolve() != source.resolve():
                 import shutil
+
                 shutil.copy2(source, train_file)
                 if not val_file.exists():
                     shutil.copy2(source, val_file)

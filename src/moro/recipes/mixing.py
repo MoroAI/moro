@@ -32,9 +32,14 @@ class MixingStrategy(BaseModel):
 
     domain_ratio + replay_ratio = 1.0 (always)
     """
-    domain_ratio: float = Field(..., ge=0.0, le=1.0, description="Fraction of domain-specific training data")
+
+    domain_ratio: float = Field(
+        ..., ge=0.0, le=1.0, description="Fraction of domain-specific training data"
+    )
     replay_ratio: float = Field(..., ge=0.0, le=1.0, description="Fraction of general replay data")
-    kl_penalty_lambda: float = Field(..., ge=0.0, description="KL divergence regularization strength")
+    kl_penalty_lambda: float = Field(
+        ..., ge=0.0, description="KL divergence regularization strength"
+    )
     reasoning: str = Field(default="", description="Human-readable explanation of the calculation")
 
     model_config = {"frozen": False}  # allow computed fields during validation

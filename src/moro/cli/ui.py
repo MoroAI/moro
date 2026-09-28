@@ -26,6 +26,7 @@ def ui_command(
         import uvicorn
 
         from moro.dashboard.mission_control import app as mission_app
+
         uvicorn.run(mission_app, host=host, port=port, log_level="info")
     except ImportError:
         server = start_server(host=host, port=port)
@@ -35,4 +36,3 @@ def ui_command(
             console.print("\n[yellow]Dashboard stopped.[/yellow]")
         finally:
             server.server_close()
-

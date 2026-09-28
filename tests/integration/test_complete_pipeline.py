@@ -28,6 +28,7 @@ import yaml
 # FIXTURES
 # ===================================================================
 
+
 @pytest.fixture
 def temp_project():
     """Create a temporary project directory."""
@@ -58,21 +59,24 @@ def sample_dataset(temp_project):
             "messages": [
                 {"role": "system", "content": "You are a helpful assistant."},
                 {"role": "user", "content": "What is the capital of France?"},
-                {"role": "assistant", "content": "The capital of France is Paris."}
+                {"role": "assistant", "content": "The capital of France is Paris."},
             ]
         },
         {
             "messages": [
                 {"role": "system", "content": "You are a helpful assistant."},
                 {"role": "user", "content": "What is 2 + 2?"},
-                {"role": "assistant", "content": "2 + 2 equals 4."}
+                {"role": "assistant", "content": "2 + 2 equals 4."},
             ]
         },
         {
             "messages": [
                 {"role": "system", "content": "You are a helpful assistant."},
                 {"role": "user", "content": "What is the boiling point of water?"},
-                {"role": "assistant", "content": "Water boils at 100 degrees Celsius at sea level."}
+                {
+                    "role": "assistant",
+                    "content": "Water boils at 100 degrees Celsius at sea level.",
+                },
             ]
         },
     ]
@@ -95,23 +99,15 @@ def sample_eval_suite(temp_project):
         "cases": [
             {
                 "id": "capital_france",
-                "messages": [
-                    {"role": "user", "content": "What is the capital of France?"}
-                ],
-                "expect": {
-                    "contains": ["Paris"]
-                }
+                "messages": [{"role": "user", "content": "What is the capital of France?"}],
+                "expect": {"contains": ["Paris"]},
             },
             {
                 "id": "math_addition",
-                "messages": [
-                    {"role": "user", "content": "What is 2 + 2?"}
-                ],
-                "expect": {
-                    "contains": ["4"]
-                }
+                "messages": [{"role": "user", "content": "What is 2 + 2?"}],
+                "expect": {"contains": ["4"]},
             },
-        ]
+        ],
     }
 
     with open(eval_path, "w", encoding="utf-8") as f:
@@ -152,17 +148,13 @@ def sample_config(temp_project):
             "epochs": 1,
             "max_seq_length": 512,
         },
-        "eval": {
-            "suites": [
-                {"path": "./eval/test_suite.yaml"}
-            ]
-        },
+        "eval": {"suites": [{"path": "./eval/test_suite.yaml"}]},
         "release": {
             "require": {
                 "min_improvement": 0.0,
                 "safety_pass": True,
             }
-        }
+        },
     }
 
     with open(config_path, "w", encoding="utf-8") as f:
@@ -174,6 +166,7 @@ def sample_config(temp_project):
 # ===================================================================
 # TESTS
 # ===================================================================
+
 
 class TestStateManagement:
     """Test the unified state manager."""
@@ -188,9 +181,7 @@ class TestStateManagement:
         assert db_path.exists()
 
         # Check tables exist
-        cursor = conn.execute(
-            "SELECT name FROM sqlite_master WHERE type='table'"
-        )
+        cursor = conn.execute("SELECT name FROM sqlite_master WHERE type='table'")
         tables = [row[0] for row in cursor.fetchall()]
 
         assert "nodes" in tables
@@ -312,9 +303,7 @@ class TestExperimentTracking:
         assert db_path.exists()
 
         # Check tables exist
-        cursor = conn.execute(
-            "SELECT name FROM sqlite_master WHERE type='table'"
-        )
+        cursor = conn.execute("SELECT name FROM sqlite_master WHERE type='table'")
         tables = [row[0] for row in cursor.fetchall()]
 
         assert "experiments" in tables
@@ -512,9 +501,7 @@ class TestRuntimeOrchestrator:
 
         # Track progress
         progress_messages = []
-        context.add_progress_callback(
-            lambda ctx, msg, pct: progress_messages.append(msg)
-        )
+        context.add_progress_callback(lambda ctx, msg, pct: progress_messages.append(msg))
 
         # Simulate execution
         async def run_test():
@@ -620,6 +607,7 @@ class TestServiceOrchestrator:
 # END-TO-END PIPELINE TEST
 # ===================================================================
 
+
 class TestCompletePipeline:
     """Test the complete pipeline end-to-end."""
 
@@ -689,6 +677,7 @@ class TestCompletePipeline:
 # ===================================================================
 # PERFORMANCE BENCHMARK TEST
 # ===================================================================
+
 
 class TestPerformanceBenchmarks:
     """Test that performance meets requirements."""

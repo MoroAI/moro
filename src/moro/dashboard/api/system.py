@@ -29,6 +29,7 @@ router = APIRouter(prefix="/api/system", tags=["system"])
 # MODELS
 # ===================================================================
 
+
 class SystemHealth(BaseModel):
     """System health and telemetry payload."""
 
@@ -57,6 +58,7 @@ class TerminalResponse(BaseModel):
 # ===================================================================
 # ENDPOINTS
 # ===================================================================
+
 
 @router.get("/health", response_model=SystemHealth)
 async def get_system_health() -> SystemHealth:
@@ -119,7 +121,9 @@ async def get_system_health() -> SystemHealth:
                 "available": True,
                 "name": torch.cuda.get_device_name(0),
                 "memory_allocated_gb": round(torch.cuda.memory_allocated() / (1024**3), 2),
-                "memory_total_gb": round(torch.cuda.get_device_properties(0).total_memory / (1024**3), 2),
+                "memory_total_gb": round(
+                    torch.cuda.get_device_properties(0).total_memory / (1024**3), 2
+                ),
             }
     except ImportError:
         pass
@@ -189,7 +193,11 @@ async def execute_terminal_command(cmd: TerminalCommand) -> TerminalResponse:
     cwd = cmd.cwd or str(project_root)
 
     command_str = cmd.command.strip()
-    if not (command_str.startswith("moro") or command_str.startswith("pytest") or command_str.startswith("python")):
+    if not (
+        command_str.startswith("moro")
+        or command_str.startswith("pytest")
+        or command_str.startswith("python")
+    ):
         raise HTTPException(
             status_code=400,
             detail="Security restriction: only 'moro', 'pytest', or 'python' commands can be executed via terminal.",
@@ -267,6 +275,7 @@ async def update_config(config: dict) -> dict:
 # WEBSOCKET ENDPOINTS
 # ===================================================================
 
+
 @router.websocket("/ws/health")
 async def ws_system_health(websocket: WebSocket) -> None:
     """Stream real-time health telemetry over WebSocket."""
@@ -286,11 +295,13 @@ async def ws_system_logs(websocket: WebSocket) -> None:
     await websocket.accept()
     try:
         while True:
-            await websocket.send_json({
-                "timestamp": datetime.now(timezone.utc).isoformat(),
-                "level": "INFO",
-                "message": "Mission Control gateway active. Heartbeat ok.",
-            })
+            await websocket.send_json(
+                {
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                    "level": "INFO",
+                    "message": "Mission Control gateway active. Heartbeat ok.",
+                }
+            )
             await asyncio.sleep(3)
     except WebSocketDisconnect:
         pass

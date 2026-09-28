@@ -16,8 +16,7 @@ def _make_result(
     run_id: str | None = None,
 ) -> EvalResult:
     cases = [
-        CaseScore(case_id=cid, passed=p, score=s)
-        for cid, p, s in zip(case_ids, passed, scores)
+        CaseScore(case_id=cid, passed=p, score=s) for cid, p, s in zip(case_ids, passed, scores)
     ]
     total = len(cases)
     pass_rate = sum(c.passed for c in cases) / total if total else 0.0
@@ -78,7 +77,7 @@ def test_compute_delta_all_cases_compared():
 
     delta = _compute_delta(base, adapter)
 
-    assert delta["improved_cases"] == 1   # c2
+    assert delta["improved_cases"] == 1  # c2
     assert delta["regressed_cases"] == 1  # c3
     assert delta["unchanged_cases"] == 1  # c1
     assert len(delta["improvement_details"]) == 1

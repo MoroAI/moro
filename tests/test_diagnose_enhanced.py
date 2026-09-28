@@ -8,6 +8,7 @@ from moro.diagnose.analyzer import analyze_error
 # Analyzer pattern tests
 # ──────────────────────────────────────────────────────────────────────────────
 
+
 def test_oom_detected():
     diagnosis = analyze_error("RuntimeError: CUDA out of memory trying to allocate 2.5 GiB")
     assert "memory" in diagnosis["issue"].lower()
@@ -46,6 +47,7 @@ def test_empty_error_handled():
 # ──────────────────────────────────────────────────────────────────────────────
 # Log scanner tests
 # ──────────────────────────────────────────────────────────────────────────────
+
 
 def test_log_scanner_finds_traceback(tmp_path: Path):
     from moro.cli.diagnose import _extract_error_from_log

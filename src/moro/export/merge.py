@@ -48,7 +48,9 @@ def merge_adapter_into_base(
 
     adapter_cfg_path = adapter_path / "adapter_config.json"
     if not adapter_cfg_path.exists():
-        raise ExportError(f"Not a valid adapter directory (missing adapter_config.json): {adapter_path}")
+        raise ExportError(
+            f"Not a valid adapter directory (missing adapter_config.json): {adapter_path}"
+        )
 
     from moro.models.loading import model_load_options, resolve_model_reference
 
@@ -66,7 +68,9 @@ def merge_adapter_into_base(
         "float32": torch.float32,
     }
     if torch_dtype not in dtype_map:
-        raise ExportError(f"Invalid torch_dtype: {torch_dtype}. Choose auto, float16, bfloat16, or float32.")
+        raise ExportError(
+            f"Invalid torch_dtype: {torch_dtype}. Choose auto, float16, bfloat16, or float32."
+        )
     dtype = dtype_map[torch_dtype]
 
     model_kwargs = {**load_opts}

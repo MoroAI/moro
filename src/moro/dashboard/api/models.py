@@ -26,6 +26,7 @@ router = APIRouter(prefix="/api/models", tags=["models"])
 # MODELS
 # ===================================================================
 
+
 class ModelInfo(BaseModel):
     """Information about a model in the registry."""
 
@@ -47,6 +48,7 @@ class ModelInfo(BaseModel):
 # ===================================================================
 # HELPER FUNCTIONS
 # ===================================================================
+
 
 def _get_models_from_releases(project_root: Path) -> list[dict]:
     """Scan releases/ directory on filesystem."""
@@ -72,21 +74,23 @@ def _get_models_from_releases(project_root: Path) -> list[dict]:
 
             pass_rate = eval_results.get("pass_rate") if isinstance(eval_results, dict) else None
 
-            models.append({
-                "model_id": f"mod_{rel_dir.name}",
-                "model_name": f"moro-{rel_dir.name}",
-                "version": rel_dir.name,
-                "base_model": "Qwen/Qwen2.5-1.5B-Instruct",
-                "quantization": "nf4",
-                "adapter_type": "lora",
-                "lora_rank": 16,
-                "eval_pass_rate": pass_rate or 0.88,
-                "eval_delta": round((pass_rate or 0.88) - 0.75, 3),
-                "status": "released",
-                "is_production": False,
-                "trained_at": created_at,
-                "deployed_at": None,
-            })
+            models.append(
+                {
+                    "model_id": f"mod_{rel_dir.name}",
+                    "model_name": f"moro-{rel_dir.name}",
+                    "version": rel_dir.name,
+                    "base_model": "Qwen/Qwen2.5-1.5B-Instruct",
+                    "quantization": "nf4",
+                    "adapter_type": "lora",
+                    "lora_rank": 16,
+                    "eval_pass_rate": pass_rate or 0.88,
+                    "eval_delta": round((pass_rate or 0.88) - 0.75, 3),
+                    "status": "released",
+                    "is_production": False,
+                    "trained_at": created_at,
+                    "deployed_at": None,
+                }
+            )
 
     return models
 
@@ -94,6 +98,7 @@ def _get_models_from_releases(project_root: Path) -> list[dict]:
 # ===================================================================
 # ENDPOINTS
 # ===================================================================
+
 
 @router.get("/", response_model=list[ModelInfo])
 async def list_models(status: str | None = None, production_only: bool = False) -> list[ModelInfo]:
@@ -107,7 +112,9 @@ async def list_models(status: str | None = None, production_only: bool = False) 
             from moro.state.manager import StateManager
 
             state_manager = StateManager(db_path)
-            registered_models = state_manager.list_models(status=status, production_only=production_only)
+            registered_models = state_manager.list_models(
+                status=status, production_only=production_only
+            )
         except Exception:
             pass
 
@@ -123,21 +130,23 @@ async def list_models(status: str | None = None, production_only: bool = False) 
 
     # If still empty, add default candidate model for immediate preview
     if not registered_models:
-        registered_models.append({
-            "model_id": "mod_default_v010",
-            "model_name": "moro-qwen-instruct-v0.1.0",
-            "version": "v0.1.0",
-            "base_model": "Qwen/Qwen2.5-1.5B-Instruct",
-            "quantization": "nf4",
-            "adapter_type": "lora",
-            "lora_rank": 16,
-            "eval_pass_rate": 0.85,
-            "eval_delta": 0.12,
-            "status": "released",
-            "is_production": True,
-            "trained_at": datetime.now(timezone.utc).isoformat(),
-            "deployed_at": None,
-        })
+        registered_models.append(
+            {
+                "model_id": "mod_default_v010",
+                "model_name": "moro-qwen-instruct-v0.1.0",
+                "version": "v0.1.0",
+                "base_model": "Qwen/Qwen2.5-1.5B-Instruct",
+                "quantization": "nf4",
+                "adapter_type": "lora",
+                "lora_rank": 16,
+                "eval_pass_rate": 0.85,
+                "eval_delta": 0.12,
+                "status": "released",
+                "is_production": True,
+                "trained_at": datetime.now(timezone.utc).isoformat(),
+                "deployed_at": None,
+            }
+        )
 
     return [ModelInfo(**m) for m in registered_models]
 
@@ -225,8 +234,12 @@ async def delete_model(model_id: str) -> dict:
 async def compare_models(model_a_id: str, model_b_id: str) -> dict:
     """Compare two models side-by-side with automatic winner evaluation."""
     all_models = await list_models()
-    model_a = next((m for m in all_models if m.model_id == model_a_id or m.version == model_a_id), None)
-    model_b = next((m for m in all_models if m.model_id == model_b_id or m.version == model_b_id), None)
+    model_a = next(
+        (m for m in all_models if m.model_id == model_a_id or m.version == model_a_id), None
+    )
+    model_b = next(
+        (m for m in all_models if m.model_id == model_b_id or m.version == model_b_id), None
+    )
 
     if not model_a or not model_b:
         raise HTTPException(status_code=404, detail="One or both models not found for comparison")

@@ -43,7 +43,9 @@ def _get_db_path(db_option: Path | None) -> Path:
 
 @app.command("status")
 def flywheel_status(
-    db_path: Path | None = typer.Option(None, "--db", help="Path to production logs SQLite database."),
+    db_path: Path | None = typer.Option(
+        None, "--db", help="Path to production logs SQLite database."
+    ),
     json_output: bool = typer.Option(False, "--json", help="Output stats as JSON."),
 ) -> None:
     """View production log queue and flywheel statistics."""
@@ -75,8 +77,12 @@ def flywheel_status(
 
 @app.command("ingest")
 def flywheel_ingest(
-    jsonl_path: Path = typer.Argument(..., help="Path to raw JSONL file containing production logs.", exists=True),
-    db_path: Path | None = typer.Option(None, "--db", help="Path to production logs SQLite database."),
+    jsonl_path: Path = typer.Argument(
+        ..., help="Path to raw JSONL file containing production logs.", exists=True
+    ),
+    db_path: Path | None = typer.Option(
+        None, "--db", help="Path to production logs SQLite database."
+    ),
 ) -> None:
     """Import raw production logs into the SQLite database."""
     try:
@@ -87,7 +93,9 @@ def flywheel_ingest(
         with console.status("[cyan]Ingesting production logs…[/cyan]"):
             count = ingestor.insert_logs_from_jsonl(jsonl_path)
 
-        console.print(f"[bold green]✓[/bold green] Ingested [bold]{count}[/bold] production logs into {resolved_db}")
+        console.print(
+            f"[bold green]✓[/bold green] Ingested [bold]{count}[/bold] production logs into {resolved_db}"
+        )
     except Exception as exc:
         console.print(f"[bold red]Ingest error:[/bold red] {exc}")
         raise typer.Exit(code=1)
@@ -95,9 +103,15 @@ def flywheel_ingest(
 
 @app.command("run")
 def flywheel_run(
-    db_path: Path | None = typer.Option(None, "--db", help="Path to production logs SQLite database."),
-    min_pairs: int = typer.Option(1, "--min-pairs", help="Minimum pairs needed to generate an epoch."),
-    output_dir: Path | None = typer.Option(None, "--output-dir", help="Directory to save DPO dataset."),
+    db_path: Path | None = typer.Option(
+        None, "--db", help="Path to production logs SQLite database."
+    ),
+    min_pairs: int = typer.Option(
+        1, "--min-pairs", help="Minimum pairs needed to generate an epoch."
+    ),
+    output_dir: Path | None = typer.Option(
+        None, "--output-dir", help="Directory to save DPO dataset."
+    ),
     json_output: bool = typer.Option(False, "--json", help="Output execution summary as JSON."),
 ) -> None:
     """Execute a continuous learning cycle: extract preference pairs and compile DPO dataset."""
@@ -122,8 +136,12 @@ def flywheel_run(
             return
 
         if summary.pairs_generated == 0:
-            console.print("[yellow]No eligible logs or feedback found to extract preference pairs.[/yellow]")
-            console.print("Ingest logs with [bold]moro flywheel ingest[/bold] or run [bold]moro flywheel serve[/bold].")
+            console.print(
+                "[yellow]No eligible logs or feedback found to extract preference pairs.[/yellow]"
+            )
+            console.print(
+                "Ingest logs with [bold]moro flywheel ingest[/bold] or run [bold]moro flywheel serve[/bold]."
+            )
             return
 
         console.print(
@@ -152,7 +170,9 @@ def flywheel_run(
 
 @app.command("history")
 def flywheel_history(
-    db_path: Path | None = typer.Option(None, "--db", help="Path to production logs SQLite database."),
+    db_path: Path | None = typer.Option(
+        None, "--db", help="Path to production logs SQLite database."
+    ),
     limit: int = typer.Option(10, "--limit", help="Max epochs to display."),
     json_output: bool = typer.Option(False, "--json", help="Output history as JSON."),
 ) -> None:
@@ -194,8 +214,12 @@ def flywheel_history(
 def flywheel_serve(
     host: str = typer.Option("127.0.0.1", "--host", help="Host address."),
     port: int = typer.Option(8001, "--port", help="Port number."),
-    api_key: str | None = typer.Option(None, "--api-key", help="Optional API key for webhook auth."),
-    db_path: Path | None = typer.Option(None, "--db", help="Path to production logs SQLite database."),
+    api_key: str | None = typer.Option(
+        None, "--api-key", help="Optional API key for webhook auth."
+    ),
+    db_path: Path | None = typer.Option(
+        None, "--db", help="Path to production logs SQLite database."
+    ),
 ) -> None:
     """Start the FastAPI webhook receiver for production chat UIs."""
     try:

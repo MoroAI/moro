@@ -1,6 +1,5 @@
 """Tests for the epistemic quality engine (IT metrics)."""
 
-
 from collections import Counter
 
 from moro.data.models import DatasetMessage, DatasetRow
@@ -29,6 +28,7 @@ def _make_row(user: str, asst: str) -> DatasetRow:
 # Zlib Entropy Tests
 # ──────────────────────────────────────────────────────────────────────────────
 
+
 class TestZlibEntropy:
     def test_empty_text_returns_zero(self):
         assert calculate_zlib_entropy("") == 0.0
@@ -46,6 +46,7 @@ class TestZlibEntropy:
         """Random character string should have high compression ratio."""
         import random
         import string
+
         rng = random.Random(42)
         random_text = "".join(rng.choices(string.printable, k=200))
         entropy = calculate_zlib_entropy(random_text)
@@ -74,6 +75,7 @@ class TestZlibEntropy:
 # ──────────────────────────────────────────────────────────────────────────────
 # PPMI Proxy Tests
 # ──────────────────────────────────────────────────────────────────────────────
+
 
 class TestDomainPPMI:
     def test_empty_glossary_returns_zero(self):
@@ -104,6 +106,7 @@ class TestDomainPPMI:
 # Resnik IC Tests
 # ──────────────────────────────────────────────────────────────────────────────
 
+
 class TestResnikIC:
     def test_empty_text_returns_zero(self):
         counts = Counter({"hello": 5})
@@ -131,6 +134,7 @@ class TestResnikIC:
 # ──────────────────────────────────────────────────────────────────────────────
 # MI Guard Classification Tests
 # ──────────────────────────────────────────────────────────────────────────────
+
 
 class TestMIGuardClassification:
     def test_duplicate_always_boilerplate(self):
@@ -177,9 +181,12 @@ class TestMIGuardClassification:
 # Full Epistemic Scoring Integration
 # ──────────────────────────────────────────────────────────────────────────────
 
+
 class TestEpistemicScoring:
     def test_score_row_epistemic_returns_metadata(self):
-        row = _make_row("What is acetaminophen?", "Acetaminophen is a pain reliever and fever reducer.")
+        row = _make_row(
+            "What is acetaminophen?", "Acetaminophen is a pain reliever and fever reducer."
+        )
         metadata = score_row_epistemic(
             row=row,
             domain_glossary={"acetaminophen"},

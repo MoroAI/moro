@@ -10,19 +10,41 @@ def test_state_graph_lineage_flow(tmp_path: Path):
     manager = StateGraphManager(db_file)
 
     # 1. Record raw source
-    manager.record_node("raw_support_001", "raw_source", name="support_v1.jsonl", metadata={"rows": 100})
+    manager.record_node(
+        "raw_support_001", "raw_source", name="support_v1.jsonl", metadata={"rows": 100}
+    )
 
     # 2. Record dataset version
-    manager.record_node("ds_ver_001", "dataset_version", parent_id="raw_support_001", name="clean_train_v1", metadata={"train_split": 80})
+    manager.record_node(
+        "ds_ver_001",
+        "dataset_version",
+        parent_id="raw_support_001",
+        name="clean_train_v1",
+        metadata={"train_split": 80},
+    )
 
     # 3. Record training run
-    manager.record_node("run_qwen_lora", "training_run", parent_id="ds_ver_001", name="qwen-lora-v1", metadata={"loss": 1.2})
+    manager.record_node(
+        "run_qwen_lora",
+        "training_run",
+        parent_id="ds_ver_001",
+        name="qwen-lora-v1",
+        metadata={"loss": 1.2},
+    )
 
     # 4. Record eval
-    manager.record_node("eval_qwen_001", "eval_result", parent_id="run_qwen_lora", name="eval-golden-v1", metadata={"pass_rate": 0.98})
+    manager.record_node(
+        "eval_qwen_001",
+        "eval_result",
+        parent_id="run_qwen_lora",
+        name="eval-golden-v1",
+        metadata={"pass_rate": 0.98},
+    )
 
     # 5. Record release
-    manager.record_node("rel_qwen_prod", "release", parent_id="eval_qwen_001", name="release-prod-v1")
+    manager.record_node(
+        "rel_qwen_prod", "release", parent_id="eval_qwen_001", name="release-prod-v1"
+    )
 
     # Verify Ancestry Trace
     ancestors = manager.get_ancestors("rel_qwen_prod")

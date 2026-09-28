@@ -197,7 +197,9 @@ class MoroAIFlywheelOrchestrator:
                 f.write(json.dumps(payload) + "\n")
         return path
 
-    def _record_epoch_in_db(self, epoch_id: str, pairs: list[PreferencePair], dataset_path: Path) -> None:
+    def _record_epoch_in_db(
+        self, epoch_id: str, pairs: list[PreferencePair], dataset_path: Path
+    ) -> None:
         db_path = getattr(self.ingestor, "db_path", None)
         if not db_path:
             return

@@ -52,7 +52,9 @@ def export_command(
         cfg = load_project_config()
 
         if format not in _FORMATS:
-            raise ExportError(f"Unsupported export format: {format}. Choose from: {', '.join(_FORMATS)}")
+            raise ExportError(
+                f"Unsupported export format: {format}. Choose from: {', '.join(_FORMATS)}"
+            )
 
         selected = resolve_export_run(root, cfg.project.name, run_id)
         gate = check_release_requirements(root, selected, cfg)
@@ -63,7 +65,9 @@ def export_command(
         console.print(f"[cyan]→[/cyan]  Exporting run: [bold]{resolved_run_id}[/bold]")
         console.print(f"[cyan]→[/cyan]  Format: [bold]{format}[/bold]")
         if gate["status"] == "passed":
-            console.print(f"[green]✓[/green] Release gate: passed ({len(gate['evaluations'])} evaluation(s) verified)")
+            console.print(
+                f"[green]✓[/green] Release gate: passed ({len(gate['evaluations'])} evaluation(s) verified)"
+            )
         else:
             console.print("[dim]ℹ  Release gate: not required[/dim]")
 

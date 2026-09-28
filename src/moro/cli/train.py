@@ -124,7 +124,9 @@ def train_command(
             exp_id = tracker.create_experiment(
                 name=run_name or f"run_{run_id}",
                 base_model=cfg.model.name,
-                dataset_id=dataset_row.get("version_id") if isinstance(dataset_row, dict) else getattr(dataset_row, "version_id", None),
+                dataset_id=dataset_row.get("version_id")
+                if isinstance(dataset_row, dict)
+                else getattr(dataset_row, "version_id", None),
                 dataset_name=str(train_path),
                 state_node_id=run_id,
             )
@@ -133,7 +135,9 @@ def train_command(
                 hyperparameters={
                     "learning_rate": getattr(cfg.training, "learning_rate", None),
                     "batch_size": getattr(cfg.training, "batch_size", None),
-                    "gradient_accumulation_steps": getattr(cfg.training, "gradient_accumulation_steps", None),
+                    "gradient_accumulation_steps": getattr(
+                        cfg.training, "gradient_accumulation_steps", None
+                    ),
                     "epochs": getattr(cfg.training, "epochs", None),
                     "warmup_ratio": getattr(cfg.training, "warmup_ratio", None),
                     "weight_decay": getattr(cfg.training, "weight_decay", None),

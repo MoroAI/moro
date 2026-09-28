@@ -87,7 +87,9 @@ def test_equal_quality_threshold_is_inclusive():
 
 def test_epistemic_scoring_attaches_metadata():
     """Epistemic scoring should attach full DatasetRowMetadata to valid rows."""
-    row = _make_row("What is the dosage for ibuprofen?", "Adults: 200–400mg every 4–6 hours as needed.")
+    row = _make_row(
+        "What is the dosage for ibuprofen?", "Adults: 200–400mg every 4–6 hours as needed."
+    )
     valid, _, _, _ = clean_rows([row], use_epistemic_scoring=True)
     assert len(valid) == 1
     assert valid[0].metadata is not None
@@ -140,4 +142,3 @@ def test_mi_guard_preserves_high_ppmi_row():
         f"(normalized_ppmi={normalized_ppmi:.3f})"
     )
     assert mi_guard is True, "MI Guard override should be True for noisy-but-valuable rows"
-

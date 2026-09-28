@@ -38,6 +38,7 @@ class DeploymentManager:
         progress_callback: Callable[[str, float | None], None] | None = None,
     ) -> dict[str, Any]:
         """Deploy a release to the specified target environment."""
+
         def report(msg: str, pct: float | None = None) -> None:
             if progress_callback:
                 progress_callback(msg, pct)

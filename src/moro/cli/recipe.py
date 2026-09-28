@@ -140,9 +140,7 @@ def suggest_command(
         mix_table.add_row("Model size", f"{param_b:.1f}B")
         console.print()
         console.print(mix_table)
-        console.print(
-            f"[dim]  {mixing.reasoning}[/dim]"
-        )
+        console.print(f"[dim]  {mixing.reasoning}[/dim]")
 
     console.print(
         "\n[dim]Apply this recipe: [bold]moro recipe apply[/bold] then [bold]moro train[/bold][/dim]"
@@ -153,7 +151,9 @@ def suggest_command(
 def apply_command(
     config_path: Path | None = typer.Option(None, "--config", help="Use an explicit moro.yaml."),
     model: str | None = typer.Option(None, "--model", help="Override the suggested model name."),
-    target_vram: float | None = typer.Option(None, "--target-vram", min=0, help="Override VRAM budget in GB."),
+    target_vram: float | None = typer.Option(
+        None, "--target-vram", min=0, help="Override VRAM budget in GB."
+    ),
     max_seq_length: int | None = typer.Option(None, "--max-seq-length", min=16, max=32768),
     yes: bool = typer.Option(False, "--yes", "-y", help="Skip confirmation prompt."),
 ) -> None:
@@ -209,6 +209,8 @@ def apply_command(
             current[section].update(values)
         else:
             current[section] = values
-    cfg_file.write_text(yaml.safe_dump(current, sort_keys=False, allow_unicode=True), encoding="utf-8")
+    cfg_file.write_text(
+        yaml.safe_dump(current, sort_keys=False, allow_unicode=True), encoding="utf-8"
+    )
     console.print(f"[green]✓[/green] [bold]{cfg_file}[/bold] updated.")
     console.print("\n[bold]Next steps:[/bold] Run [bold]moro train[/bold]")

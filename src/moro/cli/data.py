@@ -79,7 +79,11 @@ def build_command(
 
         # 3. Clean + deduplicate (with epistemic scoring & MI Guard)
         glossary_path = root / "domain_glossary.txt"
-        if not glossary_path.exists() and hasattr(cfg.dataset, "domain_glossary") and cfg.dataset.domain_glossary:
+        if (
+            not glossary_path.exists()
+            and hasattr(cfg.dataset, "domain_glossary")
+            and cfg.dataset.domain_glossary
+        ):
             glossary_path = root / cfg.dataset.domain_glossary
 
         with console.status("[cyan]Cleaning, scoring epistemically, and deduplicating…[/cyan]"):

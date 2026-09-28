@@ -269,6 +269,7 @@ class ServiceOrchestrator:
             conn.close()
         except Exception:
             pass
+
     # ===================================================================
     # SERVICE CONTROL OPERATIONS
     # ===================================================================
@@ -282,16 +283,18 @@ class ServiceOrchestrator:
             healthy = self._check_health(service) if running else False
 
             service_type = "docker" if name == "ollama" and not pid else service.service_type
-            items.append({
-                "name": name,
-                "type": service_type,
-                "port": service.port,
-                "url": f"http://localhost:{service.port}" if service.port else "",
-                "running": running,
-                "healthy": healthy,
-                "pid": pid,
-                "description": service.description,
-            })
+            items.append(
+                {
+                    "name": name,
+                    "type": service_type,
+                    "port": service.port,
+                    "url": f"http://localhost:{service.port}" if service.port else "",
+                    "running": running,
+                    "healthy": healthy,
+                    "pid": pid,
+                    "description": service.description,
+                }
+            )
         return ServiceStatusList(items)
 
     def start_service(self, name: str) -> bool:
@@ -305,7 +308,9 @@ class ServiceOrchestrator:
 
         # Check if already running on designated port
         if service.port and is_port_open(service.port):
-            self._register_service_state(service, "running", pid=self._read_pid(name), health_status="healthy")
+            self._register_service_state(
+                service, "running", pid=self._read_pid(name), health_status="healthy"
+            )
             return True
 
         # Special handling for Ollama (supports Docker container)
@@ -346,7 +351,9 @@ class ServiceOrchestrator:
             time.sleep(1.5)
             running = (service.port and is_port_open(service.port)) or (proc.poll() is None)
             health = "healthy" if self._check_health(service) else "starting"
-            self._register_service_state(service, "running" if running else "failed", pid=proc.pid, health_status=health)
+            self._register_service_state(
+                service, "running" if running else "failed", pid=proc.pid, health_status=health
+            )
             return running
         except Exception as e:
             console.print(f"[red]Failed to start {name}: {e}[/red]")
@@ -475,7 +482,9 @@ class ServiceOrchestrator:
 
     def supervise(self) -> None:
         """Main supervision loop that monitors and auto-restarts services if they crash."""
-        console.print("[cyan]Starting service supervisor loop (Press Ctrl+C to terminate)...[/cyan]")
+        console.print(
+            "[cyan]Starting service supervisor loop (Press Ctrl+C to terminate)...[/cyan]"
+        )
         try:
             while True:
                 for service_name, proc in list(self._processes.items()):
@@ -494,7 +503,9 @@ class ServiceOrchestrator:
                                 console.print(
                                     f"[red]Service '{service_name}' exceeded maximum restart attempts.[/red]"
                                 )
-                                self._register_service_state(service, "failed", health_status="crashed")
+                                self._register_service_state(
+                                    service, "failed", health_status="crashed"
+                                )
                                 del self._processes[service_name]
                 time.sleep(4)
         except KeyboardInterrupt:

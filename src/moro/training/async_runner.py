@@ -40,6 +40,7 @@ class AsyncTrainingRunner:
         This wraps training execution in an async interface that can
         report progress to the orchestrator and log to the experiment tracker.
         """
+
         def report(msg: str, pct: float | None = None) -> None:
             if progress_callback:
                 progress_callback(msg, pct)

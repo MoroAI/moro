@@ -76,39 +76,50 @@ def scan_command(
                         flag_counts[flag_name] = flag_counts.get(flag_name, 0) + len(matches)
                         found_in_line.append(flag_name)
                 if found_in_line:
-                    leaks.append({
-                        "line": line_no,
-                        "types": found_in_line,
-                        "snippet": line.strip()[:80] + ("…" if len(line.strip()) > 80 else ""),
-                    })
+                    leaks.append(
+                        {
+                            "line": line_no,
+                            "types": found_in_line,
+                            "snippet": line.strip()[:80] + ("…" if len(line.strip()) > 80 else ""),
+                        }
+                    )
 
         total_leaks = sum(flag_counts.values())
 
         if json_output:
-            typer.echo(json.dumps({
-                "target": str(target),
-                "total_lines": total_lines,
-                "total_leaks": total_leaks,
-                "flag_counts": flag_counts,
-                "leaks": leaks[:100],
-            }, indent=2))
+            typer.echo(
+                json.dumps(
+                    {
+                        "target": str(target),
+                        "total_lines": total_lines,
+                        "total_leaks": total_leaks,
+                        "flag_counts": flag_counts,
+                        "leaks": leaks[:100],
+                    },
+                    indent=2,
+                )
+            )
             return
 
         if not leaks:
-            console.print(Panel(
-                f"[bold green]✓ No PII or secrets detected across {total_lines} lines.[/bold green]\n"
-                "Dataset is safe for training.",
-                title="Privacy Guard Clean",
-                border_style="green",
-            ))
+            console.print(
+                Panel(
+                    f"[bold green]✓ No PII or secrets detected across {total_lines} lines.[/bold green]\n"
+                    "Dataset is safe for training.",
+                    title="Privacy Guard Clean",
+                    border_style="green",
+                )
+            )
             return
 
-        console.print(Panel(
-            f"[bold red]⚠  {total_leaks} potential PII/secret matches found across {len(leaks)} lines.[/bold red]\n"
-            "Use [bold]moro guard redact[/bold] to clean these before training or publishing.",
-            title="Privacy Guard Alert",
-            border_style="red",
-        ))
+        console.print(
+            Panel(
+                f"[bold red]⚠  {total_leaks} potential PII/secret matches found across {len(leaks)} lines.[/bold red]\n"
+                "Use [bold]moro guard redact[/bold] to clean these before training or publishing.",
+                title="Privacy Guard Alert",
+                border_style="red",
+            )
+        )
 
         table = Table(title="Detected Leak Summary", show_header=True)
         table.add_column("Category", style="cyan")
@@ -130,7 +141,9 @@ def scan_command(
 
             console.print(sample_table)
             if len(leaks) > 10:
-                console.print(f"[dim]... and {len(leaks) - 10} more lines with potential leaks.[/dim]")
+                console.print(
+                    f"[dim]... and {len(leaks) - 10} more lines with potential leaks.[/dim]"
+                )
 
     except (ProjectError, DatasetError) as exc:
         console.print(f"[bold red]Error:[/bold red] {exc}")

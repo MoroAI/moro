@@ -2,7 +2,6 @@
 Tests for Flywheel Ingestor and Orchestrator.
 """
 
-
 from moro.flywheel.ingestors.sqlite_ingestor import SQLiteLogIngestor
 from moro.flywheel.models import InferenceLogPayload
 from moro.flywheel.orchestrator import FlywheelConfig, MoroAIFlywheelOrchestrator

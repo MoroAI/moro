@@ -16,8 +16,10 @@ from pydantic import BaseModel, Field, model_validator
 # Epistemic Quality Sub-Models
 # ──────────────────────────────────────────────────────────────────────────────
 
+
 class QualityScoreBreakdown(BaseModel):
     """Weighted quality components (heuristic layer)."""
+
     completeness: float = Field(default=1.0, ge=0.0, le=1.0)
     length_sanity: float = Field(default=1.0, ge=0.0, le=1.0)
     low_repetition: float = Field(default=1.0, ge=0.0, le=1.0)
@@ -27,6 +29,7 @@ class QualityScoreBreakdown(BaseModel):
 
 class DomainQualityScores(BaseModel):
     """Domain-specific trust dimensions."""
+
     factual_grounding_score: float = Field(default=1.0, ge=0.0, le=1.0)
     logical_coherence_score: float = Field(default=1.0, ge=0.0, le=1.0)
     instruction_strictness_score: float = Field(default=1.0, ge=0.0, le=1.0)
@@ -41,10 +44,17 @@ class InformationTheoreticMetrics(BaseModel):
     - resnik_ic: proxy for Resnik Information Content (IDF of rarest token).
     - local_vector_density: proxy for neighbourhood isolation (MinHash Jaccard, future).
     """
-    zlib_entropy: float = Field(default=0.0, ge=0.0, description="Zlib compression ratio proxy for perplexity")
-    max_ppmi: float = Field(default=0.0, ge=0.0, description="Domain glossary intersection density (PPMI proxy)")
+
+    zlib_entropy: float = Field(
+        default=0.0, ge=0.0, description="Zlib compression ratio proxy for perplexity"
+    )
+    max_ppmi: float = Field(
+        default=0.0, ge=0.0, description="Domain glossary intersection density (PPMI proxy)"
+    )
     resnik_ic: float = Field(default=0.0, ge=0.0, description="Rarest-token IDF (Resnik IC proxy)")
-    local_vector_density: float = Field(default=0.5, ge=0.0, le=1.0, description="MinHash Jaccard density (outlier proxy)")
+    local_vector_density: float = Field(
+        default=0.5, ge=0.0, le=1.0, description="MinHash Jaccard density (outlier proxy)"
+    )
 
     @property
     def ppmi_score(self) -> float:
@@ -70,6 +80,7 @@ class DatasetRowMetadata(BaseModel):
     This replaces the loose `dict[str, Any]` metadata field with a
     typed schema that enforces information-theoretic consistency.
     """
+
     domain: Literal["general", "medical", "legal", "financial", "code", "cybersecurity"] = "general"
     language: str = "en"
     token_count: int = Field(default=0, ge=0)
@@ -113,6 +124,7 @@ class DatasetRowMetadata(BaseModel):
 # Core Row Model
 # ──────────────────────────────────────────────────────────────────────────────
 
+
 class DatasetMessage(BaseModel):
     role: Literal["system", "user", "assistant"]
     content: str
@@ -142,6 +154,7 @@ class InvalidRow(BaseModel):
 # ──────────────────────────────────────────────────────────────────────────────
 # Dataset Statistics
 # ──────────────────────────────────────────────────────────────────────────────
+
 
 class DatasetStats(BaseModel):
     rows_total: int = 0

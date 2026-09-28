@@ -37,6 +37,7 @@ class EvalHarness:
         progress_callback: Callable[[str, float | None], None] | None = None,
     ) -> dict[str, Any]:
         """Execute evaluation suite asynchronously with live progress reporting."""
+
         def report(msg: str, pct: float | None = None) -> None:
             if progress_callback:
                 progress_callback(msg, pct)

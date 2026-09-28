@@ -20,20 +20,26 @@ console = Console()
 
 
 def validate_command(
-    config_path: Path | None = typer.Option(None, "--config", "-c", help="Explicit path to moro.yaml."),
+    config_path: Path | None = typer.Option(
+        None, "--config", "-c", help="Explicit path to moro.yaml."
+    ),
     json_output: bool = typer.Option(False, "--json", help="Output results as JSON."),
 ) -> None:
     """Run pre-flight validation on the project configuration and environment."""
     root = find_project_root()
     if not root and not config_path:
-        console.print("[bold red]Error:[/bold red] No moro.yaml found. Run [bold]moro init[/bold] first.")
+        console.print(
+            "[bold red]Error:[/bold red] No moro.yaml found. Run [bold]moro init[/bold] first."
+        )
         raise typer.Exit(code=1)
 
     resolved_root = root or config_path.parent  # type: ignore
     resolved_cfg_file = config_path or (resolved_root / CONFIG_FILE)
 
     if not resolved_cfg_file.exists():
-        console.print(f"[bold red]Error:[/bold red] Configuration file not found: {resolved_cfg_file}")
+        console.print(
+            f"[bold red]Error:[/bold red] Configuration file not found: {resolved_cfg_file}"
+        )
         raise typer.Exit(code=1)
 
     try:
@@ -71,9 +77,15 @@ def validate_command(
 
     if report.passed:
         if report.warning_count > 0:
-            console.print(f"\n[green]✓ Project ready with [yellow]{report.warning_count} non-blocking warnings[/yellow].[/green]")
+            console.print(
+                f"\n[green]✓ Project ready with [yellow]{report.warning_count} non-blocking warnings[/yellow].[/green]"
+            )
         else:
-            console.print("\n[bold green]✓ All pre-flight checks passed! Project is 100% ready for training and release.[/bold green]")
+            console.print(
+                "\n[bold green]✓ All pre-flight checks passed! Project is 100% ready for training and release.[/bold green]"
+            )
     else:
-        console.print(f"\n[bold red]✗ Pre-flight validation failed with {report.error_count} errors.[/bold red]")
+        console.print(
+            f"\n[bold red]✗ Pre-flight validation failed with {report.error_count} errors.[/bold red]"
+        )
         raise typer.Exit(code=1)

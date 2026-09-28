@@ -34,7 +34,9 @@ hooks_app = typer.Typer(
 
 @hooks_app.command("install")
 def install_hooks(
-    force: bool = typer.Option(False, "--force", "-f", help="Reinstall even if hooks already exist."),
+    force: bool = typer.Option(
+        False, "--force", "-f", help="Reinstall even if hooks already exist."
+    ),
 ) -> None:
     """
     Install MoroAI safety and alignment pre-commit hooks.
@@ -74,7 +76,9 @@ def install_hooks(
     if not safety_script.exists():
         scripts_dir.mkdir(parents=True, exist_ok=True)
         # Create minimal self-contained scanner if not already copied
-        src_script = Path(__file__).resolve().parents[3] / "scripts" / "hooks" / "pre_commit_safety_check.py"
+        src_script = (
+            Path(__file__).resolve().parents[3] / "scripts" / "hooks" / "pre_commit_safety_check.py"
+        )
         if src_script.exists():
             safety_script.write_text(src_script.read_text(encoding="utf-8"), encoding="utf-8")
 
@@ -99,8 +103,7 @@ def install_hooks(
         if git_hooks_dir.exists():
             direct_hook = git_hooks_dir / "pre-commit"
             direct_hook.write_text(
-                "#!/bin/sh\n"
-                "python scripts/hooks/pre_commit_safety_check.py\n",
+                "#!/bin/sh\npython scripts/hooks/pre_commit_safety_check.py\n",
                 encoding="utf-8",
             )
             direct_hook.chmod(0o755)
@@ -152,9 +155,7 @@ def check_hooks(
 
     script = root / "scripts" / "hooks" / "pre_commit_safety_check.py"
     if not script.exists():
-        console.print(
-            f"[bold red]Error:[/bold red] Safety check script not found at {script}"
-        )
+        console.print(f"[bold red]Error:[/bold red] Safety check script not found at {script}")
         raise typer.Exit(code=1)
 
     console.print("[cyan]Running MoroAI safety scan on all tracked files…[/cyan]\n")

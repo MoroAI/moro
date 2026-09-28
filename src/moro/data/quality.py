@@ -41,6 +41,7 @@ from moro.data.models import (
 # Information-Theoretic Metric Proxies
 # ──────────────────────────────────────────────────────────────────────────────
 
+
 def calculate_zlib_entropy(text: str) -> float:
     """
     Proxy for Perplexity / Information Density via zlib compression ratio.
@@ -114,6 +115,7 @@ def calculate_resnik_ic(
 # Basic Quality Breakdown (heuristic layer)
 # ──────────────────────────────────────────────────────────────────────────────
 
+
 def compute_basic_quality_breakdown(row: DatasetRow) -> QualityScoreBreakdown:
     """Compute foundational heuristic quality scores."""
     roles = {msg.role for msg in row.messages}
@@ -154,10 +156,10 @@ def compute_basic_quality_breakdown(row: DatasetRow) -> QualityScoreBreakdown:
 # ──────────────────────────────────────────────────────────────────────────────
 
 # Tunable thresholds (can later be exposed in moro.yaml)
-_HIGH_ENTROPY_THRESHOLD = 0.45   # Above this → likely gibberish/HTML
-_LOW_ENTROPY_THRESHOLD = 0.15    # Below this → repetitive boilerplate
-_HIGH_PPMI_THRESHOLD = 0.5       # Strong domain signal (PPMI > 0.5 after normalization)
-_HIGH_IC_THRESHOLD = 8.0         # Very rare concept (Resnik IC > 8.0)
+_HIGH_ENTROPY_THRESHOLD = 0.45  # Above this → likely gibberish/HTML
+_LOW_ENTROPY_THRESHOLD = 0.15  # Below this → repetitive boilerplate
+_HIGH_PPMI_THRESHOLD = 0.5  # Strong domain signal (PPMI > 0.5 after normalization)
+_HIGH_IC_THRESHOLD = 8.0  # Very rare concept (Resnik IC > 8.0)
 
 
 def classify_row(
@@ -211,6 +213,7 @@ def classify_row(
 # Composite Scoring (backward-compatible entry point)
 # ──────────────────────────────────────────────────────────────────────────────
 
+
 def approximate_token_count(messages: list[DatasetMessage]) -> int:
     """
     Fast token approximation using word splitting.
@@ -258,12 +261,7 @@ def score_row(row: DatasetRow, token_count: int | None = None) -> float:
 
     formatting = 1.0 if all(m.content.strip() for m in row.messages) else 0.0
 
-    score = (
-        0.30 * completeness
-        + 0.25 * length_sanity
-        + 0.25 * repetition_score
-        + 0.20 * formatting
-    )
+    score = 0.30 * completeness + 0.25 * length_sanity + 0.25 * repetition_score + 0.20 * formatting
     return round(max(0.0, min(1.0, score)), 4)
 
 

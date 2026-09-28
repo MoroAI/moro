@@ -12,13 +12,15 @@ def _make_fake_adapter(path: Path, base_model: str = "owner/TestModel") -> Path:
     """Create a minimal fake PEFT adapter directory."""
     path.mkdir(parents=True, exist_ok=True)
     (path / "adapter_config.json").write_text(
-        json.dumps({
-            "peft_type": "LORA",
-            "r": 16,
-            "lora_alpha": 32,
-            "base_model_name_or_path": base_model,
-            "revision": None,
-        }),
+        json.dumps(
+            {
+                "peft_type": "LORA",
+                "r": 16,
+                "lora_alpha": 32,
+                "base_model_name_or_path": base_model,
+                "revision": None,
+            }
+        ),
         encoding="utf-8",
     )
     # Fake weights file
@@ -60,6 +62,7 @@ def test_write_gguf_script_is_executable(tmp_path: Path):
         project_name="test",
     )
     import stat
+
     mode = script.stat().st_mode
     assert mode & stat.S_IXUSR  # owner execute bit set
 

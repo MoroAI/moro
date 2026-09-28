@@ -42,7 +42,9 @@ class SQLiteLogIngestor(AbstractLogIngestor):
         signal_conditions = []
 
         if self.include_corrections:
-            signal_conditions.append("human_correction IS NOT NULL AND length(trim(human_correction)) > 0")
+            signal_conditions.append(
+                "human_correction IS NOT NULL AND length(trim(human_correction)) > 0"
+            )
 
         if self.include_negative:
             signal_conditions.append("user_rating IS NOT NULL AND user_rating < 0")
@@ -221,7 +223,13 @@ class SQLiteLogIngestor(AbstractLogIngestor):
                 rating = data.get("user_rating")
                 if rating is None and "implicit_signal" in data:
                     sig = data["implicit_signal"]
-                    rating = 1.0 if sig == "positive" else -1.0 if sig in ("negative", "regenerate") else None
+                    rating = (
+                        1.0
+                        if sig == "positive"
+                        else -1.0
+                        if sig in ("negative", "regenerate")
+                        else None
+                    )
                 correction = data.get("human_correction")
                 latency = data.get("latency_ms")
 

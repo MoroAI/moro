@@ -29,6 +29,7 @@ router = APIRouter(prefix="/api/datasets", tags=["datasets"])
 # MODELS
 # ===================================================================
 
+
 class DatasetInfo(BaseModel):
     """Information about a dataset."""
 
@@ -65,6 +66,7 @@ class DatasetPreview(BaseModel):
 # ===================================================================
 # HELPER FUNCTIONS
 # ===================================================================
+
 
 def _find_dataset_file(data_dir: Path, dataset_id: str) -> Path | None:
     """Find a dataset file by id or name."""
@@ -109,6 +111,7 @@ def compile_dataset_sync(file_path: Path) -> None:
 # ENDPOINTS
 # ===================================================================
 
+
 @router.get("/", response_model=list[DatasetInfo])
 async def list_datasets() -> list[DatasetInfo]:
     """List all raw and compiled datasets in the project."""
@@ -120,7 +123,12 @@ async def list_datasets() -> list[DatasetInfo]:
 
     if data_dir.exists():
         for file_path in sorted(data_dir.iterdir(), key=lambda p: p.stat().st_mtime, reverse=True):
-            if file_path.is_file() and file_path.suffix.lower() in [".jsonl", ".json", ".csv", ".txt"]:
+            if file_path.is_file() and file_path.suffix.lower() in [
+                ".jsonl",
+                ".json",
+                ".csv",
+                ".txt",
+            ]:
                 # Count rows if small
                 row_count = None
                 try:
@@ -138,7 +146,9 @@ async def list_datasets() -> list[DatasetInfo]:
                         size_bytes=file_path.stat().st_size,
                         format=file_path.suffix.lstrip(".").lower(),
                         row_count=row_count,
-                        created_at=datetime.fromtimestamp(file_path.stat().st_mtime, timezone.utc).isoformat(),
+                        created_at=datetime.fromtimestamp(
+                            file_path.stat().st_mtime, timezone.utc
+                        ).isoformat(),
                         status="uploaded",
                     )
                 )
@@ -161,7 +171,9 @@ async def list_datasets() -> list[DatasetInfo]:
                         size_bytes=file_path.stat().st_size,
                         format="jsonl",
                         row_count=row_count,
-                        created_at=datetime.fromtimestamp(file_path.stat().st_mtime, timezone.utc).isoformat(),
+                        created_at=datetime.fromtimestamp(
+                            file_path.stat().st_mtime, timezone.utc
+                        ).isoformat(),
                         status="compiled",
                     )
                 )
@@ -231,11 +243,13 @@ async def upload_multiple_datasets(
         file_ext = Path(filename).suffix.lower()
 
         if file_ext not in allowed_extensions:
-            results.append({
-                "filename": filename,
-                "status": "skipped",
-                "reason": f"Invalid file type: {file_ext}",
-            })
+            results.append(
+                {
+                    "filename": filename,
+                    "status": "skipped",
+                    "reason": f"Invalid file type: {file_ext}",
+                }
+            )
             continue
 
         file_path = data_dir / filename
@@ -245,11 +259,13 @@ async def upload_multiple_datasets(
         if auto_compile:
             background_tasks.add_task(compile_dataset_sync, file_path)
 
-        results.append({
-            "filename": filename,
-            "status": "uploaded",
-            "size_bytes": file_path.stat().st_size,
-        })
+        results.append(
+            {
+                "filename": filename,
+                "status": "uploaded",
+                "size_bytes": file_path.stat().st_size,
+            }
+        )
 
     return {
         "results": results,

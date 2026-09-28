@@ -23,7 +23,9 @@ app = typer.Typer(
 
 @app.command("list")
 def list_models_command(
-    tag: str | None = typer.Option(None, "--tag", "-t", help="Filter by tag (staging, production, candidate)."),
+    tag: str | None = typer.Option(
+        None, "--tag", "-t", help="Filter by tag (staging, production, candidate)."
+    ),
     json_output: bool = typer.Option(False, "--json", help="Output as JSON."),
 ) -> None:
     """List registered models."""
@@ -104,13 +106,17 @@ def show_model_command(
 @app.command("promote")
 def promote_model_command(
     model_id: str = typer.Argument(..., help="Model ID to promote."),
-    tag: str = typer.Option("production", "--tag", "-t", help="Target tag (e.g. production, staging)."),
+    tag: str = typer.Option(
+        "production", "--tag", "-t", help="Target tag (e.g. production, staging)."
+    ),
 ) -> None:
     """Promote a model to a target tag."""
     registry = ModelRegistry()
     success = registry.promote_model(model_id, target_tag=tag)
     if success:
-        console.print(f"[bold green]✓[/bold green] Promoted model [bold]{model_id}[/bold] to [bold magenta]{tag}[/bold magenta].")
+        console.print(
+            f"[bold green]✓[/bold green] Promoted model [bold]{model_id}[/bold] to [bold magenta]{tag}[/bold magenta]."
+        )
     else:
         console.print(f"[bold red]Error:[/bold red] Model '{model_id}' not found.")
         raise typer.Exit(code=1)
@@ -124,7 +130,9 @@ def delete_model_command(
     registry = ModelRegistry()
     success = registry.delete_model(model_id)
     if success:
-        console.print(f"[bold green]✓[/bold green] Deleted model [bold]{model_id}[/bold] from registry.")
+        console.print(
+            f"[bold green]✓[/bold green] Deleted model [bold]{model_id}[/bold] from registry."
+        )
     else:
         console.print(f"[bold red]Error:[/bold red] Model '{model_id}' not found.")
         raise typer.Exit(code=1)

@@ -121,4 +121,3 @@ def redact_rows(rows: list[DatasetRow]) -> tuple[list[DatasetRow], int]:
         if flags:
             redacted_count += 1
     return rows, redacted_count
-

@@ -109,7 +109,9 @@ def get_db_stats(db_path: Path) -> dict[str, int]:
     conn = get_production_db(db_path)
     try:
         total_logs = conn.execute("SELECT COUNT(*) as cnt FROM inference_logs").fetchone()["cnt"]
-        pending_logs = conn.execute("SELECT COUNT(*) as cnt FROM inference_logs WHERE is_processed = 0").fetchone()["cnt"]
+        pending_logs = conn.execute(
+            "SELECT COUNT(*) as cnt FROM inference_logs WHERE is_processed = 0"
+        ).fetchone()["cnt"]
         processed_logs = total_logs - pending_logs
         total_pairs = conn.execute("SELECT COUNT(*) as cnt FROM preference_pairs").fetchone()["cnt"]
         total_epochs = conn.execute("SELECT COUNT(*) as cnt FROM dpo_epochs").fetchone()["cnt"]

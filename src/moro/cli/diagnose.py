@@ -102,12 +102,17 @@ def diagnose_command(
 
         if json_output:
             diagnosis = analyze_error(error_text)
-            typer.echo(json.dumps({
-                "run_id": resolved_run_id,
-                "status": status,
-                "error": error_text[:1000] if error_text else None,
-                "diagnosis": diagnosis,
-            }, indent=2))
+            typer.echo(
+                json.dumps(
+                    {
+                        "run_id": resolved_run_id,
+                        "status": status,
+                        "error": error_text[:1000] if error_text else None,
+                        "diagnosis": diagnosis,
+                    },
+                    indent=2,
+                )
+            )
             return
 
         # Header
@@ -121,18 +126,22 @@ def diagnose_command(
         console.print(f"[bold]Status:[/bold] [{color}]{status}[/{color}]")
 
         if status == "completed":
-            console.print("\n[green]✓ This run completed successfully — nothing to diagnose.[/green]")
+            console.print(
+                "\n[green]✓ This run completed successfully — nothing to diagnose.[/green]"
+            )
             return
 
         diagnosis = analyze_error(error_text)
 
         console.print()
-        console.print(Panel(
-            f"[bold red]{diagnosis['issue']}[/bold red]\n\n"
-            f"[bold]Likely cause:[/bold] {diagnosis['cause']}",
-            title="Diagnosis",
-            border_style="red",
-        ))
+        console.print(
+            Panel(
+                f"[bold red]{diagnosis['issue']}[/bold red]\n\n"
+                f"[bold]Likely cause:[/bold] {diagnosis['cause']}",
+                title="Diagnosis",
+                border_style="red",
+            )
+        )
 
         if diagnosis["actions"]:
             console.print("\n[bold yellow]Recommended actions:[/bold yellow]")
@@ -147,9 +156,7 @@ def diagnose_command(
                 table.add_row(key, str(val))
             console.print()
             console.print(table)
-            console.print(
-                "\n[dim]Apply automatically: [bold]moro recipe apply[/bold][/dim]"
-            )
+            console.print("\n[dim]Apply automatically: [bold]moro recipe apply[/bold][/dim]")
 
         if error_text and status == "failed":
             short = error_text[:400].replace("\n", " ")

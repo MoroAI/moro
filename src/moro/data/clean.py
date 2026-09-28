@@ -32,6 +32,7 @@ from moro.data.quality import (
 # Global Stats First-Pass
 # ──────────────────────────────────────────────────────────────────────────────
 
+
 def _build_global_stats(rows: list[DatasetRow]) -> tuple[Counter, int]:
     """
     First pass over all rows to build global token frequency map.
@@ -64,20 +65,20 @@ def _load_domain_glossary(glossary_path: Path | None) -> set[str]:
 # Near-Duplicate Hashing
 # ──────────────────────────────────────────────────────────────────────────────
 
+
 def _near_hash(row: DatasetRow) -> str:
     """
     Normalized content hash for near-duplicate detection.
     Lowercases and strips extra whitespace before hashing.
     """
-    text = json.dumps(
-        [[m.role, " ".join(m.content.lower().split())] for m in row.messages]
-    )
+    text = json.dumps([[m.role, " ".join(m.content.lower().split())] for m in row.messages])
     return sha256_text(text)
 
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Main Clean Pipeline
 # ──────────────────────────────────────────────────────────────────────────────
+
 
 def clean_rows(
     rows: list[DatasetRow],
@@ -141,7 +142,9 @@ def clean_rows(
         roles = {m.role for m in row.messages}
         if not {"user", "assistant"} <= roles or row.messages[-1].role != "assistant":
             invalid_rows.append(
-                InvalidRow(source=row.source, reason="Conversation needs user and final assistant turn")
+                InvalidRow(
+                    source=row.source, reason="Conversation needs user and final assistant turn"
+                )
             )
             continue
 
@@ -177,9 +180,7 @@ def clean_rows(
                     seen_near_hashes.add(near_key)
 
             if is_duplicate:
-                invalid_rows.append(
-                    InvalidRow(source=row.source, reason="duplicate")
-                )
+                invalid_rows.append(InvalidRow(source=row.source, reason="duplicate"))
                 continue
 
         # ── Step 4: Epistemic scoring ────────────────────────────────────────
@@ -201,7 +202,9 @@ def clean_rows(
 
         quality = row.quality_score
         mi_guard = row.metadata.mi_guard_override if use_epistemic_scoring else False
-        classification = row.metadata.classification if use_epistemic_scoring else "HIGH_QUALITY_STANDARD"
+        classification = (
+            row.metadata.classification if use_epistemic_scoring else "HIGH_QUALITY_STANDARD"
+        )
 
         # ── Step 5: Quality filter (respects MI Guard) ───────────────────────
         if quality < min_quality_score and not mi_guard:

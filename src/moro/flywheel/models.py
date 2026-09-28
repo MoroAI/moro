@@ -14,6 +14,7 @@ from pydantic import BaseModel, Field
 
 class FeedbackType(str, Enum):
     """Categorization of feedback signals for preference pairs."""
+
     EXPLICIT_HUMAN_CORRECTION = "EXPLICIT_HUMAN_CORRECTION"
     IMPLICIT_NEGATIVE_RATING = "IMPLICIT_NEGATIVE_RATING"
     AUTOMATED_RULE_VIOLATION = "AUTOMATED_RULE_VIOLATION"
@@ -22,6 +23,7 @@ class FeedbackType(str, Enum):
 
 class InferenceLogPayload(BaseModel):
     """A single production inference log entry captured from gateways/chat UIs."""
+
     session_id: str = Field(..., min_length=1)
     prompt: str = Field(..., min_length=1)
     completion: str = Field(..., min_length=1)
@@ -35,6 +37,7 @@ class InferenceLogPayload(BaseModel):
 
 class PreferencePair(BaseModel):
     """DPO preference pair (prompt, chosen, rejected) with provenance."""
+
     pair_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     prompt: str
     chosen: str
@@ -48,6 +51,7 @@ class PreferencePair(BaseModel):
 
 class FeedbackEntry(BaseModel):
     """File-based production feedback entry (backward-compatible)."""
+
     session_id: str
     timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     user_prompt: str
@@ -60,6 +64,7 @@ class FeedbackEntry(BaseModel):
 
 class RefinedTrainingPair(BaseModel):
     """The output of the Flywheel Refiner, ready for data compilation."""
+
     format: Literal["sft", "dpo"]
     messages: list[dict[str, str]] | None = None
     prompt: str | None = None

@@ -37,7 +37,9 @@ def test_validation_engine_healthy(tmp_path: Path):
     (tmp_path / "data" / "raw" / "data.jsonl").write_text('{"messages": []}\n')
 
     (tmp_path / "eval").mkdir(parents=True)
-    (tmp_path / "eval" / "test_eval.yaml").write_text(yaml.safe_dump({"name": "test_suite", "cases": []}))
+    (tmp_path / "eval" / "test_eval.yaml").write_text(
+        yaml.safe_dump({"name": "test_suite", "cases": []})
+    )
 
     config = load_config(cfg_file)
     report = validate_project(config, tmp_path)
@@ -79,4 +81,3 @@ def test_validation_engine_missing_resources(tmp_path: Path):
     assert any(c.name == "Dataset Source" and c.status == "warn" for c in report.checks)
     assert any("Eval Suite:" in c.name and c.status == "warn" for c in report.checks)
     assert any(c.name == "Safety Governance" and c.status == "warn" for c in report.checks)
-

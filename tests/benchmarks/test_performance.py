@@ -29,13 +29,18 @@ def temp_project():
 def large_dataset(temp_project):
     """Generate a large test dataset (10,000 rows)."""
     dataset_path = temp_project / "large_dataset.jsonl"
-    sample = json.dumps({
-        "messages": [
-            {"role": "system", "content": "You are a helpful assistant."},
-            {"role": "user", "content": "What is the capital of France?"},
-            {"role": "assistant", "content": "The capital of France is Paris."}
-        ]
-    }) + "\n"
+    sample = (
+        json.dumps(
+            {
+                "messages": [
+                    {"role": "system", "content": "You are a helpful assistant."},
+                    {"role": "user", "content": "What is the capital of France?"},
+                    {"role": "assistant", "content": "The capital of France is Paris."},
+                ]
+            }
+        )
+        + "\n"
+    )
 
     with open(dataset_path, "w", encoding="utf-8") as f:
         f.write(sample * 10000)
@@ -126,7 +131,9 @@ class TestVRAMPredictionPerformance:
 
             errors.append(error)
 
-            print(f"\n{case['model_class']}: Predicted {predicted:.2f}GB, Actual {actual:.2f}GB, Error {error:.1%}")
+            print(
+                f"\n{case['model_class']}: Predicted {predicted:.2f}GB, Actual {actual:.2f}GB, Error {error:.1%}"
+            )
 
         # Target: > 95% accuracy (error < 5%)
         avg_error = sum(errors) / len(errors)
@@ -166,7 +173,7 @@ class TestDashboardPerformance:
         # Target: < 500ms
         assert avg_time < 0.5, f"Average response time too high: {avg_time:.3f}s"
 
-        print(f"\nAverage Health Endpoint Response Time: {avg_time*1000:.0f}ms")
+        print(f"\nAverage Health Endpoint Response Time: {avg_time * 1000:.0f}ms")
 
 
 class TestStateQueryPerformance:
@@ -197,7 +204,7 @@ class TestStateQueryPerformance:
         duration = time.time() - start
 
         # Target: < 100ms
-        assert duration < 0.1, f"Query too slow: {duration*1000:.0f}ms"
+        assert duration < 0.1, f"Query too slow: {duration * 1000:.0f}ms"
         assert len(nodes) == 100
 
-        print(f"\nState Query Time (100 nodes from 1000): {duration*1000:.0f}ms")
+        print(f"\nState Query Time (100 nodes from 1000): {duration * 1000:.0f}ms")

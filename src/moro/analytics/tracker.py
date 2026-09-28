@@ -433,7 +433,9 @@ class ExperimentTracker:
             "hyperparameters": hyperparams,
             "hyperparameter_differences": hp_diffs,
             "metrics_comparison": metrics_comparison,
-            "best_experiment_id": experiments[best_idx]["experiment_id"] if best_idx is not None else None,
+            "best_experiment_id": experiments[best_idx]["experiment_id"]
+            if best_idx is not None
+            else None,
             "best_experiment_index": best_idx,
         }
 
@@ -559,7 +561,9 @@ class ExperimentTracker:
             if len(rows) < 3:
                 return {"error": "Not enough data for correlation analysis", "count": len(rows)}
 
-            target_values = [float(row["target_metric"]) for row in rows if row["target_metric"] is not None]
+            target_values = [
+                float(row["target_metric"]) for row in rows if row["target_metric"] is not None
+            ]
 
             correlations: dict[str, float | None] = {}
             hp_keys = [
@@ -652,7 +656,9 @@ class ExperimentTracker:
         recommendations.extend(self._detect_failure_patterns(experiments))
         return recommendations
 
-    def _analyze_learning_rate_effectiveness(self, experiments: list[dict[str, Any]]) -> dict[str, Any] | None:
+    def _analyze_learning_rate_effectiveness(
+        self, experiments: list[dict[str, Any]]
+    ) -> dict[str, Any] | None:
         lr_groups: dict[float, list[dict[str, Any]]] = {}
         for exp in experiments:
             hp = self.get_hyperparameters(exp["experiment_id"])
@@ -682,7 +688,9 @@ class ExperimentTracker:
             }
         return None
 
-    def _analyze_lora_rank_effectiveness(self, experiments: list[dict[str, Any]]) -> dict[str, Any] | None:
+    def _analyze_lora_rank_effectiveness(
+        self, experiments: list[dict[str, Any]]
+    ) -> dict[str, Any] | None:
         rank_groups: dict[int, list[dict[str, Any]]] = {}
         for exp in experiments:
             hp = self.get_hyperparameters(exp["experiment_id"])
@@ -712,7 +720,9 @@ class ExperimentTracker:
             }
         return None
 
-    def _check_diminishing_returns(self, experiments: list[dict[str, Any]]) -> dict[str, Any] | None:
+    def _check_diminishing_returns(
+        self, experiments: list[dict[str, Any]]
+    ) -> dict[str, Any] | None:
         completed = [e for e in experiments if e.get("status") == "completed"]
         if len(completed) < 3:
             return None

@@ -13,9 +13,7 @@ def test_initialize_production_db(tmp_path):
     # Tables should exist
     tables = [
         row[0]
-        for row in conn.execute(
-            "SELECT name FROM sqlite_master WHERE type='table'"
-        ).fetchall()
+        for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()
     ]
     assert "inference_logs" in tables
     assert "preference_pairs" in tables

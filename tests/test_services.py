@@ -31,4 +31,3 @@ def test_service_orchestrator_print_status_and_logs(tmp_path: Path):
     # get_logs on non-running service should return appropriate message
     logs = orch.get_logs("dashboard")
     assert "No log file found" in logs or "is not running" in logs or isinstance(logs, str)
-

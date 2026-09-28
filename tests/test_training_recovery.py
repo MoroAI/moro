@@ -1,6 +1,5 @@
 """Tests for the OOM Auto-Recovery Protocol."""
 
-
 from moro.training.recovery import apply_oom_recovery_protocol, summarize_recovery
 
 
@@ -11,6 +10,7 @@ def _make_config():
     import yaml
 
     from moro.config.models import MoroConfig
+
     # Create a temporary file to use as dataset source
     tmpfile = tempfile.NamedTemporaryFile(suffix=".jsonl", delete=False)
     tmpfile.close()
@@ -63,7 +63,7 @@ def test_step1_reduces_seq_length():
     config = _make_config()
     original_seq = config.dataset.max_seq_length  # 2048
     recovered, actions = apply_oom_recovery_protocol(config, step_limit=1)
-    
+
     new_seq = recovered.dataset.max_seq_length
     assert new_seq < original_seq
     assert new_seq == max(512, int(original_seq * 0.75))
@@ -76,7 +76,7 @@ def test_step2_reduces_batch_size():
     original_bs = config.training.batch_size  # 4
     original_acc = config.training.gradient_accumulation_steps  # 4
     recovered, actions = apply_oom_recovery_protocol(config, step_limit=2)
-    
+
     assert recovered.training.batch_size == 1
     assert recovered.training.gradient_accumulation_steps == original_acc * original_bs
     assert any("[Step 2]" in a for a in actions)
@@ -87,7 +87,7 @@ def test_step3_narrows_target_modules():
     config = _make_config()
     assert len(config.adapter.target_modules) == 7  # pre-condition
     recovered, actions = apply_oom_recovery_protocol(config, step_limit=3)
-    
+
     assert len(recovered.adapter.target_modules) <= 4
     assert any("[Step 3]" in a for a in actions)
 
@@ -97,7 +97,7 @@ def test_step4_halves_lora_rank():
     config = _make_config()
     original_r = config.adapter.r  # 64
     recovered, actions = apply_oom_recovery_protocol(config, step_limit=4)
-    
+
     assert recovered.adapter.r <= original_r // 2
     assert recovered.adapter.r >= 8  # minimum
     assert any("[Step 4]" in a for a in actions)
@@ -108,9 +108,9 @@ def test_step5_enables_paged_optimizer():
     config = _make_config()
     assert config.training.optimizer != "paged_adamw_8bit"  # pre-condition
     assert not config.training.gradient_checkpointing  # pre-condition
-    
+
     recovered, actions = apply_oom_recovery_protocol(config)
-    
+
     assert recovered.training.optimizer == "paged_adamw_8bit"
     assert recovered.training.gradient_checkpointing is True
     assert any("[Step 5]" in a for a in actions)
@@ -120,12 +120,13 @@ def test_full_recovery_protocol():
     """All 5 steps should be applied and reported."""
     config = _make_config()
     recovered, actions = apply_oom_recovery_protocol(config)
-    
+
     # All steps should have been applied
     assert len(actions) >= 5
     step_numbers = set()
     for a in actions:
         import re
+
         m = re.search(r"\[Step (\d)\]", a)
         if m:
             step_numbers.add(int(m.group(1)))
@@ -138,9 +139,9 @@ def test_recovery_does_not_mutate_original():
     original_seq = config.dataset.max_seq_length
     original_bs = config.training.batch_size
     original_r = config.adapter.r
-    
+
     recovered, _ = apply_oom_recovery_protocol(config)
-    
+
     assert config.dataset.max_seq_length == original_seq
     assert config.training.batch_size == original_bs
     assert config.adapter.r == original_r

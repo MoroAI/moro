@@ -28,6 +28,7 @@ logger = logging.getLogger("moro.runtime")
 # EXECUTION LIFECYCLE STATES
 # ===================================================================
 
+
 class ExecutionState(str, Enum):
     """States of the execution lifecycle."""
 
@@ -57,6 +58,7 @@ class ExecutionPhase(str, Enum):
 # ===================================================================
 # EXECUTION CONTEXT
 # ===================================================================
+
 
 class ExecutionContext:
     """Carries all state through an execution lifecycle.
@@ -161,6 +163,7 @@ class ExecutionContext:
 # RUNTIME ORCHESTRATOR
 # ===================================================================
 
+
 class MoroRuntimeOrchestrator:
     """The central runtime orchestrator for MoroAI.
 
@@ -189,6 +192,7 @@ class MoroRuntimeOrchestrator:
 
         if config_path.exists():
             import yaml
+
             with open(config_path) as f:
                 return yaml.safe_load(f) or {}
 
@@ -203,6 +207,7 @@ class MoroRuntimeOrchestrator:
         """Get or create the state manager."""
         if self._state_manager is None:
             from moro.state.manager import StateManager
+
             self._state_manager = StateManager(self.project_root / ".moro" / "state.db")
         return self._state_manager
 
@@ -211,7 +216,10 @@ class MoroRuntimeOrchestrator:
         """Get or create the experiment tracker."""
         if self._experiment_tracker is None:
             from moro.analytics.tracker import ExperimentTracker
-            self._experiment_tracker = ExperimentTracker(self.project_root / ".moro" / "analytics.db")
+
+            self._experiment_tracker = ExperimentTracker(
+                self.project_root / ".moro" / "analytics.db"
+            )
         return self._experiment_tracker
 
     @property
@@ -219,9 +227,9 @@ class MoroRuntimeOrchestrator:
         """Get or create the service orchestrator."""
         if self._service_orchestrator is None:
             from moro.services.orchestrator import ServiceOrchestrator
+
             self._service_orchestrator = ServiceOrchestrator(
-                self.project_root,
-                self.project_root / ".moro" / "state.db"
+                self.project_root, self.project_root / ".moro" / "state.db"
             )
         return self._service_orchestrator
 
@@ -282,7 +290,9 @@ class MoroRuntimeOrchestrator:
             context.state = ExecutionState.EXECUTING
             context.report_progress(f"Starting {context.phase.value}...")
 
-            logger.info(f"Executing phase {context.phase.value} for execution {context.execution_id}")
+            logger.info(
+                f"Executing phase {context.phase.value} for execution {context.execution_id}"
+            )
 
             # Execute the phase handler
             result = await phase_handler(context)
@@ -294,7 +304,9 @@ class MoroRuntimeOrchestrator:
             # Complete
             context.complete(result)
 
-            logger.info(f"Completed phase {context.phase.value} for execution {context.execution_id}")
+            logger.info(
+                f"Completed phase {context.phase.value} for execution {context.execution_id}"
+            )
 
             return result
 
@@ -375,14 +387,16 @@ class MoroRuntimeOrchestrator:
         """
         pipeline_id = f"pipeline_{uuid.uuid4().hex[:8]}"
 
-        console.print(Panel(
-            f"[bold cyan]MoroAI Complete Pipeline[/bold cyan]\n\n"
-            f"Pipeline ID: {pipeline_id}\n"
-            f"Data Source: {data_source}\n"
-            f"Target Model: {target_model}\n"
-            f"Deploy Target: {deploy_target or 'None'}",
-            border_style="blue"
-        ))
+        console.print(
+            Panel(
+                f"[bold cyan]MoroAI Complete Pipeline[/bold cyan]\n\n"
+                f"Pipeline ID: {pipeline_id}\n"
+                f"Data Source: {data_source}\n"
+                f"Target Model: {target_model}\n"
+                f"Deploy Target: {deploy_target or 'None'}",
+                border_style="blue",
+            )
+        )
 
         results: dict[str, Any] = {
             "pipeline_id": pipeline_id,
@@ -395,14 +409,10 @@ class MoroRuntimeOrchestrator:
             console.print("\n[bold]Phase 1: Data Compilation[/bold]")
 
             data_context = self.create_execution(
-                ExecutionPhase.DATA_COMPILATION,
-                {"data_source": str(data_source)}
+                ExecutionPhase.DATA_COMPILATION, {"data_source": str(data_source)}
             )
 
-            data_result = await self.execute_phase(
-                data_context,
-                self._phase_data_compilation
-            )
+            data_result = await self.execute_phase(data_context, self._phase_data_compilation)
             results["phases"]["data_compilation"] = data_result
 
             # Phase 2: Recipe Generation
@@ -413,13 +423,10 @@ class MoroRuntimeOrchestrator:
                 {
                     "dataset_id": data_result.get("dataset_id"),
                     "target_model": target_model,
-                }
+                },
             )
 
-            recipe_result = await self.execute_phase(
-                recipe_context,
-                self._phase_recipe_generation
-            )
+            recipe_result = await self.execute_phase(recipe_context, self._phase_recipe_generation)
             results["phases"]["recipe_generation"] = recipe_result
 
             # Phase 3: Training
@@ -431,13 +438,10 @@ class MoroRuntimeOrchestrator:
                     "dataset_id": data_result.get("dataset_id"),
                     "recipe": recipe_result,
                     "target_model": target_model,
-                }
+                },
             )
 
-            training_result = await self.execute_phase(
-                training_context,
-                self._phase_training
-            )
+            training_result = await self.execute_phase(training_context, self._phase_training)
             results["phases"]["training"] = training_result
 
             # Phase 4: Evaluation
@@ -449,13 +453,10 @@ class MoroRuntimeOrchestrator:
                     {
                         "training_run_id": training_result.get("experiment_id"),
                         "eval_suite": str(eval_suite),
-                    }
+                    },
                 )
 
-                eval_result = await self.execute_phase(
-                    eval_context,
-                    self._phase_evaluation
-                )
+                eval_result = await self.execute_phase(eval_context, self._phase_evaluation)
                 results["phases"]["evaluation"] = eval_result
 
             # Phase 5: Release
@@ -467,13 +468,10 @@ class MoroRuntimeOrchestrator:
                     "training_run_id": training_result.get("experiment_id"),
                     "eval_results": results["phases"].get("evaluation"),
                     "target_model": target_model,
-                }
+                },
             )
 
-            release_result = await self.execute_phase(
-                release_context,
-                self._phase_release
-            )
+            release_result = await self.execute_phase(release_context, self._phase_release)
             results["phases"]["release"] = release_result
 
             # Phase 6: Deployment (optional)
@@ -485,13 +483,10 @@ class MoroRuntimeOrchestrator:
                     {
                         "release_id": release_result.get("release_id"),
                         "deploy_target": deploy_target,
-                    }
+                    },
                 )
 
-                deploy_result = await self.execute_phase(
-                    deploy_context,
-                    self._phase_deployment
-                )
+                deploy_result = await self.execute_phase(deploy_context, self._phase_deployment)
                 results["phases"]["deployment"] = deploy_result
 
             # Pipeline complete
@@ -501,24 +496,28 @@ class MoroRuntimeOrchestrator:
                 r.get("duration", 0) for r in results["phases"].values() if isinstance(r, dict)
             )
 
-            console.print(Panel(
-                f"[bold green]✅ Pipeline Complete![/bold green]\n\n"
-                f"Pipeline ID: {pipeline_id}\n"
-                f"Duration: {total_duration:.1f}s\n"
-                f"Phases Completed: {len(results['phases'])}",
-                border_style="green"
-            ))
+            console.print(
+                Panel(
+                    f"[bold green]✅ Pipeline Complete![/bold green]\n\n"
+                    f"Pipeline ID: {pipeline_id}\n"
+                    f"Duration: {total_duration:.1f}s\n"
+                    f"Phases Completed: {len(results['phases'])}",
+                    border_style="green",
+                )
+            )
 
         except Exception as e:
             results["success"] = False
             results["error"] = str(e)
 
-            console.print(Panel(
-                f"[bold red]❌ Pipeline Failed[/bold red]\n\n"
-                f"Pipeline ID: {pipeline_id}\n"
-                f"Error: {str(e)}",
-                border_style="red"
-            ))
+            console.print(
+                Panel(
+                    f"[bold red]❌ Pipeline Failed[/bold red]\n\n"
+                    f"Pipeline ID: {pipeline_id}\n"
+                    f"Error: {str(e)}",
+                    border_style="red",
+                )
+            )
 
         return results
 
@@ -603,11 +602,7 @@ class MoroRuntimeOrchestrator:
         recipe_input = context.config.get("recipe", {})
         recipe = recipe_input.get("recipe", recipe_input) if isinstance(recipe_input, dict) else {}
 
-        target_model = (
-            context.config.get("target_model")
-            or recipe.get("model_name")
-            or "unknown"
-        )
+        target_model = context.config.get("target_model") or recipe.get("model_name") or "unknown"
 
         context.report_progress("Initializing training...")
 
@@ -838,9 +833,13 @@ class MoroRuntimeOrchestrator:
 
         health["database"] = {
             "state_db_exists": state_db.exists(),
-            "state_db_size_mb": (state_db.stat().st_size / (1024 * 1024)) if state_db.exists() else 0,
+            "state_db_size_mb": (state_db.stat().st_size / (1024 * 1024))
+            if state_db.exists()
+            else 0,
             "analytics_db_exists": analytics_db.exists(),
-            "analytics_db_size_mb": (analytics_db.stat().st_size / (1024 * 1024)) if analytics_db.exists() else 0,
+            "analytics_db_size_mb": (analytics_db.stat().st_size / (1024 * 1024))
+            if analytics_db.exists()
+            else 0,
         }
 
         return health

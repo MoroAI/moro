@@ -1,6 +1,5 @@
 """Tests for the Mixing Strategy (Catastrophic Forgetting Guard)."""
 
-
 from moro.recipes.mixing import (
     calculate_mixing_strategy,
     estimate_jargon_divergence,
@@ -93,7 +92,7 @@ def test_divergence_clamped():
     """Divergence should be clamped to [0, 1] even with bad inputs."""
     s_neg = calculate_mixing_strategy(1.5, -0.5)
     s_over = calculate_mixing_strategy(1.5, 2.0)
-    
+
     # Should not raise and should return valid ratios
     assert 0.0 <= s_neg.replay_ratio <= 1.0
     assert 0.0 <= s_over.replay_ratio <= 1.0

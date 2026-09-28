@@ -28,6 +28,7 @@ router = APIRouter(prefix="/api/training", tags=["training"])
 # MODELS
 # ===================================================================
 
+
 class TrainingConfig(BaseModel):
     """Configuration for a training run."""
 
@@ -111,8 +112,14 @@ def _discover_filesystem_runs(project_root: Path) -> dict[str, TrainingRun]:
                 status=status,
                 model_name=model_name,
                 dataset_id="compiled",
-                started_at=datetime.fromtimestamp(run_dir.stat().st_mtime, timezone.utc).isoformat(),
-                completed_at=datetime.fromtimestamp(run_dir.stat().st_mtime, timezone.utc).isoformat() if results_path.exists() else None,
+                started_at=datetime.fromtimestamp(
+                    run_dir.stat().st_mtime, timezone.utc
+                ).isoformat(),
+                completed_at=datetime.fromtimestamp(
+                    run_dir.stat().st_mtime, timezone.utc
+                ).isoformat()
+                if results_path.exists()
+                else None,
                 current_step=100,
                 total_steps=100,
                 current_loss=loss or 1.25,
@@ -125,6 +132,7 @@ def _discover_filesystem_runs(project_root: Path) -> dict[str, TrainingRun]:
 # ===================================================================
 # BACKGROUND WORKER
 # ===================================================================
+
 
 async def _simulate_training_worker(run_id: str, config: TrainingConfig) -> None:
     """Simulate training execution step-by-step with real cancellation support."""
@@ -150,7 +158,9 @@ async def _simulate_training_worker(run_id: str, config: TrainingConfig) -> None
                 break
 
             await asyncio.sleep(0.04)
-            current_loss = max(0.2, current_loss - (1.8 / total_steps) + (0.02 if step % 7 == 0 else -0.01))
+            current_loss = max(
+                0.2, current_loss - (1.8 / total_steps) + (0.02 if step % 7 == 0 else -0.01)
+            )
             run.current_step = step + 1
             run.current_loss = round(current_loss, 4)
             run.peak_vram_gb = round(3.8 + (step / total_steps) * 0.7, 2)
@@ -160,14 +170,18 @@ async def _simulate_training_worker(run_id: str, config: TrainingConfig) -> None
             run.completed_at = datetime.now(timezone.utc).isoformat()
             # Save results
             with open(run_dir / "results.json", "w", encoding="utf-8") as f:
-                json.dump({
-                    "run_id": run_id,
-                    "model_name": config.model_name,
-                    "status": "completed",
-                    "final_loss": run.current_loss,
-                    "peak_vram_gb": run.peak_vram_gb,
-                    "completed_at": run.completed_at,
-                }, f, indent=2)
+                json.dump(
+                    {
+                        "run_id": run_id,
+                        "model_name": config.model_name,
+                        "status": "completed",
+                        "final_loss": run.current_loss,
+                        "peak_vram_gb": run.peak_vram_gb,
+                        "completed_at": run.completed_at,
+                    },
+                    f,
+                    indent=2,
+                )
 
     except asyncio.CancelledError:
         run.status = "cancelled"
@@ -181,6 +195,7 @@ async def _simulate_training_worker(run_id: str, config: TrainingConfig) -> None
 # ===================================================================
 # ENDPOINTS
 # ===================================================================
+
 
 @router.get("/runs", response_model=list[TrainingRun])
 async def list_training_runs(status: str | None = None, limit: int = 50) -> list[TrainingRun]:
@@ -300,7 +315,9 @@ async def get_gpu_status() -> dict:
                 {
                     "index": i,
                     "name": torch.cuda.get_device_name(i),
-                    "memory_total_gb": round(torch.cuda.get_device_properties(i).total_memory / (1024**3), 2),
+                    "memory_total_gb": round(
+                        torch.cuda.get_device_properties(i).total_memory / (1024**3), 2
+                    ),
                     "memory_allocated_gb": round(torch.cuda.memory_allocated(i) / (1024**3), 2),
                     "memory_reserved_gb": round(torch.cuda.memory_reserved(i) / (1024**3), 2),
                 }

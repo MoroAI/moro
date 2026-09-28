@@ -93,7 +93,9 @@ app.add_typer(guard_app, name="guard")
 app.add_typer(flywheel_app, name="flywheel")
 
 # ── Pre-Flight Validation ───────────────────────────────────────────────────
-app.command(name="validate", help="Run pre-flight validation on project config and environment.")(validate_command)
+app.command(name="validate", help="Run pre-flight validation on project config and environment.")(
+    validate_command
+)
 
 # ── Model Registry ───────────────────────────────────────────────────────────
 app.add_typer(registry_app, name="registry")
@@ -107,6 +109,7 @@ app.add_typer(analytics_app, name="analytics")
 # ── Mission Control Web Dashboard ─────────────────────────────────────────────
 app.command(name="ui", help="Launch the MoroAI Mission Control Web Dashboard.")(ui_command)
 app.add_typer(dashboard_app, name="dashboard")
+
 
 # ── Version ──────────────────────────────────────────────────────────────────
 @app.command(name="version", help="Show MoroAI version.")

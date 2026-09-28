@@ -24,6 +24,7 @@ router = APIRouter(prefix="/api/deployment", tags=["deployment"])
 # MODELS
 # ===================================================================
 
+
 class DeploymentRequest(BaseModel):
     """Request to deploy a model."""
 
@@ -51,6 +52,7 @@ _deployments: dict[str, dict] = {}
 # HELPER FUNCTIONS
 # ===================================================================
 
+
 async def _check_ollama() -> dict:
     """Check if Ollama is accessible on localhost:11434."""
     try:
@@ -69,6 +71,7 @@ async def _check_ollama() -> dict:
 # ===================================================================
 # ENDPOINTS
 # ===================================================================
+
 
 @router.get("/status")
 async def get_deployment_status() -> dict:
@@ -147,7 +150,9 @@ async def delete_ollama_model(model_name: str) -> dict:
         import httpx
 
         async with httpx.AsyncClient(timeout=5.0) as client:
-            resp = await client.delete("http://localhost:11434/api/delete", json={"name": model_name})
+            resp = await client.delete(
+                "http://localhost:11434/api/delete", json={"name": model_name}
+            )
             if resp.status_code == 200:
                 return {"status": "success", "model": model_name}
     except Exception:
@@ -156,7 +161,9 @@ async def delete_ollama_model(model_name: str) -> dict:
 
 
 @router.post("/ollama/test")
-async def test_ollama_model(model_name: str, prompt: str = "Hello! Tell me about local AI.") -> dict:
+async def test_ollama_model(
+    model_name: str, prompt: str = "Hello! Tell me about local AI."
+) -> dict:
     """Test inference on a deployed model."""
     try:
         import time

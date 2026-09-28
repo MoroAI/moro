@@ -115,7 +115,15 @@ def convert_to_gguf_direct(
 
     # Step 1: Convert to F16
     subprocess.run(
-        [python, str(converter), "--outtype", "f16", "--outfile", str(f16_path), str(merged_model_dir)],
+        [
+            python,
+            str(converter),
+            "--outtype",
+            "f16",
+            "--outfile",
+            str(f16_path),
+            str(merged_model_dir),
+        ],
         check=True,
     )
 

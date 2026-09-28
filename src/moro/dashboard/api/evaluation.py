@@ -52,11 +52,13 @@ async def list_evaluation_suites() -> dict:
     for d in [eval_dir, quickstart_eval]:
         if d.exists():
             for p in d.glob("*.yaml"):
-                suites.append({
-                    "name": p.stem,
-                    "path": str(p),
-                    "size_bytes": p.stat().st_size,
-                })
+                suites.append(
+                    {
+                        "name": p.stem,
+                        "path": str(p),
+                        "size_bytes": p.stat().st_size,
+                    }
+                )
     return {"suites": suites}
 
 
@@ -79,9 +81,21 @@ async def run_evaluation(request: EvalRunRequest) -> EvalResultItem:
         sample_suite = {
             "name": "sample-eval-suite",
             "cases": [
-                {"id": "c1", "messages": [{"role": "user", "content": "Explain LoRA."}], "expect": {"contains": ["rank", "adapter"]}},
-                {"id": "c2", "messages": [{"role": "user", "content": "What is 2+2?"}], "expect": {"contains": ["4"]}},
-                {"id": "c3", "messages": [{"role": "user", "content": "Summarize privacy mode."}], "expect": {"contains": ["local"]}},
+                {
+                    "id": "c1",
+                    "messages": [{"role": "user", "content": "Explain LoRA."}],
+                    "expect": {"contains": ["rank", "adapter"]},
+                },
+                {
+                    "id": "c2",
+                    "messages": [{"role": "user", "content": "What is 2+2?"}],
+                    "expect": {"contains": ["4"]},
+                },
+                {
+                    "id": "c3",
+                    "messages": [{"role": "user", "content": "Summarize privacy mode."}],
+                    "expect": {"contains": ["local"]},
+                },
             ],
         }
         suite_path.parent.mkdir(parents=True, exist_ok=True)

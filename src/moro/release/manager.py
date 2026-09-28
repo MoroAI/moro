@@ -36,6 +36,7 @@ class ReleaseManager:
         progress_callback: Callable[[str, float | None], None] | None = None,
     ) -> dict[str, Any]:
         """Create a new model release after verifying governance gates."""
+
         def report(msg: str, pct: float | None = None) -> None:
             if progress_callback:
                 progress_callback(msg, pct)
@@ -112,6 +113,7 @@ class ReleaseManager:
         model_dir = run_dir / "model"
         if model_dir.exists():
             import shutil
+
             shutil.copytree(model_dir, release_dir / "model", dirs_exist_ok=True)
 
         metadata = {

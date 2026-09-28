@@ -26,6 +26,7 @@ from pathlib import Path
 @dataclass
 class CaseRobustnessResult:
     """Robustness metrics for a single eval case."""
+
     case_id: str
     base_passed: bool
     perturbed_results: dict[str, bool]  # perturbation_type → passed
@@ -44,14 +45,8 @@ class CaseRobustnessResult:
 
         total = len(self.perturbed_results)
         passed_count = sum(1 for p in self.perturbed_results.values() if p)
-        strict_count = sum(
-            1 for p in self.perturbed_results.values() if p == self.base_passed
-        )
-        vulns = [
-            ptype
-            for ptype, p in self.perturbed_results.items()
-            if self.base_passed and not p
-        ]
+        strict_count = sum(1 for p in self.perturbed_results.values() if p == self.base_passed)
+        vulns = [ptype for ptype, p in self.perturbed_results.items() if self.base_passed and not p]
 
         self.raw_robustness = round(passed_count / total, 4)
         self.strict_robustness = round(strict_count / total, 4)
@@ -62,6 +57,7 @@ class CaseRobustnessResult:
 @dataclass
 class RobustnessReport:
     """Aggregate robustness report across all eval cases."""
+
     total_cases: int
     case_results: list[CaseRobustnessResult]
 
@@ -79,15 +75,11 @@ class RobustnessReport:
             return
 
         n = len(self.case_results)
-        self.avg_raw_robustness = round(
-            sum(r.raw_robustness for r in self.case_results) / n, 4
-        )
+        self.avg_raw_robustness = round(sum(r.raw_robustness for r in self.case_results) / n, 4)
         self.avg_strict_robustness = round(
             sum(r.strict_robustness for r in self.case_results) / n, 4
         )
-        self.total_vulnerabilities = sum(
-            r.vulnerability_count for r in self.case_results
-        )
+        self.total_vulnerabilities = sum(r.vulnerability_count for r in self.case_results)
 
         # Count failures per perturbation type
         for result in self.case_results:
@@ -217,7 +209,12 @@ def create_perturbed_suite(
         if user_msg_idx >= 0:
             orig_text = case.messages[user_msg_idx].content
             perturbed = engine.generate_perturbations(orig_text)
-            for ptype in ["distractor_injection", "typo_noise", "negation_constraint", "entity_swap"]:
+            for ptype in [
+                "distractor_injection",
+                "typo_noise",
+                "negation_constraint",
+                "entity_swap",
+            ]:
                 p_text = perturbed[ptype]
                 case_dict = case.model_dump(mode="json")
                 case_dict["id"] = f"{case.id}_{ptype}"
@@ -283,7 +280,12 @@ def evaluate_robustness(
         if user_msg_idx >= 0:
             orig_text = case.messages[user_msg_idx].content
             perturbed_texts = engine.generate_perturbations(orig_text)
-            for ptype in ["distractor_injection", "typo_noise", "negation_constraint", "entity_swap"]:
+            for ptype in [
+                "distractor_injection",
+                "typo_noise",
+                "negation_constraint",
+                "entity_swap",
+            ]:
                 p_text = perturbed_texts[ptype]
                 # Clone case
                 p_messages = [
@@ -296,7 +298,9 @@ def evaluate_robustness(
                     expect=case.expect,
                 )
                 if stub_responses is not None:
-                    p_resp = stub_responses.get(f"{case.id}_{ptype}", stub_responses.get(case.id, ""))
+                    p_resp = stub_responses.get(
+                        f"{case.id}_{ptype}", stub_responses.get(case.id, "")
+                    )
                 elif generator is not None:
                     p_resp = _generate_response(generator, [m.model_dump() for m in p_messages])
                 else:
@@ -306,7 +310,12 @@ def evaluate_robustness(
                 perturbed_results[ptype] = p_score.passed
         else:
             # Fallback if no user message found
-            for ptype in ["distractor_injection", "typo_noise", "negation_constraint", "entity_swap"]:
+            for ptype in [
+                "distractor_injection",
+                "typo_noise",
+                "negation_constraint",
+                "entity_swap",
+            ]:
                 perturbed_results[ptype] = base_score.passed
 
         results.append(

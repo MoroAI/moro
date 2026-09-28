@@ -64,8 +64,18 @@ training:
 
     # Create sample data
     sample_data = [
-        {"messages": [{"role": "user", "content": "Hello"}, {"role": "assistant", "content": "Hi!"}]},
-        {"messages": [{"role": "user", "content": "Test"}, {"role": "assistant", "content": "Response"}]},
+        {
+            "messages": [
+                {"role": "user", "content": "Hello"},
+                {"role": "assistant", "content": "Hi!"},
+            ]
+        },
+        {
+            "messages": [
+                {"role": "user", "content": "Test"},
+                {"role": "assistant", "content": "Response"},
+            ]
+        },
     ]
 
     with open(project_dir / "data" / "raw" / "sample_data.jsonl", "w", encoding="utf-8") as f:

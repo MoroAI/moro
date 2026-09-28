@@ -32,7 +32,9 @@ def _get_tracker() -> ExperimentTracker:
 
 @analytics_app.command("list")
 def analytics_list(
-    status: str | None = typer.Option(None, help="Filter by status (e.g. completed, failed, running)"),
+    status: str | None = typer.Option(
+        None, help="Filter by status (e.g. completed, failed, running)"
+    ),
     base_model: str | None = typer.Option(None, help="Filter by base model name"),
     limit: int = typer.Option(20, help="Maximum number of experiments to show"),
 ) -> None:
@@ -110,15 +112,17 @@ def analytics_show(
         hp = tracker.get_hyperparameters(experiment_id) or {}
         metrics = tracker.get_metrics(experiment_id)
 
-        console.print(Panel(
-            f"[bold]Experiment:[/bold] {exp.get('experiment_name')} ({exp.get('experiment_id')})\n"
-            f"[bold]Status:[/bold] {exp.get('status')} | [bold]Base Model:[/bold] {exp.get('base_model')}\n"
-            f"[bold]Created:[/bold] {exp.get('created_at')} | [bold]Duration:[/bold] {exp.get('duration_seconds', 0) or 0:.1f}s\n"
-            f"[bold]Train Loss:[/bold] {exp.get('final_train_loss') or '-'} | [bold]Eval Delta:[/bold] {exp.get('eval_delta') or '-'}\n"
-            f"[bold]Metric Steps Logged:[/bold] {len(metrics)}",
-            title=f"Experiment Detail: {experiment_id}",
-            border_style="cyan",
-        ))
+        console.print(
+            Panel(
+                f"[bold]Experiment:[/bold] {exp.get('experiment_name')} ({exp.get('experiment_id')})\n"
+                f"[bold]Status:[/bold] {exp.get('status')} | [bold]Base Model:[/bold] {exp.get('base_model')}\n"
+                f"[bold]Created:[/bold] {exp.get('created_at')} | [bold]Duration:[/bold] {exp.get('duration_seconds', 0) or 0:.1f}s\n"
+                f"[bold]Train Loss:[/bold] {exp.get('final_train_loss') or '-'} | [bold]Eval Delta:[/bold] {exp.get('eval_delta') or '-'}\n"
+                f"[bold]Metric Steps Logged:[/bold] {len(metrics)}",
+                title=f"Experiment Detail: {experiment_id}",
+                border_style="cyan",
+            )
+        )
 
         if hp:
             hp_table = Table(title="Recorded Hyperparameters")
@@ -126,7 +130,14 @@ def analytics_show(
             hp_table.add_column("Value", style="white")
 
             for k, v in hp.items():
-                if k not in ("param_id", "experiment_id", "created_at", "full_config_json", "target_modules_json", "full_config"):
+                if k not in (
+                    "param_id",
+                    "experiment_id",
+                    "created_at",
+                    "full_config_json",
+                    "target_modules_json",
+                    "full_config",
+                ):
                     hp_table.add_row(k, str(v) if v is not None else "-")
 
             console.print(hp_table)
@@ -155,10 +166,12 @@ def analytics_compare(
             console.print(f"[red]{comparison['error']}[/red]")
             return
 
-        console.print(Panel(
-            f"[bold]Comparing {len(ids)} experiments[/bold]: {', '.join(ids)}",
-            border_style="blue",
-        ))
+        console.print(
+            Panel(
+                f"[bold]Comparing {len(ids)} experiments[/bold]: {', '.join(ids)}",
+                border_style="blue",
+            )
+        )
 
         # Hyperparameter differences
         hp_diffs = comparison.get("hyperparameter_differences", {})
@@ -167,7 +180,7 @@ def analytics_compare(
             hp_table = Table()
             hp_table.add_column("Parameter", style="cyan")
             for i, exp_id in enumerate(ids):
-                hp_table.add_column(f"Exp {i+1} ({exp_id[:8]})", style="white")
+                hp_table.add_column(f"Exp {i + 1} ({exp_id[:8]})", style="white")
 
             for param, values in hp_diffs.items():
                 row = [param] + [str(v) if v is not None else "-" for v in values]
@@ -184,9 +197,16 @@ def analytics_compare(
         metric_table = Table()
         metric_table.add_column("Metric", style="cyan")
         for i, exp_id in enumerate(ids):
-            metric_table.add_column(f"Exp {i+1} ({exp_id[:8]})", style="white")
+            metric_table.add_column(f"Exp {i + 1} ({exp_id[:8]})", style="white")
 
-        for metric_name in ["final_train_loss", "final_eval_loss", "eval_pass_rate", "eval_delta", "duration_seconds", "peak_vram_gb"]:
+        for metric_name in [
+            "final_train_loss",
+            "final_eval_loss",
+            "eval_pass_rate",
+            "eval_delta",
+            "duration_seconds",
+            "peak_vram_gb",
+        ]:
             values = metrics.get(metric_name, [])
             row = [metric_name]
             for val in values:
@@ -277,11 +297,13 @@ def analytics_recommend(
             console.print("[yellow]No recommendations available yet.[/yellow]")
             return
 
-        console.print(Panel(
-            "[bold]Experiment Recommendations[/bold]\n"
-            "Derived from historical metrics, hyperparameter analysis, and failure patterns",
-            border_style="blue",
-        ))
+        console.print(
+            Panel(
+                "[bold]Experiment Recommendations[/bold]\n"
+                "Derived from historical metrics, hyperparameter analysis, and failure patterns",
+                border_style="blue",
+            )
+        )
 
         rec_type_icons = {
             "hyperparameter_change": "⚙️",

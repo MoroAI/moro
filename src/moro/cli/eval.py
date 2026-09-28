@@ -251,29 +251,37 @@ def compare_command(
 
         if json_output:
             import json as _json
-            typer.echo(_json.dumps({
-                "base": base_result.model_dump(mode="json"),
-                "adapter": adapter_result.model_dump(mode="json"),
-                "delta": delta,
-            }, indent=2))
+
+            typer.echo(
+                _json.dumps(
+                    {
+                        "base": base_result.model_dump(mode="json"),
+                        "adapter": adapter_result.model_dump(mode="json"),
+                        "delta": delta,
+                    },
+                    indent=2,
+                )
+            )
             return
 
         # Summary panel
         dr = delta["pass_rate_delta"]
         summary_color = "green" if dr > 0 else "red" if dr < 0 else "yellow"
-        console.print(Panel(
-            f"[bold]Pass rate:[/bold] {base_result.pass_rate * 100:.1f}% → "
-            f"[{summary_color}]{adapter_result.pass_rate * 100:.1f}%[/{summary_color}] "
-            f"([{summary_color}]{'+' if dr >= 0 else ''}{dr * 100:.1f}%[/{summary_color}])\n"
-            f"[bold]Avg score:[/bold] {base_result.avg_score:.4f} → "
-            f"{adapter_result.avg_score:.4f} ({'+' if delta['avg_score_delta'] >= 0 else ''}"
-            f"{delta['avg_score_delta']:.4f})\n"
-            f"[bold]Improved cases:[/bold] [green]{delta['improved_cases']}[/green]  "
-            f"[bold]Regressions:[/bold] [red]{delta['regressed_cases']}[/red]  "
-            f"[bold]Unchanged:[/bold] {delta['unchanged_cases']}",
-            title=f"Comparison — {delta['summary'].replace('_', ' ').title()}",
-            border_style=summary_color,
-        ))
+        console.print(
+            Panel(
+                f"[bold]Pass rate:[/bold] {base_result.pass_rate * 100:.1f}% → "
+                f"[{summary_color}]{adapter_result.pass_rate * 100:.1f}%[/{summary_color}] "
+                f"([{summary_color}]{'+' if dr >= 0 else ''}{dr * 100:.1f}%[/{summary_color}])\n"
+                f"[bold]Avg score:[/bold] {base_result.avg_score:.4f} → "
+                f"{adapter_result.avg_score:.4f} ({'+' if delta['avg_score_delta'] >= 0 else ''}"
+                f"{delta['avg_score_delta']:.4f})\n"
+                f"[bold]Improved cases:[/bold] [green]{delta['improved_cases']}[/green]  "
+                f"[bold]Regressions:[/bold] [red]{delta['regressed_cases']}[/red]  "
+                f"[bold]Unchanged:[/bold] {delta['unchanged_cases']}",
+                title=f"Comparison — {delta['summary'].replace('_', ' ').title()}",
+                border_style=summary_color,
+            )
+        )
 
         # Per-case delta table
         table = Table(title="Per-Case Delta", show_header=True)
@@ -359,7 +367,9 @@ def perturb_command(
         if output:
             create_perturbed_suite(suite_path, output, seed=seed, max_samples=max_samples)
             if not json_output:
-                console.print(f"[bold green]✓[/bold green] Perturbed eval suite exported to: [bold]{output}[/bold]")
+                console.print(
+                    f"[bold green]✓[/bold green] Perturbed eval suite exported to: [bold]{output}[/bold]"
+                )
             if not base_model and not run_id:
                 if json_output:
                     typer.echo(json.dumps({"exported_suite": str(output), "seed": seed}))
@@ -394,7 +404,9 @@ def perturb_command(
                 seed=seed,
                 max_samples=max_samples,
                 local_only=cfg.project.privacy_mode == "local_only",
-                revision=cfg.model.revision if not run_id and model_path == cfg.model.name else None,
+                revision=cfg.model.revision
+                if not run_id and model_path == cfg.model.name
+                else None,
             )
 
         if json_output:
@@ -452,7 +464,11 @@ def perturb_command(
         for c in report.case_results:
             b_icon = "[green]✓[/green]" if c.base_passed else "[red]✗[/red]"
             v_color = "green" if c.vulnerability_count == 0 else "red"
-            failed_str = ", ".join(c.failed_perturbations) if c.failed_perturbations else "[green]none[/green]"
+            failed_str = (
+                ", ".join(c.failed_perturbations)
+                if c.failed_perturbations
+                else "[green]none[/green]"
+            )
             table.add_row(
                 c.case_id,
                 b_icon,
@@ -473,4 +489,3 @@ def perturb_command(
     except Exception as exc:
         console.print(f"[bold red]Unexpected error:[/bold red] {exc}")
         raise typer.Exit(code=1)
-
