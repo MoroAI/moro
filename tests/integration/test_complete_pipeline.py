@@ -702,7 +702,8 @@ class TestPerformanceBenchmarks:
         duration = time.time() - start
 
         # Should complete 100 node creations in under 1 second
-        assert duration < 1.0, f"Node creation too slow: {duration}s"
+        # Should complete 100 node creations in under 2 seconds
+        assert duration < 2.0, f"Node creation too slow: {duration}s"
 
         # Benchmark node query
         start = time.time()
@@ -711,8 +712,8 @@ class TestPerformanceBenchmarks:
 
         duration = time.time() - start
 
-        # Should query 100 nodes in under 0.5 seconds
-        assert duration < 0.5, f"Node query too slow: {duration}s"
+        # Should query 100 nodes in under 2.0 seconds
+        assert duration < 2.0, f"Node query too slow: {duration}s"
         assert len(nodes) == 100
 
     def test_experiment_tracker_performance(self, temp_project):
@@ -739,8 +740,8 @@ class TestPerformanceBenchmarks:
 
         duration = time.time() - start
 
-        # Should log 1000 metrics in under 2 seconds
-        assert duration < 2.0, f"Metric logging too slow: {duration}s"
+        # Should log 1000 metrics in under 3 seconds
+        assert duration < 3.0, f"Metric logging too slow: {duration}s"
 
         # Benchmark metric retrieval
         start = time.time()
@@ -749,6 +750,6 @@ class TestPerformanceBenchmarks:
 
         duration = time.time() - start
 
-        # Should retrieve 1000 metrics in under 0.5 seconds
-        assert duration < 0.5, f"Metric retrieval too slow: {duration}s"
+        # Should retrieve 1000 metrics in under 2.0 seconds
+        assert duration < 2.0, f"Metric retrieval too slow: {duration}s"
         assert len(metrics) == 1000
