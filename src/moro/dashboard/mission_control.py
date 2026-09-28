@@ -32,9 +32,14 @@ class DockerConnector:
 
     def __init__(self) -> None:
         self._available: bool | None = None
+        self._last_checked: float = 0.0
 
     @property
     def available(self) -> bool:
+        import time
+        now = time.time()
+        if self._available is not None and (now - self._last_checked) < 5.0:
+            return self._available
         try:
             result = subprocess.run(
                 ["docker", "info"],
@@ -44,6 +49,7 @@ class DockerConnector:
             self._available = result.returncode == 0
         except (FileNotFoundError, subprocess.TimeoutExpired, OSError):
             self._available = False
+        self._last_checked = now
         return self._available
 
     def list_containers(self) -> list[dict]:
@@ -111,15 +117,23 @@ class OllamaConnector:
 
     def __init__(self, base_url: str = "http://127.0.0.1:11434") -> None:
         self.base_url = base_url
+        self._available: bool | None = None
+        self._last_checked: float = 0.0
 
     @property
     def available(self) -> bool:
+        import time
+        now = time.time()
+        if self._available is not None and (now - self._last_checked) < 5.0:
+            return self._available
         try:
             import httpx
-            response = httpx.get(f"{self.base_url}/api/tags", timeout=3.0)
-            return response.status_code == 200
+            response = httpx.get(f"{self.base_url}/api/tags", timeout=1.0)
+            self._available = response.status_code == 200
         except Exception:
-            return False
+            self._available = False
+        self._last_checked = now
+        return self._available
 
     def list_models(self) -> list[dict]:
         """List all Ollama models."""
@@ -840,3 +854,7 @@ async def ws_logs_stream(websocket: WebSocket) -> None:
             await asyncio.sleep(3)
     except WebSocketDisconnect:
         pass
+
+
+# Global alias for orchestrators and tests
+mission_app = app

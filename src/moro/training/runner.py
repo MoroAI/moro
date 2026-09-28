@@ -20,11 +20,14 @@ logger = logging.getLogger(__name__)
 class TrainingRunner:
     """Orchestrates model fine-tuning with automatic experiment tracking."""
 
-    def __init__(self, project_root: Path) -> None:
+    def __init__(self, project_root: Path, experiment_tracker: Any = None) -> None:
         self.project_root = Path(project_root)
         self.project_root.mkdir(parents=True, exist_ok=True)
-        analytics_db = self.project_root / ".moro" / "analytics.db"
-        self.tracker = ExperimentTracker(analytics_db)
+        if experiment_tracker is not None:
+            self.tracker = experiment_tracker
+        else:
+            analytics_db = self.project_root / ".moro" / "analytics.db"
+            self.tracker = ExperimentTracker(analytics_db)
 
     def _get_gpu_name(self) -> str | None:
         try:
@@ -152,3 +155,24 @@ class TrainingRunner:
                 error_message=str(exc),
             )
             raise
+
+    async def run_training_async(
+        self,
+        experiment_id: str,
+        dataset_id: str,
+        recipe: dict[str, Any],
+        progress_callback: Any = None,
+    ) -> dict[str, Any]:
+        """Asynchronously run training with progress reporting."""
+        from moro.training.async_runner import AsyncTrainingRunner
+
+        runner = AsyncTrainingRunner(
+            project_root=self.project_root,
+            experiment_tracker=self.tracker,
+        )
+        return await runner.run_training_async(
+            experiment_id=experiment_id,
+            dataset_id=dataset_id,
+            recipe=recipe,
+            progress_callback=progress_callback,
+        )

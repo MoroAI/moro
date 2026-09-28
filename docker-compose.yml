@@ -1,0 +1,112 @@
+version: '3.8'
+
+services:
+  # Ollama for model serving
+  ollama:
+    image: ollama/ollama:latest
+    container_name: moroai-ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+      - ./releases:/models
+    environment:
+      - OLLAMA_NUM_PARALLEL=4
+      - OLLAMA_MAX_LOADED_MODELS=2
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Webhook receiver for production logs
+  webhook:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: moroai-webhook
+    command: python -m uvicorn moro.flywheel.webhook.receiver:webhook_app --host 0.0.0.0 --port 8001
+    ports:
+      - "8001:8001"
+    volumes:
+      - ./data:/app/data
+      - ./.moro:/app/.moro
+    environment:
+      - MORO_PROJECT_ROOT=/app
+    depends_on:
+      - ollama
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/webhook/stats"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Mission Control Dashboard
+  dashboard:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: moroai-dashboard
+    command: python -m uvicorn moro.dashboard.mission_control:mission_app --host 0.0.0.0 --port 8501
+    ports:
+      - "8501:8501"
+    volumes:
+      - ./data:/app/data
+      - ./.moro:/app/.moro
+      - ./runs:/app/runs
+      - ./releases:/app/releases
+    environment:
+      - MORO_PROJECT_ROOT=/app
+    depends_on:
+      - ollama
+      - webhook
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8501/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Feedback Gateway (proxy for chat UIs)
+  gateway:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: moroai-gateway
+    command: python -m uvicorn moro.dashboard.gateway:gateway_app --host 0.0.0.0 --port 8000
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data:/app/data
+    environment:
+      - MORO_PROJECT_ROOT=/app
+      - OLLAMA_BASE_URL=http://ollama:11434
+    depends_on:
+      - ollama
+    restart: unless-stopped
+
+  # Flywheel Daemon (runs periodically)
+  flywheel:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: moroai-flywheel
+    command: >
+      sh -c "while true; do
+        python -m moro.main flywheel run;
+        sleep 3600;
+      done"
+    volumes:
+      - ./data:/app/data
+      - ./.moro:/app/.moro
+      - ./runs:/app/runs
+    environment:
+      - MORO_PROJECT_ROOT=/app
+    depends_on:
+      - ollama
+    restart: unless-stopped
+
+volumes:
+  ollama_data:

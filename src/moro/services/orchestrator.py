@@ -62,6 +62,38 @@ class ServiceDefinition:
         self.description = description
 
 
+class ServiceStatusList(list):
+    """Dual list/dictionary interface for service statuses."""
+
+    def __getitem__(self, key: Any) -> Any:
+        if isinstance(key, str):
+            for item in self:
+                if item.get("name") == key:
+                    return item
+            raise KeyError(key)
+        return super().__getitem__(key)
+
+    def __contains__(self, key: Any) -> bool:
+        if isinstance(key, str):
+            return any(item.get("name") == key for item in self)
+        return super().__contains__(key)
+
+    def values(self) -> list[dict[str, Any]]:
+        return list(self)
+
+    def keys(self) -> list[str]:
+        return [item["name"] for item in self if "name" in item]
+
+    def items(self) -> list[tuple[str, dict[str, Any]]]:
+        return [(item["name"], item) for item in self if "name" in item]
+
+    def get(self, key: str, default: Any = None) -> Any:
+        for item in self:
+            if item.get("name") == key:
+                return item
+        return default
+
+
 class ServiceOrchestrator:
     """Orchestrates all MoroAI background services.
 
@@ -237,21 +269,20 @@ class ServiceOrchestrator:
             conn.close()
         except Exception:
             pass
-
     # ===================================================================
     # SERVICE CONTROL OPERATIONS
     # ===================================================================
 
-    def get_status(self) -> dict[str, dict[str, Any]]:
+    def get_status(self) -> ServiceStatusList:
         """Return the running status of all managed services."""
-        result: dict[str, dict[str, Any]] = {}
+        items: list[dict[str, Any]] = []
         for name, service in self.services.items():
             running = is_port_open(service.port) if service.port else False
             pid = self._read_pid(name)
             healthy = self._check_health(service) if running else False
 
             service_type = "docker" if name == "ollama" and not pid else service.service_type
-            result[name] = {
+            items.append({
                 "name": name,
                 "type": service_type,
                 "port": service.port,
@@ -260,8 +291,8 @@ class ServiceOrchestrator:
                 "healthy": healthy,
                 "pid": pid,
                 "description": service.description,
-            }
-        return result
+            })
+        return ServiceStatusList(items)
 
     def start_service(self, name: str) -> bool:
         """Start a specific service."""
