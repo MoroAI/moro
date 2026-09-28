@@ -41,8 +41,30 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css">
     <script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.js"></script>
     
+    <!-- Dropzone.js for file uploads -->
+    <link rel="stylesheet" href="https://unpkg.com/dropzone@5/dist/min/dropzone.min.css">
+    <script src="https://unpkg.com/dropzone@5/dist/min/dropzone.min.js"></script>
+    
     <style>
         body { font-family: 'Inter', system-ui, -apple-system, sans-serif; }
+        
+        /* Dropzone Dark Custom Styling */
+        .dropzone {
+            border: 2px dashed rgba(14, 165, 233, 0.4) !important;
+            border-radius: 12px !important;
+            background: rgba(15, 23, 42, 0.6) !important;
+            backdrop-filter: blur(8px);
+            transition: all 0.25s ease;
+        }
+        .dropzone:hover {
+            border-color: #0ea5e9 !important;
+            background: rgba(14, 165, 233, 0.08) !important;
+        }
+        .dropzone .dz-message {
+            color: #94a3b8 !important;
+            font-size: 1rem;
+            margin: 2em 0;
+        }
         ::-webkit-scrollbar { width: 6px; height: 6px; }
         ::-webkit-scrollbar-track { background: #0f172a; }
         ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
@@ -107,6 +129,11 @@
                             :class="activeTab === 'overview' ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30' : 'text-gray-400 hover:text-white hover:bg-gray-800/50'"
                             class="px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all">
                         🚀 Overview
+                    </button>
+                    <button @click="setTab('datasets')" 
+                            :class="activeTab === 'datasets' ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30' : 'text-gray-400 hover:text-white hover:bg-gray-800/50'"
+                            class="px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all">
+                        📁 Datasets
                     </button>
                     <button @click="setTab('training')" 
                             :class="activeTab === 'training' ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30' : 'text-gray-400 hover:text-white hover:bg-gray-800/50'"
@@ -421,6 +448,194 @@
                                 </p>
                             </div>
                         </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- ======================================================== -->
+        <!-- TAB 1.5: DATASET FOUNDRY & INGESTION                     -->
+        <!-- ======================================================== -->
+        <div x-show="activeTab === 'datasets'" x-transition>
+            <!-- Header & Summary Metrics -->
+            <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
+                <div>
+                    <h2 class="text-xl font-bold text-white flex items-center gap-2">
+                        <span>📁</span> Dataset Foundry & Epistemic Curation
+                    </h2>
+                    <p class="text-xs text-gray-400">Ingest domain data, inspect mutual information distributions, and build training-ready splits.</p>
+                </div>
+                <div class="flex items-center gap-3">
+                    <button @click="fetchDatasets()" class="px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-xs font-semibold rounded-lg text-gray-200 transition-all">
+                        🔄 Refresh
+                    </button>
+                    <span class="text-xs font-mono px-2.5 py-1 rounded-lg bg-blue-950 text-blue-400 border border-blue-800">
+                        <span x-text="datasets.length">0</span> Datasets Available
+                    </span>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+                <!-- Dropzone Upload Area (1 Col) -->
+                <div class="mission-card rounded-xl p-6 space-y-4">
+                    <div class="flex justify-between items-center">
+                        <h3 class="text-sm font-bold text-white flex items-center gap-2">
+                            <span>📤</span> Drag & Drop Dataset Upload
+                        </h3>
+                        <span class="text-[10px] font-mono text-cyan-400 bg-cyan-950/60 border border-cyan-800 px-1.5 py-0.5 rounded">Raw Ingestion</span>
+                    </div>
+                    
+                    <form action="/api/datasets/upload" class="dropzone" id="dataset-upload-dropzone">
+                        <div class="dz-message needsclick text-center py-6">
+                            <div class="w-12 h-12 bg-blue-500/10 text-blue-400 rounded-xl mx-auto mb-3 flex items-center justify-center text-2xl">
+                                📥
+                            </div>
+                            <p class="text-sm font-semibold text-gray-200">Drop files here or click to browse</p>
+                            <p class="text-[11px] text-gray-500 mt-1">Supports .jsonl, .json, .csv, .txt</p>
+                        </div>
+                    </form>
+
+                    <div class="p-3 bg-gray-950/70 border border-gray-800 rounded-xl flex items-center justify-between">
+                        <label for="auto-compile-chk" class="text-xs text-gray-300 font-medium cursor-pointer">
+                            Auto-compile after upload
+                        </label>
+                        <input type="checkbox" id="auto-compile-chk" x-model="autoCompileUpload" class="w-4 h-4 rounded bg-gray-900 border-gray-700 text-blue-600 focus:ring-0">
+                    </div>
+
+                    <div class="text-[11px] text-gray-400 space-y-1 bg-blue-950/20 border border-blue-900/40 p-3 rounded-xl">
+                        <p class="font-semibold text-blue-300">💡 Epistemic Validation:</p>
+                        <p>Uploaded corpora are validated against schema standards and prepared for Shannon entropy & MI Guard filtering.</p>
+                    </div>
+                </div>
+
+                <!-- Datasets Table / List (2 Cols) -->
+                <div class="lg:col-span-2 mission-card rounded-xl p-6">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-sm font-bold text-white flex items-center gap-2">
+                            <span>📋</span> Project Datasets Registry
+                        </h3>
+                        <span class="text-xs text-gray-400 font-mono" x-text="datasets.length + ' registered'"></span>
+                    </div>
+
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-xs">
+                            <thead class="border-b border-gray-800 text-gray-400 uppercase font-mono text-[10px]">
+                                <tr>
+                                    <th class="pb-2.5">Name / ID</th>
+                                    <th class="pb-2.5">Format</th>
+                                    <th class="pb-2.5">Size</th>
+                                    <th class="pb-2.5">Rows</th>
+                                    <th class="pb-2.5">Status</th>
+                                    <th class="pb-2.5 text-right">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-gray-800/60 font-mono">
+                                <template x-for="ds in datasets" :key="ds.id">
+                                    <tr class="hover:bg-gray-800/30 transition-colors">
+                                        <td class="py-3 font-sans">
+                                            <p class="font-semibold text-white truncate max-w-[180px]" x-text="ds.name"></p>
+                                            <p class="text-[10px] text-gray-500 font-mono truncate max-w-[180px]" x-text="ds.id"></p>
+                                        </td>
+                                        <td class="py-3">
+                                            <span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase"
+                                                  :class="ds.format === 'jsonl' ? 'bg-indigo-950 text-indigo-400 border border-indigo-800' : 'bg-gray-800 text-gray-300'"
+                                                  x-text="ds.format"></span>
+                                        </td>
+                                        <td class="py-3 text-gray-300" x-text="formatBytes(ds.size_bytes)"></td>
+                                        <td class="py-3 text-cyan-400 font-semibold" x-text="ds.row_count != null ? ds.row_count.toLocaleString() : '-'"></td>
+                                        <td class="py-3">
+                                            <span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase"
+                                                  :class="ds.status === 'compiled' ? 'bg-emerald-950 text-emerald-400 border border-emerald-800' : 'bg-blue-950 text-blue-400 border border-blue-800'"
+                                                  x-text="ds.status"></span>
+                                        </td>
+                                        <td class="py-3 text-right space-x-1.5">
+                                            <button @click="previewDataset(ds.id)" 
+                                                    class="px-2.5 py-1 bg-gray-800 hover:bg-gray-700 text-blue-400 rounded text-[11px] font-sans font-medium transition-all">
+                                                Preview
+                                            </button>
+                                            <button @click="compileDataset(ds.id)" 
+                                                    class="px-2.5 py-1 bg-blue-600/20 hover:bg-blue-600/40 text-blue-300 rounded text-[11px] font-sans font-medium transition-all">
+                                                Compile
+                                            </button>
+                                            <button @click="deleteDataset(ds.id)" 
+                                                    class="px-2 py-1 bg-red-950/40 hover:bg-red-900/60 text-red-400 rounded text-[11px] font-sans transition-all">
+                                                ✕
+                                            </button>
+                                        </td>
+                                    </tr>
+                                </template>
+                                <template x-if="datasets.length === 0">
+                                    <tr>
+                                        <td colspan="6" class="py-8 text-center text-gray-500 font-sans">
+                                            No datasets detected. Drop files in the upload box above or run <code class="font-mono text-cyan-400">moro import &lt;file&gt;</code>.
+                                        </td>
+                                    </tr>
+                                </template>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Dataset Preview Modal -->
+            <div x-show="showDatasetModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm" x-transition>
+                <div class="bg-gray-900 border border-gray-800 rounded-2xl max-w-4xl w-full max-h-[85vh] flex flex-col overflow-hidden shadow-2xl">
+                    <div class="p-5 border-b border-gray-800 flex justify-between items-center bg-gray-950/60">
+                        <div>
+                            <h3 class="text-base font-bold text-white flex items-center gap-2">
+                                <span>🔍</span> Dataset Preview & Quality Telemetry
+                            </h3>
+                            <p class="text-xs text-gray-400 font-mono" x-text="datasetPreview?.dataset_id || ''"></p>
+                        </div>
+                        <button @click="showDatasetModal = false" class="text-gray-400 hover:text-white text-lg p-1">✕</button>
+                    </div>
+
+                    <div class="p-6 overflow-y-auto space-y-5 flex-1">
+                        <!-- Quality metrics stats -->
+                        <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+                            <div class="p-3 bg-gray-950 rounded-xl border border-gray-800 text-center">
+                                <p class="text-[10px] text-gray-400 uppercase font-mono">Total Rows</p>
+                                <p class="text-lg font-bold text-white mt-1" x-text="datasetPreview?.quality_metrics?.total_rows || 0"></p>
+                            </div>
+                            <div class="p-3 bg-gray-950 rounded-xl border border-gray-800 text-center">
+                                <p class="text-[10px] text-gray-400 uppercase font-mono">Sample Inspected</p>
+                                <p class="text-lg font-bold text-cyan-400 mt-1" x-text="datasetPreview?.quality_metrics?.sample_size || 0"></p>
+                            </div>
+                            <div class="p-3 bg-gray-950 rounded-xl border border-gray-800 text-center">
+                                <p class="text-[10px] text-gray-400 uppercase font-mono">Field Count</p>
+                                <p class="text-lg font-bold text-purple-400 mt-1" x-text="datasetPreview?.quality_metrics?.columns || 0"></p>
+                            </div>
+                            <div class="p-3 bg-gray-950 rounded-xl border border-gray-800 text-center">
+                                <p class="text-[10px] text-gray-400 uppercase font-mono">Avg Row Size</p>
+                                <p class="text-lg font-bold text-emerald-400 mt-1" x-text="(datasetPreview?.quality_metrics?.avg_row_size || 0).toFixed(0) + ' B'"></p>
+                            </div>
+                        </div>
+
+                        <!-- Detected fields -->
+                        <div>
+                            <p class="text-xs font-semibold text-gray-300 mb-2">Detected Schema Keys:</p>
+                            <div class="flex flex-wrap gap-1.5">
+                                <template x-for="col in datasetPreview?.columns || []" :key="col">
+                                    <span class="px-2 py-0.5 rounded-full text-xs font-mono bg-blue-950 text-blue-300 border border-blue-800" x-text="col"></span>
+                                </template>
+                            </div>
+                        </div>
+
+                        <!-- Sample rows -->
+                        <div>
+                            <p class="text-xs font-semibold text-gray-300 mb-2">Sample Content (First 10 records):</p>
+                            <div class="space-y-2">
+                                <template x-for="(row, idx) in datasetPreview?.sample_rows || []" :key="idx">
+                                    <pre class="p-3 bg-gray-950 rounded-lg border border-gray-800 text-[11px] font-mono text-gray-300 overflow-x-auto" x-text="JSON.stringify(row, null, 2)"></pre>
+                                </template>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="p-4 border-t border-gray-800 bg-gray-950/60 flex justify-end">
+                        <button @click="showDatasetModal = false" class="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-semibold">
+                            Close
+                        </button>
                     </div>
                 </div>
             </div>
@@ -999,9 +1214,15 @@
                 analyticsFilterStatus: "",
                 lossCurvesChartInstance: null,
                 qualityTrendChartInstance: null,
+                datasets: [],
+                showDatasetModal: false,
+                datasetPreview: null,
+                autoCompileUpload: false,
+                dropzoneInstance: null,
                 
                 init() {
                     this.fetchOverview();
+                    this.fetchDatasets();
                     this.initChart();
                     this.fetchAnalyticsData();
                     setInterval(() => this.fetchOverview(), 8000);
@@ -1009,6 +1230,10 @@
                 
                 setTab(tab) {
                     this.activeTab = tab;
+                    if (tab === 'datasets') {
+                        this.fetchDatasets();
+                        this.$nextTick(() => this.initDropzone());
+                    }
                     if (tab === 'terminal') {
                         this.$nextTick(() => this.initTerminal());
                     }
@@ -1022,6 +1247,92 @@
                             this.renderQualityTrend();
                         });
                     }
+                },
+
+                async fetchDatasets() {
+                    try {
+                        const res = await fetch('/api/datasets/');
+                        if (res.ok) {
+                            this.datasets = await res.json();
+                        }
+                    } catch (e) {
+                        console.error("Failed to fetch datasets:", e);
+                    }
+                },
+
+                initDropzone() {
+                    if (this.dropzoneInstance || typeof Dropzone === 'undefined') return;
+                    const el = document.getElementById('dataset-upload-dropzone');
+                    if (!el) return;
+
+                    const self = this;
+                    Dropzone.autoDiscover = false;
+                    try {
+                        this.dropzoneInstance = new Dropzone('#dataset-upload-dropzone', {
+                            url: '/api/datasets/upload',
+                            paramName: 'file',
+                            maxFilesize: 500,
+                            acceptedFiles: '.jsonl,.json,.csv,.txt',
+                            sending: function(file, xhr, formData) {
+                                formData.append('auto_compile', self.autoCompileUpload);
+                            },
+                            success: function(file, response) {
+                                self.fetchDatasets();
+                                setTimeout(() => {
+                                    if (self.dropzoneInstance) self.dropzoneInstance.removeFile(file);
+                                }, 2500);
+                            },
+                            error: function(file, message) {
+                                console.error("Upload error:", message);
+                            }
+                        });
+                    } catch (e) {
+                        console.log("Dropzone initialization notice:", e);
+                    }
+                },
+
+                async previewDataset(datasetId) {
+                    try {
+                        const res = await fetch(`/api/datasets/${datasetId}/preview`);
+                        if (res.ok) {
+                            this.datasetPreview = await res.json();
+                            this.showDatasetModal = true;
+                        }
+                    } catch (e) {
+                        console.error("Preview error:", e);
+                    }
+                },
+
+                async compileDataset(datasetId) {
+                    try {
+                        const res = await fetch(`/api/datasets/${datasetId}/compile`, { method: 'POST' });
+                        if (res.ok) {
+                            this.fetchDatasets();
+                            this.triggerCommand('moro data build');
+                        }
+                    } catch (e) {
+                        console.error("Compile error:", e);
+                    }
+                },
+
+                async deleteDataset(datasetId) {
+                    if (!confirm(`Delete dataset ${datasetId}?`)) return;
+                    try {
+                        const res = await fetch(`/api/datasets/${datasetId}`, { method: 'DELETE' });
+                        if (res.ok) {
+                            this.fetchDatasets();
+                        }
+                    } catch (e) {
+                        console.error("Delete error:", e);
+                    }
+                },
+
+                formatBytes(bytes) {
+                    if (!bytes || bytes === 0) return '0 B';
+                    const k = 1024;
+                    const sizes = ['B', 'KB', 'MB', 'GB'];
+                    const i = Math.floor(Math.log(bytes) / Math.log(k));
+                    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
                 },
 
                 toggleExpSelection(id) {

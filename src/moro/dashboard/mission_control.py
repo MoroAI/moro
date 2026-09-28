@@ -22,6 +22,13 @@ from pydantic import BaseModel
 from moro.analytics.tracker import ExperimentTracker
 from moro.analytics.visualizations import VisualAnalyticsEngine
 from moro.core.project import find_project_root
+from moro.dashboard.api.datasets import router as datasets_router
+from moro.dashboard.api.deployment import router as deployment_router
+from moro.dashboard.api.evaluation import router as evaluation_router
+from moro.dashboard.api.flywheel import router as flywheel_router
+from moro.dashboard.api.models import router as models_router
+from moro.dashboard.api.system import router as system_router
+from moro.dashboard.api.training import router as training_router
 
 # ===================================================================
 # SERVICE CONNECTORS
@@ -392,6 +399,20 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.include_router(datasets_router)
+app.include_router(training_router)
+app.include_router(models_router)
+app.include_router(deployment_router)
+app.include_router(system_router)
+app.include_router(evaluation_router)
+app.include_router(flywheel_router)
+
+static_dir = Path(__file__).resolve().parent / "static"
+if static_dir.exists():
+    from fastapi.staticfiles import StaticFiles
+
+    app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
 
 _connectors: dict[str, object] = {}
 

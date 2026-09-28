@@ -2,6 +2,7 @@ import typer
 
 from moro import __version__
 from moro.cli.analytics import analytics_app
+from moro.cli.dashboard import dashboard_app
 from moro.cli.data import app as data_app
 from moro.cli.deploy import deploy_command
 from moro.cli.diagnose import diagnose_command
@@ -105,7 +106,7 @@ app.add_typer(analytics_app, name="analytics")
 
 # ── Mission Control Web Dashboard ─────────────────────────────────────────────
 app.command(name="ui", help="Launch the MoroAI Mission Control Web Dashboard.")(ui_command)
-app.command(name="dashboard", help="Launch the MoroAI Mission Control Web Dashboard.")(ui_command)
+app.add_typer(dashboard_app, name="dashboard")
 
 # ── Version ──────────────────────────────────────────────────────────────────
 @app.command(name="version", help="Show MoroAI version.")

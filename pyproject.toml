@@ -28,6 +28,7 @@ dependencies = [
   "pydantic>=2.7",
   "PyYAML>=6.0",
   "psutil>=5.9",
+  "python-multipart>=0.0.18",
 ]
 
 [project.optional-dependencies]
