@@ -1,0 +1,40 @@
+project:
+  name: quickstart-assistant
+  privacy_mode: local_only
+  seed: 42
+
+dataset:
+  source: ./data/sample_data.jsonl
+  format: jsonl
+  deduplicate: true
+  pii_scan: false
+  max_seq_length: 1024
+
+model:
+  name: Qwen/Qwen2.5-1.5B-Instruct
+  quantization: nf4
+
+adapter:
+  type: lora
+  r: 16
+  alpha: 32
+  target_modules: auto
+
+training:
+  learning_rate: 0.0002
+  batch_size: 1
+  epochs: 3
+  max_seq_length: 1024
+
+eval:
+  suites:
+    - path: ./eval/sample_suite.yaml
+      name: general-qa
+
+release:
+  export:
+    - adapter
+    - ollama
+
+flywheel:
+  enabled: true

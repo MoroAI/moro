@@ -53,8 +53,10 @@ _TARGET_MODULES: dict[str, list[str]] = {
 }
 
 
-def _get_target_modules(model_name: str) -> list[str]:
-    lower = model_name.lower()
+def _get_target_modules(model_name: str | None) -> list[str]:
+    if not model_name:
+        return _TARGET_MODULES["default"]
+    lower = str(model_name).lower()
     for family, modules in _TARGET_MODULES.items():
         if family in lower:
             return modules
@@ -262,20 +264,22 @@ class RecipeEngine:
         dataset_id: str | None = None,
         target_model: str | None = None,
         config: dict[str, Any] | None = None,
+        model_name: str | None = None,
+        gpu_vram_gb: float | None = None,
     ) -> dict[str, Any]:
         """Generate a training recipe tailored to dataset and target model."""
-        model_name = target_model or "test-model"
-        vram = predict_peak_vram_gb(model_class=model_name, quantization="nf4")
+        chosen_model = model_name or target_model or "test-model"
+        vram = gpu_vram_gb or predict_peak_vram_gb(model_class=chosen_model, quantization="nf4")
 
         recipe = {
-            "model_name": model_name,
-            "target_model": model_name,
+            "model_name": chosen_model,
+            "target_model": chosen_model,
             "dataset_id": dataset_id,
             "quantization": "nf4",
             "adapter_type": "lora",
             "lora_r": 8,
             "lora_alpha": 16,
-            "target_modules": _get_target_modules(model_name),
+            "target_modules": _get_target_modules(chosen_model),
             "batch_size": 1,
             "gradient_accumulation_steps": 4,
             "learning_rate": 0.0002,
@@ -292,9 +296,10 @@ class RecipeEngine:
             from moro.state.schema import NodeStatus, NodeType
 
             try:
+                safe_name = str(chosen_model).replace("/", "_")
                 self.state_manager.create_node(
                     node_type=NodeType.RECIPE,
-                    name=f"recipe_{model_name.replace('/', '_')}",
+                    name=f"recipe_{safe_name}",
                     payload=recipe,
                     status=NodeStatus.COMPLETED,
                     parent_node_id=dataset_id,

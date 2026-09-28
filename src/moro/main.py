@@ -31,8 +31,23 @@ app = typer.Typer(
 )
 
 
+def version_callback(value: bool) -> None:
+    if value:
+        typer.echo(f"moro {__version__}")
+        raise typer.Exit()
+
+
 @app.callback()
-def main() -> None:
+def main(
+    version: bool = typer.Option(
+        None,
+        "--version",
+        "-v",
+        help="Show MoroAI version.",
+        callback=version_callback,
+        is_eager=True,
+    ),
+) -> None:
     """
     MoroAI CLI.
 

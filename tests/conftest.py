@@ -3,9 +3,14 @@ Shared pytest fixtures for MoroAI tests.
 """
 
 import json
+import sys
 from pathlib import Path
 
 import pytest
+
+tests_dir = str(Path(__file__).parent)
+if tests_dir not in sys.path:
+    sys.path.insert(0, tests_dir)
 
 
 @pytest.fixture

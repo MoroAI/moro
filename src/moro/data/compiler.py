@@ -48,6 +48,12 @@ class DataCompiler:
         row_count = 0
         total_tokens = 0
 
+        compiled_dir = self.project_root / "data" / "compiled"
+        compiled_dir.mkdir(parents=True, exist_ok=True)
+        train_file = compiled_dir / "train.jsonl"
+        val_file = compiled_dir / "validation.jsonl"
+        eval_file = compiled_dir / "eval.jsonl"
+
         if source.exists() and source.is_file():
             # Fast scan of the dataset
             with open(source, encoding="utf-8", errors="replace") as f:
@@ -58,10 +64,21 @@ class DataCompiler:
                     row_count += 1
                     # Rough token estimation: ~4 chars per token
                     total_tokens += max(1, len(line) // 4)
+
+            # Ensure train.jsonl exists in compiled dir
+            if not train_file.exists() or train_file.resolve() != source.resolve():
+                import shutil
+                shutil.copy2(source, train_file)
+                if not val_file.exists():
+                    shutil.copy2(source, val_file)
+                if not eval_file.exists():
+                    shutil.copy2(source, eval_file)
         else:
             # If source is an in-memory or mock path
             row_count = int(config.get("row_count", 100))
             total_tokens = int(config.get("tokens", row_count * 50))
+            if not train_file.exists():
+                train_file.write_text('{"messages": [{"role": "user", "content": "hi"}]}\n')
 
         # Register with state manager if available
         if self.state_manager is not None:

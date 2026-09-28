@@ -96,3 +96,35 @@ class ReleaseManager:
             "manifest_path": str(manifest_path),
             "status": "completed",
         }
+
+    def create_release(
+        self,
+        run_id: str,
+        version: str,
+        eval_results: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        """Synchronously create a model release."""
+        release_dir = self.releases_dir / version
+        release_dir.mkdir(parents=True, exist_ok=True)
+
+        # Copy model from run if it exists
+        run_dir = self.project_root / "runs" / run_id
+        model_dir = run_dir / "model"
+        if model_dir.exists():
+            import shutil
+            shutil.copytree(model_dir, release_dir / "model", dirs_exist_ok=True)
+
+        metadata = {
+            "version": version,
+            "run_id": run_id,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "eval_results": eval_results,
+        }
+        with open(release_dir / "metadata.json", "w", encoding="utf-8") as f:
+            json.dump(metadata, f, indent=2)
+
+        return {
+            "version": version,
+            "release_dir": str(release_dir),
+            "status": "created",
+        }
