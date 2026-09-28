@@ -1,0 +1,82 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 520" fill="none">
+  <defs>
+    <linearGradient id="termBg" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#0f172a" />
+      <stop offset="100%" stop-color="#090d16" />
+    </linearGradient>
+    <filter id="termShadow" x="-5%" y="-5%" width="110%" height="110%">
+      <feDropShadow dx="0" dy="16" stdDeviation="20" flood-color="#000000" flood-opacity="0.6" />
+    </filter>
+  </defs>
+
+  <!-- Terminal Window Container -->
+  <g filter="url(#termShadow)">
+    <rect x="20" y="20" width="920" height="480" rx="14" fill="url(#termBg)" stroke="#334155" stroke-width="1.5" />
+    
+    <!-- Titlebar -->
+    <rect x="20" y="20" width="920" height="42" rx="14" fill="#1e293b" />
+    <!-- Bottom line of titlebar to avoid rounded bottom overlap -->
+    <rect x="20" y="50" width="920" height="12" fill="#1e293b" />
+    <line x1="20" y1="62" x2="940" y2="62" stroke="#334155" stroke-width="1" />
+
+    <!-- Window Buttons -->
+    <circle cx="46" cy="41" r="6" fill="#ef4444" />
+    <circle cx="66" cy="41" r="6" fill="#f59e0b" />
+    <circle cx="86" cy="41" r="6" fill="#10b981" />
+
+    <!-- Window Title -->
+    <text x="480" y="45" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-weight="600" font-size="12" fill="#94a3b8">
+      moro terminal — zsh (80x24)
+    </text>
+  </g>
+
+  <!-- Terminal Content (Monospace) -->
+  <g transform="translate(48, 92)" font-family="'SF Mono', 'Fira Code', Menlo, Monaco, Consolas, monospace" font-size="13">
+    <!-- Command 1: moro doctor -->
+    <text y="0" fill="#64748b">$ <tspan fill="#38bdf8" font-weight="bold">moro doctor</tspan></text>
+    <text y="22" fill="#10b981">✓ GPU Hardware:</text>
+    <text x="140" y="22" fill="#e2e8f0">NVIDIA GeForce RTX 4070 (12,282 MB VRAM)</text>
+    <text y="42" fill="#10b981">✓ Compute Stack:</text>
+    <text x="140" y="42" fill="#94a3b8">CUDA 12.4 • PyTorch 2.3.1 • FlashAttention-2 enabled</text>
+    <text y="62" fill="#10b981">✓ Privacy Guard:</text>
+    <text x="140" y="62" fill="#38bdf8">Local-only mode active • 0 outbound telemetry network requests</text>
+
+    <!-- Command 2: moro recipe suggest -->
+    <text y="102" fill="#64748b">$ <tspan fill="#38bdf8" font-weight="bold">moro recipe suggest</tspan> <tspan fill="#cbd5e1">--model Qwen/Qwen2.5-7B-Instruct</tspan></text>
+    
+    <!-- Table Box -->
+    <path d="M 0 115 L 860 115" stroke="#334155" stroke-width="1" />
+    <text y="132" fill="#a855f7" font-weight="bold">⚡ CALCULATED OPTIMAL VRAM RECIPE (Safety Margin: 18.5%):</text>
+    <text y="152" fill="#94a3b8">Method: <tspan fill="#38bdf8">QLoRA 4-bit (NF4)</tspan>  |  Batch Size: <tspan fill="#f1f5f9">2</tspan> (Grad Accum: <tspan fill="#f1f5f9">8</tspan>)  |  Seq Length: <tspan fill="#f1f5f9">2,048</tspan></text>
+    <text y="172" fill="#94a3b8">LoRA Rank (r): <tspan fill="#f1f5f9">16</tspan>  |  Alpha (α): <tspan fill="#f1f5f9">32</tspan>  |  Est. Peak VRAM: <tspan fill="#10b981" font-weight="bold">9.42 GB / 12.00 GB</tspan></text>
+    <path d="M 0 185 L 860 185" stroke="#334155" stroke-width="1" />
+
+    <!-- Command 3: moro train -->
+    <text y="215" fill="#64748b">$ <tspan fill="#38bdf8" font-weight="bold">moro train</tspan> <tspan fill="#cbd5e1">--auto-recover</tspan></text>
+    <text y="237" fill="#64748b">[09:42:01]</text>
+    <text x="90" y="237" fill="#e2e8f0">Ingesting compiled dataset (8,420 clean samples, MI entropy: 0.94)</text>
+    
+    <text y="259" fill="#64748b">[09:42:08]</text>
+    <text x="90" y="259" fill="#e2e8f0">Step 140/500 [28%]</text>
+    <text x="245" y="259" fill="#38bdf8">Loss: 1.284</text>
+    <text x="350" y="259" fill="#10b981">VRAM: 9.38 GB</text>
+    <text x="480" y="259" fill="#94a3b8">[█████████░░░░░░░░░░░░░░░░░░░░░] 4.2 tok/s</text>
+
+    <!-- OOM Self-Healing Event Box -->
+    <g transform="translate(0, 276)">
+      <rect x="0" y="0" width="860" height="54" rx="8" fill="#1e293b" stroke="#f59e0b" stroke-width="1" stroke-opacity="0.6" />
+      <text x="16" y="22" fill="#fbbf24" font-weight="bold">⚡ [09:42:15] VRAM SPIKE INTERCEPTED (11.85 GB / 12.00 GB) → AUTONOMOUS SELF-HEAL:</text>
+      <text x="16" y="42" fill="#e2e8f0">↳ Level 1 Triggered: <tspan fill="#38bdf8">Dynamic sequence truncated 2048 → 1792</tspan>. Peak stabilized at <tspan fill="#10b981" font-weight="bold">9.10 GB</tspan>. Zero crash.</text>
+    </g>
+
+    <!-- Training Completion -->
+    <text y="354" fill="#64748b">[09:44:12]</text>
+    <text x="90" y="354" fill="#10b981" font-weight="bold">✓ Training converged! Final loss: 0.392 (Eval benchmark: +28.4% domain score)</text>
+
+    <!-- Deploy Command -->
+    <text y="382" fill="#64748b">$ <tspan fill="#38bdf8" font-weight="bold">moro deploy</tspan> <tspan fill="#cbd5e1">--target ollama --tag support-bot:v1</tspan></text>
+    <text y="402" fill="#10b981">✓ GGUF Q4_K_M quantified</text>
+    <text x="220" y="402" fill="#e2e8f0">✓ Modelfile registered to Ollama daemon</text>
+    <text x="560" y="402" fill="#c084fc">🚀 ollama run support-bot:v1</text>
+  </g>
+</svg>

@@ -1,0 +1,149 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 480" fill="none">
+  <defs>
+    <!-- Background Gradient -->
+    <linearGradient id="diagBg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0a0f1d" />
+      <stop offset="100%" stop-color="#040711" />
+    </linearGradient>
+
+    <!-- Node Gradient 1: Data -->
+    <linearGradient id="dataGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#1e293b" />
+      <stop offset="100%" stop-color="#0f172a" />
+    </linearGradient>
+
+    <!-- Gradient Accents -->
+    <linearGradient id="cyanLine" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#38bdf8" />
+      <stop offset="100%" stop-color="#3b82f6" />
+    </linearGradient>
+
+    <linearGradient id="purpleLine" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#818cf8" />
+      <stop offset="100%" stop-color="#c084fc" />
+    </linearGradient>
+
+    <linearGradient id="emeraldLine" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#34d399" />
+      <stop offset="100%" stop-color="#06b6d4" />
+    </linearGradient>
+
+    <filter id="nodeShadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="6" stdDeviation="8" flood-color="#000000" flood-opacity="0.5" />
+    </filter>
+
+    <filter id="lineGlow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="3" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+  </defs>
+
+  <!-- Canvas Frame -->
+  <rect width="1100" height="480" rx="16" fill="url(#diagBg)" stroke="#1e293b" stroke-width="1.5" />
+
+  <!-- Flowchart Title -->
+  <text x="50" y="46" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-weight="700" font-size="16" fill="#f8fafc" letter-spacing="0.5">
+    THE MORO END-TO-END ADAPTATION PIPELINE
+  </text>
+  <text x="50" y="68" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-weight="400" font-size="13" fill="#64748b">
+    From raw unformatted private logs to high-speed local inference in 5 autonomous steps.
+  </text>
+
+  <!-- Connective Arrows Flow -->
+  <path d="M 215 175 L 260 175" stroke="#38bdf8" stroke-width="2.5" stroke-dasharray="4 4" filter="url(#lineGlow)" />
+  <polygon points="265,175 255,170 255,180" fill="#38bdf8" />
+
+  <path d="M 470 175 L 515 175" stroke="#60a5fa" stroke-width="2.5" stroke-dasharray="4 4" filter="url(#lineGlow)" />
+  <polygon points="520,175 510,170 510,180" fill="#60a5fa" />
+
+  <path d="M 725 175 L 770 175" stroke="#a855f7" stroke-width="2.5" stroke-dasharray="4 4" filter="url(#lineGlow)" />
+  <polygon points="775,175 765,170 765,180" fill="#a855f7" />
+
+  <path d="M 875 260 L 875 320 L 515 320" stroke="#34d399" stroke-width="2.5" stroke-dasharray="4 4" filter="url(#lineGlow)" />
+  <polygon points="510,320 520,315 520,325" fill="#34d399" />
+
+  <!-- NODE 0: RAW INGESTION -->
+  <g transform="translate(50, 100)" filter="url(#nodeShadow)">
+    <rect width="165" height="150" rx="12" fill="url(#dataGrad)" stroke="#334155" stroke-width="1.5" />
+    <circle cx="28" cy="28" r="12" fill="#38bdf8" fill-opacity="0.15" />
+    <text x="24" y="32" font-size="12" fill="#38bdf8">📥</text>
+    <text x="48" y="32" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-weight="700" font-size="13" fill="#f1f5f9">1. Raw Input</text>
+    
+    <line x1="16" y1="52" x2="149" y2="52" stroke="#334155" stroke-width="1" />
+    
+    <text x="18" y="74" font-family="monospace" font-size="11" fill="#94a3b8">• JSONL / Tickets</text>
+    <text x="18" y="94" font-family="monospace" font-size="11" fill="#94a3b8">• Internal Markdown</text>
+    <text x="18" y="114" font-family="monospace" font-size="11" fill="#94a3b8">• SQL Query Logs</text>
+    <text x="18" y="134" font-family="monospace" font-size="11" fill="#38bdf8">$ moro import</text>
+  </g>
+
+  <!-- NODE 1: DATA COMPILER & MI GUARD -->
+  <g transform="translate(265, 100)" filter="url(#nodeShadow)">
+    <rect width="205" height="150" rx="12" fill="url(#dataGrad)" stroke="#38bdf8" stroke-width="1.5" />
+    <circle cx="28" cy="28" r="12" fill="#38bdf8" fill-opacity="0.2" />
+    <text x="23" y="33" font-size="12" fill="#38bdf8">🛡️</text>
+    <text x="48" y="32" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-weight="700" font-size="13" fill="#38bdf8">2. Data Compiler</text>
+    
+    <line x1="16" y1="52" x2="189" y2="52" stroke="#1e293b" stroke-width="1" />
+    
+    <text x="18" y="74" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="11" fill="#e2e8f0">✓ Cryptographic PII Masking</text>
+    <text x="18" y="94" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="11" fill="#e2e8f0">✓ Token Entropy Cleanse</text>
+    <text x="18" y="114" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="11" fill="#e2e8f0">✓ De-duplication &amp; Split</text>
+    <text x="18" y="134" font-family="monospace" font-size="11" fill="#38bdf8">$ moro data build</text>
+  </g>
+
+  <!-- NODE 2: RECIPE & TRAINING ENGINE -->
+  <g transform="translate(520, 90)" filter="url(#nodeShadow)">
+    <rect width="205" height="170" rx="12" fill="url(#dataGrad)" stroke="#60a5fa" stroke-width="1.5" />
+    <circle cx="28" cy="28" r="12" fill="#60a5fa" fill-opacity="0.2" />
+    <text x="23" y="33" font-size="12">⚙️</text>
+    <text x="48" y="32" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-weight="700" font-size="13" fill="#60a5fa">3. Training Engine</text>
+    
+    <line x1="16" y1="52" x2="189" y2="52" stroke="#1e293b" stroke-width="1" />
+    
+    <text x="18" y="72" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="11" fill="#e2e8f0">✓ VRAM Heuristic Engine</text>
+    <text x="18" y="90" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="11" fill="#e2e8f0">✓ QLoRA 4-bit / 8-bit / 16-bit</text>
+    <text x="18" y="110" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="11" fill="#10b981">✓ 5-Step OOM Self-Heal</text>
+    <text x="18" y="130" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="11" fill="#94a3b8">✓ Loss &amp; Gradient Monitor</text>
+    <text x="18" y="152" font-family="monospace" font-size="11" fill="#60a5fa">$ moro train</text>
+  </g>
+
+  <!-- NODE 3: EVAL & DEPLOY -->
+  <g transform="translate(775, 100)" filter="url(#nodeShadow)">
+    <rect width="265" height="150" rx="12" fill="url(#dataGrad)" stroke="#c084fc" stroke-width="1.5" />
+    <circle cx="28" cy="28" r="12" fill="#c084fc" fill-opacity="0.2" />
+    <text x="23" y="33" font-size="12">🚀</text>
+    <text x="48" y="32" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-weight="700" font-size="13" fill="#c084fc">4. Eval &amp; Sovereign Serve</text>
+    
+    <line x1="16" y1="52" x2="249" y2="52" stroke="#1e293b" stroke-width="1" />
+    
+    <text x="18" y="74" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="11" fill="#e2e8f0">✓ Multi-Layer Benchmark Assertions</text>
+    <text x="18" y="94" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="11" fill="#e2e8f0">✓ Export to GGUF (Q4_K_M / Q8_0)</text>
+    <text x="18" y="114" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="11" fill="#e2e8f0">✓ Instant Ollama / vLLM Service</text>
+    <text x="18" y="134" font-family="monospace" font-size="11" fill="#c084fc">$ moro deploy --target ollama</text>
+  </g>
+
+  <!-- NODE 4: DPO FEEDBACK FLYWHEEL (LOOP BACK) -->
+  <g transform="translate(265, 290)" filter="url(#nodeShadow)">
+    <rect width="245" height="135" rx="12" fill="url(#dataGrad)" stroke="#34d399" stroke-width="1.5" />
+    <circle cx="28" cy="28" r="12" fill="#34d399" fill-opacity="0.2" />
+    <text x="23" y="33" font-size="12">🔄</text>
+    <text x="48" y="32" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-weight="700" font-size="13" fill="#34d399">5. DPO Feedback Flywheel</text>
+    
+    <line x1="16" y1="52" x2="229" y2="52" stroke="#1e293b" stroke-width="1" />
+    
+    <text x="18" y="72" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="11" fill="#cbd5e1">Collects user thumbs up / down</text>
+    <text x="18" y="90" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="11" fill="#cbd5e1">Auto-compiles chosen vs rejected pairs</text>
+    <text x="18" y="115" font-family="monospace" font-size="11" fill="#34d399">$ moro flywheel sync</text>
+  </g>
+
+  <!-- MISSION CONTROL UI TAG -->
+  <g transform="translate(560, 310)">
+    <rect width="480" height="115" rx="12" fill="#0f172a" stroke="#334155" stroke-width="1" />
+    <text x="24" y="30" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-weight="700" font-size="13" fill="#f8fafc">🖥️ Mission Control Web UI</text>
+    <text x="24" y="52" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="12" fill="#94a3b8">
+      Launch a real-time web dashboard showing live VRAM telemetry, step-by-step loss convergence, dataset distribution inspectors, and model diffs.
+    </text>
+    <text x="24" y="82" font-family="monospace" font-size="12" fill="#38bdf8">$ moro ui --port 4141  →  http://localhost:4141</text>
+  </g>
+</svg>

@@ -1,0 +1,130 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 520" fill="none">
+  <defs>
+    <linearGradient id="dashBg" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#0b101d" />
+      <stop offset="100%" stop-color="#060911" />
+    </linearGradient>
+
+    <linearGradient id="chartGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#38bdf8" stop-opacity="0.35" />
+      <stop offset="100%" stop-color="#38bdf8" stop-opacity="0.0" />
+    </linearGradient>
+
+    <linearGradient id="vramGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#10b981" />
+      <stop offset="70%" stop-color="#38bdf8" />
+      <stop offset="100%" stop-color="#f59e0b" />
+    </linearGradient>
+
+    <filter id="dashShadow" x="-5%" y="-5%" width="110%" height="110%">
+      <feDropShadow dx="0" dy="16" stdDeviation="24" flood-color="#000000" flood-opacity="0.65" />
+    </filter>
+  </defs>
+
+  <!-- Frame -->
+  <g filter="url(#dashShadow)">
+    <rect x="20" y="20" width="960" height="480" rx="14" fill="url(#dashBg)" stroke="#1e293b" stroke-width="1.5" />
+
+    <!-- Top Navigation Header -->
+    <rect x="20" y="20" width="960" height="52" rx="14" fill="#0f172a" />
+    <rect x="20" y="60" width="960" height="12" fill="#0f172a" />
+    <line x1="20" y1="72" x2="980" y2="72" stroke="#1e293b" stroke-width="1" />
+
+    <!-- Header Logo & Title -->
+    <circle cx="50" cy="46" r="12" fill="#38bdf8" fill-opacity="0.2" />
+    <path d="M44 52V40L50 46L56 40V52" stroke="#38bdf8" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" />
+    <text x="72" y="51" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-weight="800" font-size="16" fill="#f8fafc">
+      Moro <tspan fill="#38bdf8">Mission Control</tspan>
+    </text>
+
+    <!-- Project Badge -->
+    <rect x="270" y="34" width="180" height="24" rx="12" fill="#1e293b" stroke="#334155" stroke-width="1" />
+    <text x="282" y="50" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="11" fill="#94a3b8">Project: <tspan fill="#e2e8f0" font-weight="600">Customer-Support-7B</tspan></text>
+
+    <!-- Status Pill -->
+    <rect x="830" y="34" width="120" height="24" rx="12" fill="#10b981" fill-opacity="0.15" stroke="#10b981" stroke-opacity="0.4" stroke-width="1" />
+    <circle cx="846" cy="46" r="4" fill="#10b981" />
+    <text x="858" y="51" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-weight="700" font-size="11" fill="#10b981">LIVE TRAINING</text>
+  </g>
+
+  <!-- Metric Card 1: VRAM Telemetry -->
+  <g transform="translate(50, 95)">
+    <rect width="280" height="120" rx="10" fill="#0f172a" stroke="#1e293b" stroke-width="1" />
+    <text x="18" y="28" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-weight="600" font-size="12" fill="#94a3b8">GPU VRAM ALLOCATION</text>
+    <text x="18" y="60" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-weight="800" font-size="28" fill="#f8fafc">9.38 <tspan font-size="16" font-weight="500" fill="#64748b">/ 12.0 GB</tspan></text>
+    
+    <!-- Progress Bar -->
+    <rect x="18" y="78" width="244" height="10" rx="5" fill="#1e293b" />
+    <rect x="18" y="78" width="190" height="10" rx="5" fill="url(#vramGrad)" />
+    
+    <text x="18" y="104" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="11" fill="#10b981">● 78% Utilized (Safety Buffer: 2.62 GB)</text>
+  </g>
+
+  <!-- Metric Card 2: Training Speed -->
+  <g transform="translate(360, 95)">
+    <rect width="280" height="120" rx="10" fill="#0f172a" stroke="#1e293b" stroke-width="1" />
+    <text x="18" y="28" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-weight="600" font-size="12" fill="#94a3b8">THROUGHPUT SPEED</text>
+    <text x="18" y="60" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-weight="800" font-size="28" fill="#38bdf8">1,840 <tspan font-size="16" font-weight="500" fill="#64748b">tok/sec</tspan></text>
+    <text x="18" y="86" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="12" fill="#e2e8f0">Batch Size: 2 • Grad Accum: 8</text>
+    <text x="18" y="104" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="11" fill="#34d399">FlashAttention-2 Kernel Active</text>
+  </g>
+
+  <!-- Metric Card 3: Quality Adherence -->
+  <g transform="translate(670, 95)">
+    <rect width="280" height="120" rx="10" fill="#0f172a" stroke="#1e293b" stroke-width="1" />
+    <text x="18" y="28" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-weight="600" font-size="12" fill="#94a3b8">EVALUATION METRIC</text>
+    <text x="18" y="60" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-weight="800" font-size="28" fill="#a855f7">+31.2%</text>
+    <text x="18" y="86" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="12" fill="#e2e8f0">Support Ticket Accuracy</text>
+    <text x="18" y="104" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="11" fill="#a855f7">Perplexity: 4.12 (Base: 8.94)</text>
+  </g>
+
+  <!-- Large Chart: Loss Curve -->
+  <g transform="translate(50, 235)">
+    <rect width="590" height="235" rx="10" fill="#0f172a" stroke="#1e293b" stroke-width="1" />
+    <text x="20" y="28" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-weight="600" font-size="12" fill="#cbd5e1">REAL-TIME LOSS CONVERGENCE (500 STEPS)</text>
+    
+    <!-- Grid Lines -->
+    <line x1="20" y1="65" x2="570" y2="65" stroke="#1e293b" stroke-dasharray="3 3" />
+    <text x="545" y="62" font-family="monospace" font-size="10" fill="#64748b">2.50</text>
+    <line x1="20" y1="115" x2="570" y2="115" stroke="#1e293b" stroke-dasharray="3 3" />
+    <text x="545" y="112" font-family="monospace" font-size="10" fill="#64748b">1.50</text>
+    <line x1="20" y1="165" x2="570" y2="165" stroke="#1e293b" stroke-dasharray="3 3" />
+    <text x="545" y="162" font-family="monospace" font-size="10" fill="#64748b">0.50</text>
+
+    <!-- Curve Fill Area -->
+    <path d="M 40 70 Q 120 140, 240 160 T 400 175 T 540 185 L 540 210 L 40 210 Z" fill="url(#chartGrad)" />
+    <!-- Main Smooth Stroke -->
+    <path d="M 40 70 Q 120 140, 240 160 T 400 175 T 540 185" stroke="#38bdf8" stroke-width="3" fill="none" />
+    
+    <!-- Current Step Dot -->
+    <circle cx="540" cy="185" r="5" fill="#38bdf8" />
+    <circle cx="540" cy="185" r="9" fill="#38bdf8" fill-opacity="0.3" />
+    <text x="470" y="172" font-family="monospace" font-weight="bold" font-size="11" fill="#38bdf8">Loss: 0.392</text>
+  </g>
+
+  <!-- Side Panel: Live Log & System Health -->
+  <g transform="translate(660, 235)">
+    <rect width="290" height="235" rx="10" fill="#0f172a" stroke="#1e293b" stroke-width="1" />
+    <text x="18" y="28" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-weight="600" font-size="12" fill="#cbd5e1">EVENT TELEMETRY FEED</text>
+    
+    <g transform="translate(18, 50)" font-family="monospace" font-size="11">
+      <text y="14" fill="#64748b">[09:42:01]</text>
+      <text x="75" y="14" fill="#38bdf8">Dataset loaded (8.4k rows)</text>
+
+      <text y="42" fill="#64748b">[09:42:15]</text>
+      <text x="75" y="42" fill="#f59e0b">OOM Spike (11.85 GB)</text>
+
+      <text y="70" fill="#64748b">[09:42:16]</text>
+      <text x="75" y="70" fill="#10b981">Dynamic Seq Cut → 1792</text>
+
+      <text y="98" fill="#64748b">[09:42:18]</text>
+      <text x="75" y="98" fill="#10b981">VRAM stabilized (9.1 GB)</text>
+
+      <text y="126" fill="#64748b">[09:43:50]</text>
+      <text x="75" y="126" fill="#e2e8f0">Validation step: PPL 4.12</text>
+
+      <text y="154" fill="#64748b">[09:44:12]</text>
+      <text x="75" y="154" fill="#a855f7">Checkpoint adapter saved</text>
+    </g>
+  </g>
+</svg>
