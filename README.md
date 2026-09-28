@@ -267,10 +267,7 @@ print(f"Compiled {dataset_summary.train_rows} rows (MI Entropy: {dataset_summary
 
 # 3. Derive optimal recipe for local hardware
 recipe_engine = RecipeEngine(project.hardware)
-recipe = recipe_engine.calculate(
-    model="Qwen/Qwen2.5-7B-Instruct",
-    target_vram_gb=12.0
-)
+recipe = recipe_engine.calculate(model="Qwen/Qwen2.5-7B-Instruct", target_vram_gb=12.0)
 
 # 4. Train with autonomous self-healing enabled
 trainer = TrainingEngine(project.config.training, recipe=recipe)
