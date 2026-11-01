@@ -1,0 +1,42 @@
+import asyncio, json, subprocess, tempfile
+from pathlib import Path
+from moro.export.gguf import write_gguf_script, convert_to_gguf_direct
+from moro.config.loader import load_config
+from moro.validation.engine import validate_project
+from moro.recipes.engine import predict_peak_vram_gb
+from moro.eval.robustness import compute_robustness_report, compute_case_robustness
+from moro.runtime.orchestrator import MoroRuntimeOrchestrator, ExecutionPhase
+from moro.state.manager import StateManager
+from moro.data.versions import build_key
+from unittest.mock import patch
+out={}
+with tempfile.TemporaryDirectory(prefix='moro-extra-probes-') as td:
+    p=Path(td); marker=p/'shell-marker'
+    script=write_gguf_script(p/'model',p/'output',project_name='$(printf AUDIT_MARKER > '+str(marker)+')')
+    r=subprocess.run(['bash',str(script)],capture_output=True,text=True)
+    out['gguf_script_injection']={'marker_created':marker.exists(),'script_exit':r.returncode}
+    cpp=p/'llama'; cpp.mkdir(); (cpp/'convert_hf_to_gguf.py').touch(); (cpp/'llama-quantize').touch()
+    def fake_run(argv,**kwargs):
+        if '--outfile' in argv: Path(argv[argv.index('--outfile')+1]).write_text('audit-only-fake-tensor')
+        else: Path(argv[2]).write_text('audit-only-fake-tensor')
+        return subprocess.CompletedProcess(argv,0)
+    with patch('moro.export.gguf.subprocess.run',side_effect=fake_run):
+        returned=convert_to_gguf_direct(p/'model',p/'gguf',cpp,quantization='f16')
+    out['gguf_f16_alias_test_mocked_converter']={'returned_file_exists':returned.exists()}
+    runtime=MoroRuntimeOrchestrator(p)
+    context=runtime.create_execution(ExecutionPhase.TRAINING,{'batch_size':1})
+    out['unbounded_recovery_at_batch_one']={'retry_requested':asyncio.run(runtime._attempt_recovery(context,RuntimeError('out of memory'))),'batch':context.config['batch_size']}
+    cfg=load_config(Path('/Users/mac/Dev/MoroAI/moro/moro.yaml'))
+    try: validate_project(cfg,Path('/Users/mac/Dev/MoroAI/moro'))
+    except Exception as e: out['default_release_validation']={'exception':type(e).__name__,'message':str(e)}
+    report=compute_robustness_report([compute_case_robustness('always-wrong',False,{'typo':False,'entity':False})])
+    out['all_wrong_robustness']={'grade':report.robustness_grade,'strict':report.avg_strict_robustness,'raw':report.avg_raw_robustness}
+    out['vram_hardcoded_branch']={str(b):predict_peak_vram_gb('1.5b',quantization='none',max_seq_length=1024,batch_size=b,lora_r=16) for b in [1,100]}
+    # A glossary's contents change but snapshot identity does not.
+    glossary=p/'glossary.txt'; glossary.write_text('before')
+    cfg.dataset.domain_glossary=glossary
+    before=build_key(cfg,p/'source','same-hash',None)
+    glossary.write_text('after')
+    out['glossary_cache_key_stale']=before==build_key(cfg,p/'source','same-hash',None)
+Path('/tmp/moro-audit-20261002/additional-probes.json').write_text(json.dumps(out,indent=2))
+print(json.dumps(out,indent=2))

@@ -1,0 +1,16 @@
+{
+  "modules": [
+    {
+      "path": "/usr/local/lib/python3.11/site-packages/moro/dashboard/uploads.py",
+      "sha256": "ba994c8aa3cd523200829a5904b99fd6d7d9ab095398b917266d5b5f3107f86d"
+    },
+    {
+      "path": "/usr/local/lib/python3.11/site-packages/moro/analytics/columns.py",
+      "sha256": "3f89a4ba061c0f0f7c2ad0354743f212fe515d5630bef470c50e9102f3a9ae81"
+    },
+    {
+      "path": "/usr/local/lib/python3.11/site-packages/moro/dashboard/templates/mission_control.html",
+      "sha256": "b3b3e0d0a0da85b12a4d46687f08c55cc530ea6c29d91ce3667a7ec380c8ea79"
+    }
+  ]
+}

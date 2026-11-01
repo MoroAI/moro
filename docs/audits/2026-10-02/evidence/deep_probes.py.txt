@@ -1,0 +1,111 @@
+"""Synthetic fault-injection probes. Never target a real project."""
+import asyncio, json, runpy, tempfile, hashlib
+from pathlib import Path
+from unittest.mock import patch
+import pytest
+from typer.testing import CliRunner
+from fastapi.testclient import TestClient
+from moro.main import app
+from moro.flywheel.ingestors.sqlite_ingestor import SQLiteLogIngestor
+from moro.flywheel.models import InferenceLogPayload
+from moro.flywheel.orchestrator import FlywheelConfig, MoroAIFlywheelOrchestrator
+from moro.flywheel.storage.schema import get_production_db
+from moro.dashboard.mission_control import app as web_app
+from moro.dashboard.api import datasets, system, models
+from moro.config.loader import load_config
+from moro.core.hashing import sha256_directory
+import moro.cli.deploy as deploy_module
+import moro.cli.export as export_module
+ROOT=Path('/Users/mac/Dev/MoroAI/moro'); OUT=Path('/tmp/moro-audit-20261002')
+results={}; runner=CliRunner()
+fixtures=runpy.run_path(str(ROOT/'tests/test_export_eligibility.py'))
+project_fixture=runpy.run_path(str(ROOT/'tests/conftest.py'))['tmp_project'].__wrapped__
+with tempfile.TemporaryDirectory(prefix='moro-deeper-audit-') as td:
+    base=Path(td)
+    # Deterministic race injection: execute genuine gate, then replace synthetic
+    # fixture bytes at the precise boundary before the packaging function.
+    for name,command,module in [('deploy',['deploy'],deploy_module),('export_ollama',['export','--format','ollama'],export_module),('export_adapter',['export'],export_module)]:
+        case=base/name;case.mkdir()
+        with pytest.MonkeyPatch.context() as mp:
+            project=project_fixture(case)
+            recorded=fixtures['recorded_run'].__wrapped__(project,mp)
+            root,directory,run,evaluation_id=fixtures['evaluated_run'].__wrapped__(recorded,mp)
+            real_gate=module.check_release_requirements
+            captured={}
+            def mutate_after_gate(*args,**kwargs):
+                gate=real_gate(*args,**kwargs)
+                captured['gate_status']=gate['status'];captured['checked_hash']=gate['adapter_sha256']
+                (directory/'adapter/adapter_model.safetensors').write_bytes(b'changed AFTER successful gate')
+                return gate
+            mp.setattr(module,'check_release_requirements',mutate_after_gate)
+            res=runner.invoke(app,[*command,'--run-id',run])
+            packages=list((root/'releases').rglob('package_manifest.json'))
+            captured.update({'exit_code':res.exit_code,'package_published':bool(packages),'controlled_interleaving':True,'model_inference_mocked':True})
+            if packages:
+                package=packages[0].parent
+                gate=json.loads((package/'release_gate.json').read_text())
+                manifest=json.loads(packages[0].read_text())
+                captured.update({'published_hash':manifest['adapter_sha256'],'gate_hash_matches_package':gate['adapter_sha256']==manifest['adapter_sha256']})
+            results['release_race_'+name]=captured
+    def make_ing(name,count=1,batch=100):
+        ing=SQLiteLogIngestor(base/(name+'.db'),batch_size=batch)
+        for i in range(count):
+            ing.insert_log(InferenceLogPayload(session_id=f'{name}-{i}',prompt=f'{name} question {i}',completion='Wrong response',human_correction=f'Correct response {i}'))
+        return ing
+    def summarize(ing,s):
+        return {'logs_ingested':s.logs_ingested,'pairs_generated':s.pairs_generated,'pending_after':ing.get_pending_count(),'dataset_written':s.dataset_path is not None,'pairs_by_type':s.pairs_by_type}
+    ing=make_ing('minimum',1)
+    s=MoroAIFlywheelOrchestrator(FlywheelConfig(min_pairs_per_epoch=3,output_dir=base/'minimum'),ing).run_cycle()
+    results['feedback_below_minimum']=summarize(ing,s)
+    ing=make_ing('capped',3)
+    s=MoroAIFlywheelOrchestrator(FlywheelConfig(max_pairs_per_epoch=1,output_dir=base/'capped'),ing).run_cycle()
+    results['feedback_above_cap']=summarize(ing,s)
+    class FailedTrainer:
+        def train_epoch(self,*args):raise RuntimeError('Synthetic training failure')
+    class RecordingGate:
+        called=False
+        def evaluate_and_deploy(self,*args):self.called=True;return True
+    ing=make_ing('failed-trainer');gate=RecordingGate()
+    s=MoroAIFlywheelOrchestrator(FlywheelConfig(auto_deploy=False,require_eval_gate=True,output_dir=base/'failed-trainer'),ing,trainer_bridge=FailedTrainer(),deployment_gate=gate).run_cycle()
+    con=get_production_db(ing.db_path);status=con.execute('SELECT status FROM dpo_epochs').fetchone()[0];con.close()
+    results['failed_training_still_calls_deployment']={'trainer_raises':True,'auto_deploy':False,'require_eval_gate':True,'deployment_hook_called':gate.called,'summary_deployed':s.deployed,'db_epoch_status':status,'initial_loss':s.initial_loss,'final_loss':s.final_loss,'hooks_are_test_doubles':True}
+    # Failure between durable pair insertion and acknowledgement.
+    ing=make_ing('crash-retry');orch=MoroAIFlywheelOrchestrator(FlywheelConfig(output_dir=base/'crash-retry'),ing)
+    with patch.object(ing,'mark_processed',side_effect=RuntimeError('Synthetic crash before ack')):
+        try:orch.run_cycle('before-crash')
+        except RuntimeError:pass
+    pending=ing.get_pending_count();orch.run_cycle('after-retry')
+    con=get_production_db(ing.db_path)
+    duplicate_counts=[dict(r) for r in con.execute('SELECT source_log_id, COUNT(*) AS n FROM preference_pairs GROUP BY source_log_id').fetchall()];con.close()
+    results['feedback_crash_retry']={'pending_after_crash':pending,'counts_per_source':duplicate_counts,'datasets_written':len(list((base/'crash-retry').glob('*.jsonl')))}
+    ing=make_ing('epoch-collision');orch=MoroAIFlywheelOrchestrator(FlywheelConfig(output_dir=base/'epoch-collision'),ing)
+    first=orch.run_cycle('fixed');before=first.dataset_path.read_bytes()
+    ing.insert_log(InferenceLogPayload(session_id='new-session',prompt='NEW INPUT',completion='wrong',human_correction='NEW CORRECT ANSWER'))
+    try:orch.run_cycle('fixed');error=None
+    except Exception as e:error=type(e).__name__
+    con=get_production_db(ing.db_path);stored=con.execute("SELECT chosen FROM preference_pairs WHERE epoch_id='fixed'").fetchone()[0];con.close()
+    after=first.dataset_path.read_bytes()
+    results['feedback_reused_epoch']={'exception':error,'existing_dataset_overwritten':before!=after,'file_has_new_answer':b'NEW CORRECT ANSWER' in after,'db_still_has_old_answer':stored!='NEW CORRECT ANSWER','new_log_pending':ing.get_pending_count()}
+    # HTTP requests operate on a dedicated in-process app/project with helper overrides.
+    project=base/'http-project';raw=project/'data/raw';raw.mkdir(parents=True)
+    external=base/'outside-project.txt';external.write_text('SYNTHETIC_OUTSIDE_READ_MARKER')
+    (raw/'linked.txt').symlink_to(external)
+    with patch.object(datasets,'get_project_root',return_value=project),patch.object(system,'get_project_root',return_value=project),patch.object(models,'get_project_root',return_value=project),patch.object(models,'get_state_db_path',return_value=project/'.moro/state.db'):
+        client=TestClient(web_app)
+        res=client.get('/api/datasets/ds_linked/preview')
+        results['symlink_dataset_read']={'status':res.status_code,'outside_marker_returned':'SYNTHETIC_OUTSIDE_READ_MARKER' in res.text,'preexisting_symlink_required':True}
+        res=client.post('/api/datasets/upload',files={'file':('linked.txt',b'SYNTHETIC_OVERWRITE_MARKER','text/plain')})
+        results['symlink_upload_write']={'status':res.status_code,'outside_target_overwritten':external.read_text()=='SYNTHETIC_OVERWRITE_MARKER','preexisting_symlink_required':True}
+        (project/'moro.yaml').write_text('{"project":{"name":"synthetic"}}')
+        before=(project/'moro.yaml').read_bytes()
+        res=client.put('/api/system/config',json={'project':{'name':'broken'},'training':{'batch_size':-99},'unknown_setting':'accepted'})
+        try:load_config(project/'moro.yaml');rejected=False
+        except Exception:rejected=True
+        results['invalid_config_http_write']={'status':res.status_code,'replaced_original':before!=(project/'moro.yaml').read_bytes(),'subsequent_strict_load_rejected':rejected}
+        rel=project/'releases/zero-score';rel.mkdir(parents=True)
+        (rel/'metadata.json').write_text(json.dumps({'eval_results':{'pass_rate':0.0}}))
+        res=client.get('/api/models/')
+        records=res.json();row=next(r for r in records if r['version']=='zero-score')
+        results['zero_score_displayed_as_success']={'status':res.status_code,'actual_metadata_pass_rate':0.0,'api_pass_rate':row['eval_pass_rate']}
+(OUT/'deep-probes.json').write_text(json.dumps(results,indent=2))
+print(json.dumps(results,indent=2))

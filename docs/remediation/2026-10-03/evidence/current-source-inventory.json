@@ -1,0 +1,3102 @@
+{
+  "generated_at": "2026-10-05T09:04:55.192900+00:00",
+  "modules": [
+    {
+      "path": "src/moro/__init__.py",
+      "lines": 1,
+      "sha256": "91447944015cec709e8aa7655f7e9d64e1e4508e7023a57fe3746911c0fc6fed",
+      "symbols": []
+    },
+    {
+      "path": "src/moro/analytics/__init__.py",
+      "lines": 6,
+      "sha256": "7ec61595ee7ff53a85c517155e10c0fc8d263d1bff636768baf5f62f61976a2d",
+      "symbols": []
+    },
+    {
+      "path": "src/moro/analytics/schema.py",
+      "lines": 312,
+      "sha256": "4d527e4b62172d5d01b9c895b7803ec386cebb4e455b7a9acf93e0b0b46e33b3",
+      "symbols": [
+        {
+          "name": "initialize_experiment_db",
+          "line": 257,
+          "kind": "FunctionDef"
+        },
+        {
+          "name": "get_experiment_db",
+          "line": 271,
+          "kind": "FunctionDef"
+        },
+        {
+          "name": "validate_metric_identifier",
+          "line": 308,
+          "kind": "FunctionDef"
+        }
+      ]
+    },
+    {
+      "path": "src/moro/analytics/tracker.py",
+      "lines": 764,
+      "sha256": "0beeba8fc6de6544e10fa32a98fc11828820c2943b645dc4a2c328d518ee1b3a",
+      "symbols": [
+        {
+          "name": "ExperimentTracker",
+          "line": 19,
+          "kind": "ClassDef"
+        }
+      ]
+    },
+    {
+      "path": "src/moro/analytics/visualizations.py",
+      "lines": 358,
+      "sha256": "1a73a4bc2be469ee9a0b9daf3d0fbf4e5732ddcec8012849afa0839616aefb2d",
+      "symbols": [
+        {
+          "name": "VisualAnalyticsEngine",
+          "line": 16,
+          "kind": "ClassDef"
+        }
+      ]
+    },
+    {
+      "path": "src/moro/cli/__init__.py",
+      "lines": 1,
+      "sha256": "40725a4d055ca86b2f0535d940dd861528d92d84089898395f0aa3d83cd1e480",
+      "symbols": []
+    },
+    {
+      "path": "src/moro/cli/analytics.py",
+      "lines": 335,
+      "sha256": "0dc10a6c5425fd895295a7d4d17c61efba35a5b4aea819e35c95be05c204d213",
+      "symbols": [
+        {
+          "name": "_get_tracker",
+          "line": 27,
+          "kind": "FunctionDef"
+        },
+        {
+          "name": "analytics_list",
+          "line": 34,
+          "kind": "FunctionDef"
+        },
+        {
+          "name": "analytics_show",
+          "line": 100,
+          "kind": "FunctionDef"
+        },
+        {
+          "name": "analytics_compare",
+          "line": 151,
+          "kind": "FunctionDef"
+        },
+        {
+          "name": "analytics_trend",
+          "line": 237,
+          "kind": "FunctionDef"
+        },
+        {
+          "name": "analytics_recommend",
+          "line": 288,
+          "kind": "FunctionDef"
+        }
+      ]
+    },
+    {
+      "path": "src/moro/cli/dashboard.py",
+      "lines": 164,
+      "sha256": "3f7c89763d8dbe6e890463b4a938230d0cc5b656e2fe70e5cd8e658ea0b6fac6",
+      "symbols": [
+        {
+          "name": "dashboard_default",
+          "line": 31,
+          "kind": "FunctionDef"
+        },
+        {
+          "name": "dashboard_serve",
+          "line": 55,
+          "kind": "FunctionDef"
+        },
+        {
+          "name": "dashboard_build",
+          "line": 131,
+          "kind": "FunctionDef"
+        },
+        {
+          "name": "dashboard_status",
+          "line": 146,
+          "kind": "FunctionDef"
+        }
+      ]
+    },
+    {
+      "path": "src/moro/cli/data.py",
+      "lines": 381,
+      "sha256": "c5612c92b96534eeb79094cf090142fe054c8aad98a99c7186347417cb16c219",
+      "symbols": [
+        {
+          "name": "compile_project",
+          "line": 17,
+          "kind": "FunctionDef"
+        },
+        {
+          "name": "build_command",
+          "line": 157,
+          "kind": "FunctionDef"
+        },
+        {
+          "name": "report_command",
+          "line": 196,
+          "kind": "FunctionDef"
+        },
+        {
+          "name": "inspect_command",
+          "line": 293,
+          "kind": "FunctionDef"
+        }
+      ]
+    },
+    {
+      "path": "src/moro/cli/deploy.py",
+      "lines": 64,
+      "sha256": "6834a9c81f777ff343f10b2be8e39d7dc13b915dd9124adba1159cae1839c631",
+      "symbols": [
+        {
+          "name": "deploy_command",
+          "line": 14,
+          "kind": "FunctionDef"
+        }
+      ]
+    },
+    {
+      "path": "src/moro/cli/diagnose.py",
+      "lines": 170,
+      "sha256": "e2711e5b0cecdfb8e52486ea3f96dd0deaa56919b70b15f4ff754e146781312f",
+      "symbols": [
+        {
+          "name": "_extract_error_from_log",
+          "line": 17,
+          "kind": "FunctionDef"
+        },
+        {
+          "name": "diagnose_command",
+          "line": 58,
+          "kind": "FunctionDef"
+        }
+      ]
+    },
+    {
+      "path": "src/moro/cli/doctor.py",
+      "lines": 92,
+      "sha256": "237b4d61385464109a2a9be0c8f75a95dd7c5916a74a7c769c05374e5b88731f",
+      "symbols": [
+        {
+          "name": "doctor_command",
+          "line": 13,
+          "kind": "FunctionDef"
+        }
+      ]
+    },
+    {
+      "path": "src/moro/cli/eval.py",
+      "lines": 491,
+      "sha256": "b6e561ffad75ca50866ea650963f9312c440a40c9251dbb4b05276bbc521db9b",
+      "symbols": [
+        {
+          "name": "eval_run_command",
+          "line": 20,
+          "kind": "FunctionDef"
+        },
+        {
+          "name": "eval_report_command",
+          "line": 129,
+          "kind": "FunctionDef"
+        },
+        {
+          "name": "list_evaluations",
+          "line": 162,
+          "kind": "FunctionDef"
+        },
+        {
+          "name": "compare_command",
+          "line": 191,
+          "kind": "FunctionDef"
+        },
+        {
+          "name": "perturb_command",
+          "line": 334,
+          "kind": "FunctionDef"
+        }
+      ]
+    },
+    {
+      "path": "src/moro/cli/export.py",
+      "lines": 216,
+      "sha256": "7a49c6090ec33968f66bc8b60de892527af1637742ee120786a4f798b74f760d",
+      "symbols": [
+        {
+          "name": "export_command",
+          "line": 25,
+          "kind": "FunctionDef"
+        }
+      ]
+    },
+    {
+      "path": "src/moro/cli/flywheel.py",
+      "lines": 247,
+      "sha256": "bfe64f3743d7116634842298c1c6cec33317189537a5249439255e7f6f28103a",
+      "symbols": [
+        {
+          "name": "_get_db_path",
+          "line": 35,
+          "kind": "FunctionDef"
+        },
+        {
+          "name": "flywheel_status",
+          "line": 45,
+          "kind": "FunctionDef"
+        },
+        {
+          "name": "flywheel_ingest",
+          "line": 79,
+          "kind": "FunctionDef"
+        },
+        {
+          "name": "flywheel_run",
+          "line": 105,
+          "kind": "FunctionDef"
+        },
+        {
+          "name": "flywheel_history",
+          "line": 172,
+          "kind": "FunctionDef"
+        },
+        {
+          "name": "flywheel_serve",
+          "line": 214,
+          "kind": "FunctionDef"
+        }
+      ]
+    },
+    {
+      "path": "src/moro/cli/guard.py",
+      "lines": 247,
+      "sha256": "55049d5b489c245aa2c50371e6e29aa747ca99199ce93c8e28a5f0ffd85a09e5",
+      "symbols": [
+        {
+          "name": "_resolve_target_file",
+          "line": 32,
+          "kind": "FunctionDef"
+        },
+        {
+          "name": "scan_command",
+          "line": 52,
+          "kind": "FunctionDef"
+        },
+        {
+          "name": "redact_command",
+          "line": 157,
+          "kind": "FunctionDef"
+        },
+        {
+          "name": "check_command",
+          "line": 218,
+          "kind": "FunctionDef"
+        }
+      ]
+    },
+    {
+      "path": "src/moro/cli/hooks.py",
+      "lines": 263,
+      "sha256": "cf10ec57597f6b9a44c4d9dc85387253018ec5b0716a7dc905cb4c3af7ad5e97",
+      "symbols": [
+        {
+          "name": "install_hooks",
+          "line": 36,
+          "kind": "FunctionDef"
+        },
+        {
+          "name": "check_hooks",
+          "line": 143,
+          "kind": "FunctionDef"
+        },
+        {
+          "name": "uninstall_hooks",
+          "line": 226,
+          "kind": "FunctionDef"
+        }
+      ]
+    },
+    {
+      "path": "src/moro/cli/import_data.py",
+      "lines": 127,
+      "sha256": "0e602d4754baf329e3111352b5b5fac9e715f185a0e72e89da9904a5157d9a7a",
+      "symbols": [
+        {
+          "name": "import_command",
+          "line": 15,
+          "kind": "FunctionDef"
+        }
+      ]
+    },
+    {
+      "path": "src/moro/cli/init.py",
+      "lines": 93,
+      "sha256": "0ae71334ce0b8dd845f95dfe88e28e1a124bb6aa7b16e8860b6f3ee3aad8066d",
+      "symbols": [
+        {
+          "name": "sanitize_project_name",
+          "line": 18,
+          "kind": "FunctionDef"
+        },
+        {
+          "name": "init_command",
+          "line": 25,
+          "kind": "FunctionDef"
+        }
+      ]
+    },
+    {
+      "path": "src/moro/cli/recipe.py",
+      "lines": 216,
+      "sha256": "f98758ce361e13535dee32e4f5703e4b26d2fcbb8bfda80916a69a9982714037",
+      "symbols": [
+        {
+          "name": "suggest_command",
+          "line": 22,
+          "kind": "FunctionDef"
+        },
+        {
+          "name": "apply_command",
+          "line": 151,
+          "kind": "FunctionDef"
+        }
+      ]
+    },
+    {
+      "path": "src/moro/cli/registry.py",
+      "lines": 138,
+      "sha256": "e7f4dc6c0b71e2de1eeb56b0a91d3505e3c2272c819e19da1805846ada7baeea",
+      "symbols": [
+        {
+          "name": "list_models_command",
+          "line": 25,
+          "kind": "FunctionDef"
+        },
+        {
+          "name": "show_model_command",
+          "line": 69,
+          "kind": "FunctionDef"
+        },
+        {
+          "name": "promote_model_command",
+          "line": 107,
+          "kind": "FunctionDef"
+        },
+        {
+          "name": "delete_model_command",
+          "line": 126,
+          "kind": "FunctionDef"
+        }
+      ]
+    },
+    {
+      "path": "src/moro/cli/runs.py",
+      "lines": 205,
+      "sha256": "489fe96ef53885f77019ee38bf06ada0b2d68c8bda340f381f8cb0f0841ee46c",
+      "symbols": [
+        {
+          "name": "project_runs",
+          "line": 17,
+          "kind": "FunctionDef"
+        },
+        {
+          "name": "_format_dt",
+          "line": 33,
+          "kind": "FunctionDef"
+        },
+        {
+          "name": "_status_color",
+          "line": 43,
+          "kind": "FunctionDef"
+        },
+        {
+          "name": "list_command",
+          "line": 54,
+          "kind": "FunctionDef"
+        },
+        {
+          "name": "show_command",
+          "line": 110,
+          "kind": "FunctionDef"
+        },
+        {
+          "name": "compare_command",
+          "line": 159,
+          "kind": "FunctionDef"
+        }
+      ]
+    },
+    {
+      "path": "src/moro/cli/services.py",
+      "lines": 136,
+      "sha256": "ccb1eec7d9960e4483be9badab9fdd4a2833a620ab683363d1d387871426da9e",
+      "symbols": [
+        {
+          "name": "services_status_command",
+          "line": 25,
+          "kind": "FunctionDef"
+        },
+        {
+          "name": "services_start_command",
+          "line": 60,
+          "kind": "FunctionDef"
+        },
+        {
+          "name": "services_stop_command",
+          "line": 79,
+          "kind": "FunctionDef"
+        },
+        {
+          "name": "services_restart_command",
+          "line": 98,
+          "kind": "FunctionDef"
+        },
+        {
+          "name": "services_supervise_command",
+          "line": 116,
+          "kind": "FunctionDef"
+        },
+        {
+          "name": "services_logs_command",
+          "line": 126,
+          "kind": "FunctionDef"
+        }
+      ]
+    },
+    {
+      "path": "src/moro/cli/status.py",
+      "lines": 104,
+      "sha256": "de3231b189181d626137612020adffc50f18f0dc176f3415e03ea69fdef2cc79",
+      "symbols": [
+        {
+          "name": "status_command",
+          "line": 13,
+          "kind": "FunctionDef"
+        }
+      ]
+    },
+    {
+      "path": "src/moro/cli/train.py",
+      "lines": 320,
+      "sha256": "cea8d7c923eaaa4d6a8929620beb1483bf6e5626d428b0f5fde8e76b1d74d732",
+      "symbols": [
+        {
+          "name": "execute_training",
+          "line": 21,
+          "kind": "FunctionDef"
+        },
+        {
+          "name": "_execute_training",
+          "line": 28,
+          "kind": "FunctionDef"
+        },
+        {
+          "name": "train_command",
+          "line": 272,
+          "kind": "FunctionDef"
+        }
+      ]
+    },
+    {
+      "path": "src/moro/cli/ui.py",
+      "lines": 38,
+      "sha256": "27d780417947d2207b6fd1a4d3b882ee06bf2f3aae8539b76430218312576df9",
+      "symbols": [
+        {
+          "name": "ui_command",
+          "line": 15,
+          "kind": "FunctionDef"
+        }
+      ]
+    },
+    {
+      "path": "src/moro/cli/validate.py",
+      "lines": 91,
+      "sha256": "bde3c8bd26b76086b6e9585b61b296f92216c82eb23a8d8651363365f79014f0",
+      "symbols": [
+        {
+          "name": "validate_command",
+          "line": 22,
+          "kind": "FunctionDef"
+        }
+      ]
+    },
+    {
+      "path": "src/moro/config/__init__.py",
+      "lines": 1,
+      "sha256": "c14ca3c1b7f819ee5d603746b36c1843f0f28eda5075589c079265705386f48a",
+      "symbols": []
+    },
+    {
+      "path": "src/moro/config/loader.py",
+      "lines": 44,
+      "sha256": "e54cadd38195b3d179496872150478c574f17583eda761388c5d0592bd86f63c",
+      "symbols": [
+        {
+          "name": "load_config",
+          "line": 10,
+          "kind": "FunctionDef"
+        }
+      ]
+    },
+    {
+      "path": "src/moro/config/models.py",
+      "lines": 143,
+      "sha256": "dd0a3e16824d9a5c20c2b1da807edabd6d1e1e18488eb34bcec083eeede129f1",
+      "symbols": [
+        {
+          "name": "StrictConfig",
+          "line": 16,
+          "kind": "ClassDef"
+        },
+        {
+          "name": "ProjectConfig",
+          "line": 20,
+          "kind": "ClassDef"
+        },
+        {
+          "name": "DatasetConfig",
+          "line": 26,
+          "kind": "ClassDef"
+        },
+        {
+          "name": "ModelConfig",
+          "line": 54,
+          "kind": "ClassDef"
+        },
+        {
+          "name": "AdapterConfig",
+          "line": 61,
+          "kind": "ClassDef"
+        },
+        {
+          "name": "TrainingConfig",
+          "line": 74,
+          "kind": "ClassDef"
+        },
+        {
+          "name": "EvalSuiteRef",
+          "line": 99,
+          "kind": "ClassDef"
+        },
+        {
+          "name": "EvalConfig",
+          "line": 104,
+          "kind": "ClassDef"
+        },
+        {
+          "name": "ReleaseRequirements",
+          "line": 110,
+          "kind": "ClassDef"
+        },
+        {
+          "name": "ReleaseConfig",
+          "line": 120,
+          "kind": "ClassDef"
+        },
+        {
+          "name": "MoroConfig",
+          "line": 129,
+          "kind": "ClassDef"
+        }
+      ]
+    },
+    {
+      "path": "src/moro/core/__init__.py",
+      "lines": 1,
+      "sha256": "5d21070956458d55a1d0c8893c0da184747f5cd2fa96147a58c86d7389d4860c",
+      "symbols": []
+    },
+    {
+      "path": "src/moro/core/errors.py",
+      "lines": 34,
+      "sha256": "dc865d3da3991a2bfcc8d2df1f795728f1b5669849c852ea43bc844cc3445633",
+      "symbols": [
+        {
+          "name": "MoroError",
+          "line": 1,
+          "kind": "ClassDef"
+        },
+        {
+          "name": "ProjectError",
+          "line": 5,
+          "kind": "ClassDef"
+        },
+        {
+          "name": "ConfigError",
+          "line": 9,
+          "kind": "ClassDef"
+        },
+        {
+          "name": "DatasetError",
+          "line": 13,
+          "kind": "ClassDef"
+        },
+        {
+          "name": "DependencyError",
+          "line": 17,
+          "kind": "ClassDef"
+        },
+        {
+          "name": "TrainingError",
+          "line": 21,
+          "kind": "ClassDef"
+        },
+        {
+          "name": "ExportError",
+          "line": 25,
+          "kind": "ClassDef"
+        },
+        {
+          "name": "EvalError",
+          "line": 29,
+          "kind": "ClassDef"
+        },
+        {
+          "name": "RecipeError",
+          "line": 33,
+          "kind": "ClassDef"
+        }
+      ]
+    },
+    {
+      "path": "src/moro/core/hashing.py",
+      "lines": 86,
+      "sha256": "633af280dcfdd84252e3262ef94ff493a3939f05fb28713ba2be5b11b5b3e55c",
+      "symbols": [
+        {
+          "name": "sha256_file",
+          "line": 9,
+          "kind": "FunctionDef"
+        },
+        {
+          "name": "sha256_text",
+          "line": 24,
+          "kind": "FunctionDef"
+        },
+        {
+          "name": "_snapshot_fields",
+          "line": 29,
+          "kind": "FunctionDef"
+        },
+        {
+          "name": "config_snapshot_hash",
+          "line": 49,
+          "kind": "FunctionDef"
+        },
+        {
+          "name": "matches_config_snapshot",
+          "line": 61,
+          "kind": "FunctionDef"
+        },
+        {
+          "name": "sha256_directory",
+          "line": 75,
+          "kind": "FunctionDef"
+        }
+      ]
+    },
+    {
+      "path": "src/moro/core/ids.py",
+      "lines": 16,
+      "sha256": "b5fdcf5970fd0860c38b922c08a5e04111262449f6f9add55241d19d9fbcf15c",
+      "symbols": [
+        {
+          "name": "new_id",
+          "line": 5,
+          "kind": "FunctionDef"
+        }
+      ]
+    },
+    {
+      "path": "src/moro/core/logging.py",
+      "lines": 44,
+      "sha256": "9a9c3db26be102e9756253cc528efff8631e0fb424d366d5d5cb6018fb36029f",
+      "symbols": [
+        {
+          "name": "info",
+          "line": 12,
+          "kind": "FunctionDef"
+        },
+        {
+          "name": "success",
+          "line": 17,
+          "kind": "FunctionDef"
+        },
+        {
+          "name": "warning",
+          "line": 22,
+          "kind": "FunctionDef"
+        },
+        {
+          "name": "error",
+          "line": 27,
+          "kind": "FunctionDef"
+        },
+        {
+          "name": "step",
+          "line": 32,
+          "kind": "FunctionDef"
+        },
+        {
+          "name": "dim",
+          "line": 37,
+          "kind": "FunctionDef"
+        },
+        {
+          "name": "get_console",
+          "line": 42,
+          "kind": "FunctionDef"
+        }
+      ]
+    },
+    {
+      "path": "src/moro/core/paths.py",
+      "lines": 65,
+      "sha256": "c85a886fefefbdd1dfb1fbf3e6a224000dfa63f8eaab86b4f7a4eda7fbb87f61",
+      "symbols": [
+        {
+          "name": "find_project_root",
+          "line": 21,
+          "kind": "FunctionDef"
+        },
+        {
+          "name": "project_dirs",
+          "line": 35,
+          "kind": "FunctionDef"
+        },
+        {
+          "name": "ensure_project_dirs",
+          "line": 55,
+          "kind": "FunctionDef"
+        }
+      ]
+    },
+    {
+      "path": "src/moro/core/project.py",
+      "lines": 30,
+      "sha256": "33d47f07ba0ab617fb2e65a0d2f2505429fd039cf588cc735a5e3543831b2fb6",
+      "symbols": [
+        {
+          "name": "require_project_root",
+          "line": 9,
+          "kind": "FunctionDef"
+        },
+        {
+          "name": "load_project_config",
+          "line": 24,
+          "kind": "FunctionDef"
+        }
+      ]
+    },
+    {
+      "path": "src/moro/dashboard/__init__.py",
+      "lines": 1,
+      "sha256": "43138850845615b5fc46f8983f2fac1b935138a62013c3b0bea7efe67641eb58",
+      "symbols": []
+    },
+    {
+      "path": "src/moro/dashboard/api/__init__.py",
+      "lines": 3,
+      "sha256": "b5488ffd49e710311aad77320211ac652a61348fce2da4a3df1a9ac6d93977c5",
+      "symbols": []
+    },
+    {
+      "path": "src/moro/dashboard/api/datasets.py",
+      "lines": 408,
+      "sha256": "bee86c50b3308189114a0648d70fdd810e338e2c5ccb36eac831418db1306b88",
+      "symbols": [
+        {
+          "name": "DatasetInfo",
+          "line": 33,
+          "kind": "ClassDef"
+        },
+        {
+          "name": "DatasetUploadResponse",
+          "line": 46,
+          "kind": "ClassDef"
+        },
+        {
+          "name": "DatasetPreview",
+          "line": 56,
+          "kind": "ClassDef"
+        },
+        {
+          "name": "_find_dataset_file",
+          "line": 71,
+          "kind": "FunctionDef"
+        },
+        {
+          "name": "_snapshot_file",
+          "line": 107,
+          "kind": "FunctionDef"
+        },
+        {
+          "name": "compile_dataset_sync",
+          "line": 129,
+          "kind": "FunctionDef"
+        },
+        {
+          "name": "list_datasets",
+          "line": 144,
+          "kind": "AsyncFunctionDef"
+        },
+        {
+          "name": "upload_dataset",
+          "line": 256,
+          "kind": "AsyncFunctionDef"
+        },
+        {
+          "name": "upload_multiple_datasets",
+          "line": 285,
+          "kind": "AsyncFunctionDef"
+        },
+        {
+          "name": "preview_dataset",
+          "line": 303,
+          "kind": "AsyncFunctionDef"
+        },
+        {
+          "name": "compile_dataset",
+          "line": 375,
+          "kind": "AsyncFunctionDef"
+        },
+        {
+          "name": "delete_dataset",
+          "line": 395,
+          "kind": "AsyncFunctionDef"
+        }
+      ]
+    },
+    {
+      "path": "src/moro/dashboard/api/deployment.py",
+      "lines": 101,
+      "sha256": "c9abe5ca287d88455caf2cfca1a65b2c852a8deac5d0843c84413bd895fe61fd",
+      "symbols": [
+        {
+          "name": "DeploymentRequest",
+          "line": 17,
+          "kind": "ClassDef"
+        },
+        {
+          "name": "_request",
+          "line": 24,
+          "kind": "AsyncFunctionDef"
+        },
+        {
+          "name": "_check_ollama",
+          "line": 36,
+          "kind": "AsyncFunctionDef"
+        },
+        {
+          "name": "get_deployment_status",
+          "line": 47,
+          "kind": "AsyncFunctionDef"
+        },
+        {
+          "name": "deploy_model",
+          "line": 53,
+          "kind": "AsyncFunctionDef"
+        },
+        {
+          "name": "undeploy_model",
+          "line": 61,
+          "kind": "AsyncFunctionDef"
+        },
+        {
+          "name": "list_ollama_models",
+          "line": 66,
+          "kind": "AsyncFunctionDef"
+        },
+        {
+          "name": "pull_ollama_model",
+          "line": 71,
+          "kind": "AsyncFunctionDef"
+        },
+        {
+          "name": "delete_ollama_model",
+          "line": 83,
+          "kind": "AsyncFunctionDef"
+        },
+        {
+          "name": "test_ollama_model",
+          "line": 89,
+          "kind": "AsyncFunctionDef"
+        }
+      ]
+    },
+    {
+      "path": "src/moro/dashboard/api/evaluation.py",
+      "lines": 106,
+      "sha256": "7c5dfabc452106b992ddc1aad3fc64ecab5d508e5651f899a949a0f64a27c064",
+      "symbols": [
+        {
+          "name": "EvalRunRequest",
+          "line": 23,
+          "kind": "ClassDef"
+        },
+        {
+          "name": "EvalResultItem",
+          "line": 30,
+          "kind": "ClassDef"
+        },
+        {
+          "name": "list_evaluation_suites",
+          "line": 43,
+          "kind": "AsyncFunctionDef"
+        },
+        {
+          "name": "run_evaluation",
+          "line": 64,
+          "kind": "AsyncFunctionDef"
+        },
+        {
+          "name": "get_eval_results",
+          "line": 92,
+          "kind": "AsyncFunctionDef"
+        }
+      ]
+    },
+    {
+      "path": "src/moro/dashboard/api/flywheel.py",
+      "lines": 109,
+      "sha256": "d099ef28ecdcebd4864da8974f7b4266fa4daa86d51cc6aacddb421aac375e7d",
+      "symbols": [
+        {
+          "name": "FlywheelCycleResponse",
+          "line": 22,
+          "kind": "ClassDef"
+        },
+        {
+          "name": "get_flywheel_status",
+          "line": 31,
+          "kind": "AsyncFunctionDef"
+        },
+        {
+          "name": "trigger_flywheel_cycle",
+          "line": 58,
+          "kind": "AsyncFunctionDef"
+        },
+        {
+          "name": "list_preference_pairs",
+          "line": 74,
+          "kind": "AsyncFunctionDef"
+        }
+      ]
+    },
+    {
+      "path": "src/moro/dashboard/api/models.py",
+      "lines": 246,
+      "sha256": "d22bdfcc3473de268d66138a68edfee5f0b07fad0a2b069757dba948f7fbb7b5",
+      "symbols": [
+        {
+          "name": "ModelInfo",
+          "line": 30,
+          "kind": "ClassDef"
+        },
+        {
+          "name": "_get_models_from_releases",
+          "line": 53,
+          "kind": "FunctionDef"
+        },
+        {
+          "name": "list_models",
+          "line": 104,
+          "kind": "AsyncFunctionDef"
+        },
+        {
+          "name": "get_model",
+          "line": 135,
+          "kind": "AsyncFunctionDef"
+        },
+        {
+          "name": "promote_model",
+          "line": 145,
+          "kind": "AsyncFunctionDef"
+        },
+        {
+          "name": "archive_model",
+          "line": 169,
+          "kind": "AsyncFunctionDef"
+        },
+        {
+          "name": "delete_model",
+          "line": 175,
+          "kind": "AsyncFunctionDef"
+        },
+        {
+          "name": "_mutate_registry",
+          "line": 179,
+          "kind": "FunctionDef"
+        },
+        {
+          "name": "compare_models",
+          "line": 211,
+          "kind": "AsyncFunctionDef"
+        }
+      ]
+    },
+    {
+      "path": "src/moro/dashboard/api/system.py",
+      "lines": 305,
+      "sha256": "3a39db209051b02444666b66d86e639be855a4e4b84ff6a98d1938dc30a7945c",
+      "symbols": [
+        {
+          "name": "SystemHealth",
+          "line": 31,
+          "kind": "ClassDef"
+        },
+        {
+          "name": "TerminalCommand",
+          "line": 41,
+          "kind": "ClassDef"
+        },
+        {
+          "name": "TerminalResponse",
+          "line": 48,
+          "kind": "ClassDef"
+        },
+        {
+          "name": "get_system_health",
+          "line": 62,
+          "kind": "AsyncFunctionDef"
+        },
+        {
+          "name": "get_services",
+          "line": 143,
+          "kind": "AsyncFunctionDef"
+        },
+        {
+          "name": "start_service",
+          "line": 156,
+          "kind": "AsyncFunctionDef"
+        },
+        {
+          "name": "stop_service",
+          "line": 174,
+          "kind": "AsyncFunctionDef"
+        },
+        {
+          "name": "execute_terminal_command",
+          "line": 192,
+          "kind": "AsyncFunctionDef"
+        },
+        {
+          "name": "get_config",
+          "line": 201,
+          "kind": "AsyncFunctionDef"
+        },
+        {
+          "name": "update_config",
+          "line": 225,
+          "kind": "AsyncFunctionDef"
+        },
+        {
+          "name": "ws_system_health",
+          "line": 278,
+          "kind": "AsyncFunctionDef"
+        },
+        {
+          "name": "ws_system_logs",
+          "line": 291,
+          "kind": "AsyncFunctionDef"
+        }
+      ]
+    },
+    {
+      "path": "src/moro/dashboard/api/training.py",
+      "lines": 130,
+      "sha256": "3be4936b6c34f19a34771a8edcd7d7c14807e1c5431d2366e4d774aecf60d0d5",
+      "symbols": [
+        {
+          "name": "TrainingConfig",
+          "line": 19,
+          "kind": "ClassDef"
+        },
+        {
+          "name": "recorded_runs",
+          "line": 32,
+          "kind": "FunctionDef"
+        },
+        {
+          "name": "list_training_runs",
+          "line": 51,
+          "kind": "AsyncFunctionDef"
+        },
+        {
+          "name": "get_training_run",
+          "line": 56,
+          "kind": "AsyncFunctionDef"
+        },
+        {
+          "name": "start_training",
+          "line": 64,
+          "kind": "AsyncFunctionDef"
+        },
+        {
+          "name": "stop_training",
+          "line": 82,
+          "kind": "AsyncFunctionDef"
+        },
+        {
+          "name": "get_training_metrics",
+          "line": 90,
+          "kind": "AsyncFunctionDef"
+        },
+        {
+          "name": "get_gpu_status",
+          "line": 104,
+          "kind": "AsyncFunctionDef"
+        }
+      ]
+    },
+    {
+      "path": "src/moro/dashboard/gateway.py",
+      "lines": 105,
+      "sha256": "f82704c4d1845197a05e812fd97f475bf52afadda51906bd20b3ba65d88c0cd7",
+      "symbols": [
+        {
+          "name": "ChatMessage",
+          "line": 20,
+          "kind": "ClassDef"
+        },
+        {
+          "name": "ChatCompletionRequest",
+          "line": 26,
+          "kind": "ClassDef"
+        },
+        {
+          "name": "ollama_request",
+          "line": 35,
+          "kind": "AsyncFunctionDef"
+        },
+        {
+          "name": "health_check",
+          "line": 48,
+          "kind": "AsyncFunctionDef"
+        },
+        {
+          "name": "list_models",
+          "line": 53,
+          "kind": "AsyncFunctionDef"
+        },
+        {
+          "name": "chat_completions",
+          "line": 68,
+          "kind": "AsyncFunctionDef"
+        }
+      ]
+    },
+    {
+      "path": "src/moro/dashboard/mission_control.py",
+      "lines": 857,
+      "sha256": "1aee7f8e62497dad8cdeb51c97c8e4e77db3f4612797370906dfa70b9cc329e4",
+      "symbols": [
+        {
+          "name": "DockerConnector",
+          "line": 38,
+          "kind": "ClassDef"
+        },
+        {
+          "name": "OllamaConnector",
+          "line": 160,
+          "kind": "ClassDef"
+        },
+        {
+          "name": "DatabaseConnector",
+          "line": 226,
+          "kind": "ClassDef"
+        },
+        {
+          "name": "TrainingMonitor",
+          "line": 322,
+          "kind": "ClassDef"
+        },
+        {
+          "name": "FlywheelMonitor",
+          "line": 352,
+          "kind": "ClassDef"
+        },
+        {
+          "name": "get_project_root",
+          "line": 408,
+          "kind": "FunctionDef"
+        },
+        {
+          "name": "startup",
+          "line": 414,
+          "kind": "AsyncFunctionDef"
+        },
+        {
+          "name": "serve_dashboard",
+          "line": 430,
+          "kind": "AsyncFunctionDef"
+        },
+        {
+          "name": "health_check",
+          "line": 443,
+          "kind": "AsyncFunctionDef"
+        },
+        {
+          "name": "system_overview",
+          "line": 454,
+          "kind": "AsyncFunctionDef"
+        },
+        {
+          "name": "state_nodes",
+          "line": 480,
+          "kind": "AsyncFunctionDef"
+        },
+        {
+          "name": "state_lineage",
+          "line": 493,
+          "kind": "AsyncFunctionDef"
+        },
+        {
+          "name": "registry_models_api",
+          "line": 504,
+          "kind": "AsyncFunctionDef"
+        },
+        {
+          "name": "registry_promote_model",
+          "line": 510,
+          "kind": "AsyncFunctionDef"
+        },
+        {
+          "name": "state_lineage_api",
+          "line": 523,
+          "kind": "AsyncFunctionDef"
+        },
+        {
+          "name": "services_status_api",
+          "line": 529,
+          "kind": "AsyncFunctionDef"
+        },
+        {
+          "name": "services_start_api",
+          "line": 538,
+          "kind": "AsyncFunctionDef"
+        },
+        {
+          "name": "services_stop_api",
+          "line": 550,
+          "kind": "AsyncFunctionDef"
+        },
+        {
+          "name": "docker_containers",
+          "line": 562,
+          "kind": "AsyncFunctionDef"
+        },
+        {
+          "name": "docker_start_container",
+          "line": 570,
+          "kind": "AsyncFunctionDef"
+        },
+        {
+          "name": "docker_stop_container",
+          "line": 581,
+          "kind": "AsyncFunctionDef"
+        },
+        {
+          "name": "docker_container_logs",
+          "line": 592,
+          "kind": "AsyncFunctionDef"
+        },
+        {
+          "name": "ollama_models",
+          "line": 601,
+          "kind": "AsyncFunctionDef"
+        },
+        {
+          "name": "ollama_model_info",
+          "line": 607,
+          "kind": "AsyncFunctionDef"
+        },
+        {
+          "name": "PromptPayload",
+          "line": 615,
+          "kind": "ClassDef"
+        },
+        {
+          "name": "ollama_generate",
+          "line": 621,
+          "kind": "AsyncFunctionDef"
+        },
+        {
+          "name": "database_production_stats",
+          "line": 628,
+          "kind": "AsyncFunctionDef"
+        },
+        {
+          "name": "database_production_logs",
+          "line": 634,
+          "kind": "AsyncFunctionDef"
+        },
+        {
+          "name": "training_runs",
+          "line": 640,
+          "kind": "AsyncFunctionDef"
+        },
+        {
+          "name": "training_active",
+          "line": 646,
+          "kind": "AsyncFunctionDef"
+        },
+        {
+          "name": "flywheel_status",
+          "line": 653,
+          "kind": "AsyncFunctionDef"
+        },
+        {
+          "name": "CommandPayload",
+          "line": 658,
+          "kind": "ClassDef"
+        },
+        {
+          "name": "terminal_execute",
+          "line": 663,
+          "kind": "AsyncFunctionDef"
+        },
+        {
+          "name": "_get_analytics_tracker",
+          "line": 676,
+          "kind": "FunctionDef"
+        },
+        {
+          "name": "_get_analytics_viz_engine",
+          "line": 681,
+          "kind": "FunctionDef"
+        },
+        {
+          "name": "analytics_experiments",
+          "line": 686,
+          "kind": "AsyncFunctionDef"
+        },
+        {
+          "name": "analytics_experiment_detail",
+          "line": 694,
+          "kind": "AsyncFunctionDef"
+        },
+        {
+          "name": "analytics_experiment_metrics",
+          "line": 712,
+          "kind": "AsyncFunctionDef"
+        },
+        {
+          "name": "analytics_compare",
+          "line": 720,
+          "kind": "AsyncFunctionDef"
+        },
+        {
+          "name": "analytics_loss_curves",
+          "line": 730,
+          "kind": "AsyncFunctionDef"
+        },
+        {
+          "name": "analytics_quality_trend",
+          "line": 738,
+          "kind": "AsyncFunctionDef"
+        },
+        {
+          "name": "analytics_heatmap",
+          "line": 745,
+          "kind": "AsyncFunctionDef"
+        },
+        {
+          "name": "analytics_resource_utilization",
+          "line": 759,
+          "kind": "AsyncFunctionDef"
+        },
+        {
+          "name": "analytics_output_comparison",
+          "line": 766,
+          "kind": "AsyncFunctionDef"
+        },
+        {
+          "name": "analytics_recommendations",
+          "line": 778,
+          "kind": "AsyncFunctionDef"
+        },
+        {
+          "name": "ws_system_metrics",
+          "line": 791,
+          "kind": "AsyncFunctionDef"
+        },
+        {
+          "name": "ws_training_telemetry",
+          "line": 810,
+          "kind": "AsyncFunctionDef"
+        },
+        {
+          "name": "ws_logs_stream",
+          "line": 835,
+          "kind": "AsyncFunctionDef"
+        }
+      ]
+    },
+    {
+      "path": "src/moro/dashboard/security.py",
+      "lines": 249,
+      "sha256": "df1c6b2d47bca6cbc59625d3e35d58efe8702c31d858c54d6f1cc6f7f4d8ec00",
+      "symbols": [
+        {
+          "name": "access_token",
+          "line": 28,
+          "kind": "FunctionDef"
+        },
+        {
+          "name": "session_value",
+          "line": 66,
+          "kind": "FunctionDef"
+        },
+        {
+          "name": "valid_session",
+          "line": 72,
+          "kind": "FunctionDef"
+        },
+        {
+          "name": "install_security",
+          "line": 108,
+          "kind": "FunctionDef"
+        },
+        {
+          "name": "LocalAccessMiddleware",
+          "line": 143,
+          "kind": "ClassDef"
+        }
+      ]
+    },
+    {
+      "path": "src/moro/dashboard/uploads.py",
+      "lines": 76,
+      "sha256": "a881430e604029f6aca9df5568e566f8816d26ca9314ab574d0a112c42b24b7e",
+      "symbols": [
+        {
+          "name": "raw_directory",
+          "line": 14,
+          "kind": "FunctionDef"
+        },
+        {
+          "name": "store_upload",
+          "line": 24,
+          "kind": "FunctionDef"
+        }
+      ]
+    },
+    {
+      "path": "src/moro/dashboard/utils.py",
+      "lines": 27,
+      "sha256": "64d7bd7a1642edfb05c1accc7c51a1b1caf39e265a168741af0c62ca2d1d03fb",
+      "symbols": [
+        {
+          "name": "get_project_root",
+          "line": 14,
+          "kind": "FunctionDef"
+        },
+        {
+          "name": "get_state_db_path",
+          "line": 20,
+          "kind": "FunctionDef"
+        },
+        {
+          "name": "get_analytics_db_path",
+          "line": 25,
+          "kind": "FunctionDef"
+        }
+      ]
+    },
+    {
+      "path": "src/moro/data/__init__.py",
+      "lines": 1,
+      "sha256": "64c27d1a977f2bb766b85840fb72fdf9e639f79d275265848998da06dcb0a692",
+      "symbols": []
+    },
+    {
+      "path": "src/moro/data/clean.py",
+      "lines": 229,
+      "sha256": "71597a0ce3b9622251b5dbe426c1911a2d95fd15e1561b8fe36a396e994a4f15",
+      "symbols": [
+        {
+          "name": "_build_global_stats",
+          "line": 36,
+          "kind": "FunctionDef"
+        },
+        {
+          "name": "_load_domain_glossary",
+          "line": 48,
+          "kind": "FunctionDef"
+        },
+        {
+          "name": "_near_hash",
+          "line": 69,
+          "kind": "FunctionDef"
+        },
+        {
+          "name": "clean_rows",
+          "line": 83,
+          "kind": "FunctionDef"
+        }
+      ]
+    },
+    {
+      "path": "src/moro/data/compiler.py",
+      "lines": 31,
+      "sha256": "03fccd7ce4583e5ef19d6176141882df6864db43a77fceda04ba9d83fadc83e9",
+      "symbols": [
+        {
+          "name": "DataCompiler",
+          "line": 11,
+          "kind": "ClassDef"
+        }
+      ]
+    },
+    {
+      "path": "src/moro/data/ingest.py",
+      "lines": 126,
+      "sha256": "f96f97a4dd20cad42600a2a295c4798392bf0a9f8509c4534fd20c9231d7c5e8",
+      "symbols": [
+        {
+          "name": "detect_format",
+          "line": 10,
+          "kind": "FunctionDef"
+        },
+        {
+          "name": "read_raw_rows",
+          "line": 25,
+          "kind": "FunctionDef"
+        },
+        {
+          "name": "_tag",
+          "line": 62,
+          "kind": "FunctionDef"
+        },
+        {
+          "name": "_read_jsonl",
+          "line": 70,
+          "kind": "FunctionDef"
+        },
+        {
+          "name": "_read_csv",
+          "line": 105,
+          "kind": "FunctionDef"
+        },
+        {
+          "name": "_read_text",
+          "line": 116,
+          "kind": "FunctionDef"
+        }
+      ]
+    },
+    {
+      "path": "src/moro/data/models.py",
+      "lines": 190,
+      "sha256": "8e5c7c0a842639db111a453a5f447e5b05af256edda064b639cf6169f9ee43e4",
+      "symbols": [
+        {
+          "name": "QualityScoreBreakdown",
+          "line": 20,
+          "kind": "ClassDef"
+        },
+        {
+          "name": "DomainQualityScores",
+          "line": 30,
+          "kind": "ClassDef"
+        },
+        {
+          "name": "InformationTheoreticMetrics",
+          "line": 38,
+          "kind": "ClassDef"
+        },
+        {
+          "name": "DatasetRowMetadata",
+          "line": 76,
+          "kind": "ClassDef"
+        },
+        {
+          "name": "DatasetMessage",
+          "line": 133,
+          "kind": "ClassDef"
+        },
+        {
+          "name": "DatasetRow",
+          "line": 138,
+          "kind": "ClassDef"
+        },
+        {
+          "name": "InvalidRow",
+          "line": 152,
+          "kind": "ClassDef"
+        },
+        {
+          "name": "DatasetStats",
+          "line": 164,
+          "kind": "ClassDef"
+        }
+      ]
+    },
+    {
+      "path": "src/moro/data/normalize.py",
+      "lines": 175,
+      "sha256": "6c9975bea7047dcddab885cd9d0462a7bc3484e06892862cb1b9c4fc06888d6a",
+      "symbols": [
+        {
+          "name": "normalize_rows",
+          "line": 10,
+          "kind": "FunctionDef"
+        },
+        {
+          "name": "_clean_raw",
+          "line": 74,
+          "kind": "FunctionDef"
+        },
+        {
+          "name": "_make_row_id",
+          "line": 79,
+          "kind": "FunctionDef"
+        },
+        {
+          "name": "_normalize_single_row",
+          "line": 88,
+          "kind": "FunctionDef"
+        },
+        {
+          "name": "_parse_messages_list",
+          "line": 139,
+          "kind": "FunctionDef"
+        },
+        {
+          "name": "_extract_prompt",
+          "line": 154,
+          "kind": "FunctionDef"
+        },
+        {
+          "name": "_extract_completion",
+          "line": 162,
+          "kind": "FunctionDef"
+        },
+        {
+          "name": "_text",
+          "line": 170,
+          "kind": "FunctionDef"
+        }
+      ]
+    },
+    {
+      "path": "src/moro/data/privacy.py",
+      "lines": 134,
+      "sha256": "e6da257b2cf324547b1a543a3418c379681dd225182b0bd3fa2db0eb844c8e2f",
+      "symbols": [
+        {
+          "name": "scan_row",
+          "line": 50,
+          "kind": "FunctionDef"
+        },
+        {
+          "name": "scan_rows",
+          "line": 65,
+          "kind": "FunctionDef"
+        },
+        {
+          "name": "redact_text",
+          "line": 90,
+          "kind": "FunctionDef"
+        },
+        {
+          "name": "redact_row",
+          "line": 105,
+          "kind": "FunctionDef"
+        },
+        {
+          "name": "redact_rows",
+          "line": 124,
+          "kind": "FunctionDef"
+        }
+      ]
+    },
+    {
+      "path": "src/moro/data/quality.py",
+      "lines": 333,
+      "sha256": "bf9038abc872b2856d085db8414638fbac775bb21d87c4aa407f9f96a38b7871",
+      "symbols": [
+        {
+          "name": "calculate_zlib_entropy",
+          "line": 45,
+          "kind": "FunctionDef"
+        },
+        {
+          "name": "calculate_domain_ppmi",
+          "line": 66,
+          "kind": "FunctionDef"
+        },
+        {
+          "name": "calculate_resnik_ic",
+          "line": 86,
+          "kind": "FunctionDef"
+        },
+        {
+          "name": "compute_basic_quality_breakdown",
+          "line": 119,
+          "kind": "FunctionDef"
+        },
+        {
+          "name": "classify_row",
+          "line": 165,
+          "kind": "FunctionDef"
+        },
+        {
+          "name": "approximate_token_count",
+          "line": 217,
+          "kind": "FunctionDef"
+        },
+        {
+          "name": "score_row",
+          "line": 226,
+          "kind": "FunctionDef"
+        },
+        {
+          "name": "score_row_epistemic",
+          "line": 268,
+          "kind": "FunctionDef"
+        }
+      ]
+    },
+    {
+      "path": "src/moro/data/report.py",
+      "lines": 104,
+      "sha256": "f6ea0ef35038d77f31728144bb5c8acf54510713eea2e84619117896d509d61d",
+      "symbols": [
+        {
+          "name": "compute_stats",
+          "line": 6,
+          "kind": "FunctionDef"
+        }
+      ]
+    },
+    {
+      "path": "src/moro/data/splitter.py",
+      "lines": 73,
+      "sha256": "3830831cac6b90db8e439a8dec603546453cd4e49c7ed60bfa9ae2e06434ae05",
+      "symbols": [
+        {
+          "name": "split_rows",
+          "line": 8,
+          "kind": "FunctionDef"
+        },
+        {
+          "name": "write_split",
+          "line": 66,
+          "kind": "FunctionDef"
+        }
+      ]
+    },
+    {
+      "path": "src/moro/data/versions.py",
+      "lines": 187,
+      "sha256": "688aa0773afdfacfc7c9af7acf2548a8096756979dbdecc2e53b9b33b2d31471",
+      "symbols": [
+        {
+          "name": "source_fingerprint",
+          "line": 15,
+          "kind": "FunctionDef"
+        },
+        {
+          "name": "glossary_path",
+          "line": 20,
+          "kind": "FunctionDef"
+        },
+        {
+          "name": "build_key",
+          "line": 29,
+          "kind": "FunctionDef"
+        },
+        {
+          "name": "verify_snapshot",
+          "line": 64,
+          "kind": "FunctionDef"
+        },
+        {
+          "name": "select_snapshot",
+          "line": 83,
+          "kind": "FunctionDef"
+        },
+        {
+          "name": "publish_snapshot",
+          "line": 107,
+          "kind": "FunctionDef"
+        }
+      ]
+    },
+    {
+      "path": "src/moro/deploy/__init__.py",
+      "lines": 5,
+      "sha256": "d497d26eb6073db4753ead1734188c093f9ca5a2dfdd9cb33bb4787e911e82b6",
+      "symbols": []
+    },
+    {
+      "path": "src/moro/deploy/manager.py",
+      "lines": 19,
+      "sha256": "5b59b2a89c0d83ef2e9f78d109be276e848febb396495ba42ea7cc1947697e93",
+      "symbols": [
+        {
+          "name": "DeploymentManager",
+          "line": 8,
+          "kind": "ClassDef"
+        }
+      ]
+    },
+    {
+      "path": "src/moro/diagnose/__init__.py",
+      "lines": 1,
+      "sha256": "716f02fe298a447b9e9b9aeee34a0c3e92a3e08ef5a40938ca21093a96f11354",
+      "symbols": []
+    },
+    {
+      "path": "src/moro/diagnose/analyzer.py",
+      "lines": 104,
+      "sha256": "7bf831b6defcaef35d688e9d25fd3c932216ffc490e9fe79ec5ba3407ed02dd2",
+      "symbols": [
+        {
+          "name": "analyze_error",
+          "line": 73,
+          "kind": "FunctionDef"
+        }
+      ]
+    },
+    {
+      "path": "src/moro/eval/__init__.py",
+      "lines": 1,
+      "sha256": "5f0d9e05ba748a0304d8beb865b6972d19e225cbbb9bd0dc7b151e974984af4c",
+      "symbols": []
+    },
+    {
+      "path": "src/moro/eval/compare.py",
+      "lines": 122,
+      "sha256": "be1997d2c9129d80c9004b15f132d40159ceec43c8127d255fd42ffd9fb56c32",
+      "symbols": [
+        {
+          "name": "compare_eval",
+          "line": 16,
+          "kind": "FunctionDef"
+        },
+        {
+          "name": "_compute_delta",
+          "line": 66,
+          "kind": "FunctionDef"
+        },
+        {
+          "name": "_summarize_delta",
+          "line": 112,
+          "kind": "FunctionDef"
+        }
+      ]
+    },
+    {
+      "path": "src/moro/eval/harness.py",
+      "lines": 61,
+      "sha256": "f9dd9c134253b6b689dd37ee0237497eac1faed1d0e0c05d045fb06e26159ca6",
+      "symbols": [
+        {
+          "name": "EvalHarness",
+          "line": 14,
+          "kind": "ClassDef"
+        }
+      ]
+    },
+    {
+      "path": "src/moro/eval/loader.py",
+      "lines": 87,
+      "sha256": "df489f555ccaa605d3229e2af2ae470f4807c5c6c56296e047e19339cafc8671",
+      "symbols": [
+        {
+          "name": "load_suite",
+          "line": 11,
+          "kind": "FunctionDef"
+        }
+      ]
+    },
+    {
+      "path": "src/moro/eval/models.py",
+      "lines": 66,
+      "sha256": "3f0f4d726e5f0091ef7e98bb3db65a133f41012f0e57b8147ff2d59f89af3f17",
+      "symbols": [
+        {
+          "name": "EvalMessage",
+          "line": 9,
+          "kind": "ClassDef"
+        },
+        {
+          "name": "EvalExpect",
+          "line": 16,
+          "kind": "ClassDef"
+        },
+        {
+          "name": "EvalCase",
+          "line": 25,
+          "kind": "ClassDef"
+        },
+        {
+          "name": "EvalSuite",
+          "line": 34,
+          "kind": "ClassDef"
+        },
+        {
+          "name": "CaseScore",
+          "line": 43,
+          "kind": "ClassDef"
+        },
+        {
+          "name": "EvalResult",
+          "line": 51,
+          "kind": "ClassDef"
+        }
+      ]
+    },
+    {
+      "path": "src/moro/eval/perturbations.py",
+      "lines": 168,
+      "sha256": "638cd8ab9bdf22fc05b22ef87e8a5b82dc3462a0e7a40d5f49ab9f8fe9bcf2c6",
+      "symbols": [
+        {
+          "name": "PerturbationEngine",
+          "line": 50,
+          "kind": "ClassDef"
+        }
+      ]
+    },
+    {
+      "path": "src/moro/eval/robustness.py",
+      "lines": 316,
+      "sha256": "0193e3b648d67b24a0e9948bc0f75d8b163c0c7d4128da9badd126b278d7b197",
+      "symbols": [
+        {
+          "name": "CaseRobustnessResult",
+          "line": 20,
+          "kind": "ClassDef"
+        },
+        {
+          "name": "RobustnessReport",
+          "line": 51,
+          "kind": "ClassDef"
+        },
+        {
+          "name": "compute_case_robustness",
+          "line": 106,
+          "kind": "FunctionDef"
+        },
+        {
+          "name": "compute_robustness_report",
+          "line": 129,
+          "kind": "FunctionDef"
+        },
+        {
+          "name": "compute_robustness_score",
+          "line": 147,
+          "kind": "FunctionDef"
+        },
+        {
+          "name": "create_perturbed_suite",
+          "line": 175,
+          "kind": "FunctionDef"
+        },
+        {
+          "name": "evaluate_robustness",
+          "line": 232,
+          "kind": "FunctionDef"
+        }
+      ]
+    },
+    {
+      "path": "src/moro/eval/runner.py",
+      "lines": 140,
+      "sha256": "685409558711dd38bbade975d9f4c07a02098ed81e0624acee75148781e1a6b9",
+      "symbols": [
+        {
+          "name": "_load_generator",
+          "line": 15,
+          "kind": "FunctionDef"
+        },
+        {
+          "name": "_generate_response",
+          "line": 49,
+          "kind": "FunctionDef"
+        },
+        {
+          "name": "run_suite",
+          "line": 57,
+          "kind": "FunctionDef"
+        }
+      ]
+    },
+    {
+      "path": "src/moro/eval/scorers.py",
+      "lines": 91,
+      "sha256": "06b3e320f4262233ea2d65efed0bb14bc3372664b72ae8ba18dd6b785fd9433c",
+      "symbols": [
+        {
+          "name": "score_case",
+          "line": 12,
+          "kind": "FunctionDef"
+        }
+      ]
+    },
+    {
+      "path": "src/moro/export/__init__.py",
+      "lines": 1,
+      "sha256": "91034ad8679ef9f54cf30e0907654535fdd8eb4ab5da4b259b7e19edbf734e00",
+      "symbols": []
+    },
+    {
+      "path": "src/moro/export/eligibility.py",
+      "lines": 95,
+      "sha256": "4a06678fb78a2883a85c4ecf8de4c187eac2074de371edf10bfd0bf7b84b1652",
+      "symbols": [
+        {
+          "name": "ExportRun",
+          "line": 19,
+          "kind": "ClassDef"
+        },
+        {
+          "name": "validate_adapter",
+          "line": 30,
+          "kind": "FunctionDef"
+        },
+        {
+          "name": "resolve_export_run",
+          "line": 52,
+          "kind": "FunctionDef"
+        }
+      ]
+    },
+    {
+      "path": "src/moro/export/gates.py",
+      "lines": 119,
+      "sha256": "0bab04213ada3b29b2e0e8b5f9db01787284bafd5f47f71a35bc5e0848956462",
+      "symbols": [
+        {
+          "name": "check_release_requirements",
+          "line": 15,
+          "kind": "FunctionDef"
+        },
+        {
+          "name": "write_gate_report",
+          "line": 118,
+          "kind": "FunctionDef"
+        }
+      ]
+    },
+    {
+      "path": "src/moro/export/gguf.py",
+      "lines": 181,
+      "sha256": "3dd11c9e43c7b36af61743c2dce4cba096961af5056b9198a37844cb94e0958c",
+      "symbols": [
+        {
+          "name": "validate_conversion",
+          "line": 19,
+          "kind": "FunctionDef"
+        },
+        {
+          "name": "write_gguf_script",
+          "line": 42,
+          "kind": "FunctionDef"
+        },
+        {
+          "name": "convert_to_gguf_direct",
+          "line": 116,
+          "kind": "FunctionDef"
+        }
+      ]
+    },
+    {
+      "path": "src/moro/export/manifest.py",
+      "lines": 175,
+      "sha256": "b4ee67577abf98589240b2b184059b2b3ad301143258572a1d765630cdde2c1e",
+      "symbols": [
+        {
+          "name": "export_adapter",
+          "line": 18,
+          "kind": "FunctionDef"
+        },
+        {
+          "name": "generate_manifest",
+          "line": 62,
+          "kind": "FunctionDef"
+        },
+        {
+          "name": "write_manifest",
+          "line": 99,
+          "kind": "FunctionDef"
+        },
+        {
+          "name": "generate_model_card",
+          "line": 108,
+          "kind": "FunctionDef"
+        },
+        {
+          "name": "write_model_card",
+          "line": 169,
+          "kind": "FunctionDef"
+        }
+      ]
+    },
+    {
+      "path": "src/moro/export/merge.py",
+      "lines": 96,
+      "sha256": "3622cc9b92e9a82bcb14874d8c768f8b1e7118230e26ad7a4d34aa6d7522871a",
+      "symbols": [
+        {
+          "name": "merge_adapter_into_base",
+          "line": 15,
+          "kind": "FunctionDef"
+        }
+      ]
+    },
+    {
+      "path": "src/moro/export/ollama.py",
+      "lines": 75,
+      "sha256": "a65ae5ec8ace57ccdaf6c2d90a5ea320af480103ce6bc756a68ef117534f1391",
+      "symbols": [
+        {
+          "name": "generate_ollama_package",
+          "line": 12,
+          "kind": "FunctionDef"
+        }
+      ]
+    },
+    {
+      "path": "src/moro/export/paths.py",
+      "lines": 28,
+      "sha256": "b7a5f6478c3223dc5a36af50c977bd47c2b4952c02f97246101c125c30a1880b",
+      "symbols": [
+        {
+          "name": "deployment_directory",
+          "line": 9,
+          "kind": "FunctionDef"
+        }
+      ]
+    },
+    {
+      "path": "src/moro/flywheel/__init__.py",
+      "lines": 49,
+      "sha256": "0dceadf6754f39649a210ef7b326c96dae01929c91b09f825fd645bce282e978",
+      "symbols": []
+    },
+    {
+      "path": "src/moro/flywheel/architecture.py",
+      "lines": 70,
+      "sha256": "b11eead2f044b3cc5b231153c177f102039a5ff92a187566b655bad90c4bc295",
+      "symbols": [
+        {
+          "name": "AbstractLogIngestor",
+          "line": 13,
+          "kind": "ClassDef"
+        },
+        {
+          "name": "AbstractPreferenceExtractor",
+          "line": 37,
+          "kind": "ClassDef"
+        },
+        {
+          "name": "AbstractSyntheticGenerator",
+          "line": 46,
+          "kind": "ClassDef"
+        },
+        {
+          "name": "AbstractDPOTrainerBridge",
+          "line": 55,
+          "kind": "ClassDef"
+        },
+        {
+          "name": "AbstractDeploymentGate",
+          "line": 64,
+          "kind": "ClassDef"
+        }
+      ]
+    },
+    {
+      "path": "src/moro/flywheel/extractors/__init__.py",
+      "lines": 5,
+      "sha256": "9c4cb5f0296d69fd2b73435f5874f1c547b9d332b0e199a220ebf753bf5fb2e7",
+      "symbols": []
+    },
+    {
+      "path": "src/moro/flywheel/extractors/deterministic_extractor.py",
+      "lines": 182,
+      "sha256": "0fe299e17eecbf670ec13a58e5455902268c9b65e187846368c11bdb44f31de0",
+      "symbols": [
+        {
+          "name": "DeterministicPreferenceExtractor",
+          "line": 17,
+          "kind": "ClassDef"
+        }
+      ]
+    },
+    {
+      "path": "src/moro/flywheel/generators/__init__.py",
+      "lines": 8,
+      "sha256": "117228add63b2ae442f31e08b5c2cc498726ce6900756fa57116e65984831dc6",
+      "symbols": []
+    },
+    {
+      "path": "src/moro/flywheel/generators/grounded_generator.py",
+      "lines": 120,
+      "sha256": "c75ad2af635a857e76ba0bc4acb480622f934bce0e822e9b04cad2013ef94425",
+      "symbols": [
+        {
+          "name": "OllamaGroundedGenerator",
+          "line": 17,
+          "kind": "ClassDef"
+        },
+        {
+          "name": "DeterministicGroundedGenerator",
+          "line": 90,
+          "kind": "ClassDef"
+        }
+      ]
+    },
+    {
+      "path": "src/moro/flywheel/ingestors/__init__.py",
+      "lines": 5,
+      "sha256": "b4fc66fd26e077b649f750bbcee1fcbdb2a750d0d90562f41f883e49726bac74",
+      "symbols": []
+    },
+    {
+      "path": "src/moro/flywheel/ingestors/sqlite_ingestor.py",
+      "lines": 301,
+      "sha256": "f6fbb58863801dfc43c6962415b14f0444a53a22444c08e6ba1f66a400d61336",
+      "symbols": [
+        {
+          "name": "SQLiteLogIngestor",
+          "line": 20,
+          "kind": "ClassDef"
+        }
+      ]
+    },
+    {
+      "path": "src/moro/flywheel/models.py",
+      "lines": 74,
+      "sha256": "c7ea377e066e601cdaee96510718cac892664be5fce4689cc6d702ef266f7602",
+      "symbols": [
+        {
+          "name": "FeedbackType",
+          "line": 15,
+          "kind": "ClassDef"
+        },
+        {
+          "name": "InferenceLogPayload",
+          "line": 24,
+          "kind": "ClassDef"
+        },
+        {
+          "name": "PreferencePair",
+          "line": 38,
+          "kind": "ClassDef"
+        },
+        {
+          "name": "FeedbackEntry",
+          "line": 52,
+          "kind": "ClassDef"
+        },
+        {
+          "name": "RefinedTrainingPair",
+          "line": 65,
+          "kind": "ClassDef"
+        }
+      ]
+    },
+    {
+      "path": "src/moro/flywheel/orchestrator.py",
+      "lines": 320,
+      "sha256": "45bb3181635736eb404ebc381b46faabdcf747e9d39cd3efc9f75ca6937db18e",
+      "symbols": [
+        {
+          "name": "FlywheelConfig",
+          "line": 35,
+          "kind": "ClassDef"
+        },
+        {
+          "name": "DPOExecutionSummary",
+          "line": 55,
+          "kind": "ClassDef"
+        },
+        {
+          "name": "MoroAIFlywheelOrchestrator",
+          "line": 93,
+          "kind": "ClassDef"
+        },
+        {
+          "name": "FlywheelOrchestrator",
+          "line": 296,
+          "kind": "ClassDef"
+        }
+      ]
+    },
+    {
+      "path": "src/moro/flywheel/storage/__init__.py",
+      "lines": 9,
+      "sha256": "7a24c7c01f597ffe2df1aa56c76b415e7c84ed303566a993b43de8109f125020",
+      "symbols": []
+    },
+    {
+      "path": "src/moro/flywheel/storage/schema.py",
+      "lines": 126,
+      "sha256": "b4c709bd609fe1a132c47c35db579201dd247f44c609759a25494a55bfca455a",
+      "symbols": [
+        {
+          "name": "initialize_production_db",
+          "line": 84,
+          "kind": "FunctionDef"
+        },
+        {
+          "name": "get_production_db",
+          "line": 99,
+          "kind": "FunctionDef"
+        },
+        {
+          "name": "get_db_stats",
+          "line": 107,
+          "kind": "FunctionDef"
+        }
+      ]
+    },
+    {
+      "path": "src/moro/flywheel/webhook/__init__.py",
+      "lines": 9,
+      "sha256": "b25ca7e7542a975559ec0f444b3366547d00f9d9e8c115c3ea4968edb975bae2",
+      "symbols": []
+    },
+    {
+      "path": "src/moro/flywheel/webhook/receiver.py",
+      "lines": 231,
+      "sha256": "9e5175961d99cbf53ff0e33c9b2012e797b89cba3887a3acf1cd378dfa25508e",
+      "symbols": [
+        {
+          "name": "WebhookConfig",
+          "line": 23,
+          "kind": "ClassDef"
+        },
+        {
+          "name": "get_config",
+          "line": 42,
+          "kind": "FunctionDef"
+        },
+        {
+          "name": "set_config",
+          "line": 49,
+          "kind": "FunctionDef"
+        },
+        {
+          "name": "authenticated",
+          "line": 54,
+          "kind": "FunctionDef"
+        },
+        {
+          "name": "ingest",
+          "line": 58,
+          "kind": "FunctionDef"
+        },
+        {
+          "name": "WebhookRequestHandler",
+          "line": 122,
+          "kind": "ClassDef"
+        },
+        {
+          "name": "health",
+          "line": 185,
+          "kind": "FunctionDef"
+        },
+        {
+          "name": "receive_feedback",
+          "line": 191,
+          "kind": "AsyncFunctionDef"
+        },
+        {
+          "name": "stats",
+          "line": 214,
+          "kind": "FunctionDef"
+        },
+        {
+          "name": "start_webhook_receiver",
+          "line": 220,
+          "kind": "FunctionDef"
+        }
+      ]
+    },
+    {
+      "path": "src/moro/hardware/__init__.py",
+      "lines": 1,
+      "sha256": "7b8b724c040541e54877ab75aa669dd9213a8b76822d72aa8b9ee56fd3d1b0ca",
+      "symbols": []
+    },
+    {
+      "path": "src/moro/hardware/detector.py",
+      "lines": 135,
+      "sha256": "af7b924172376f1a98a1dbe429cb37329e80e283935fce6c4a933af9e889304c",
+      "symbols": [
+        {
+          "name": "_get_vram_gb",
+          "line": 11,
+          "kind": "FunctionDef"
+        },
+        {
+          "name": "detect_hardware",
+          "line": 48,
+          "kind": "FunctionDef"
+        }
+      ]
+    },
+    {
+      "path": "src/moro/hardware/profile.py",
+      "lines": 20,
+      "sha256": "f35db0c7b29a4ec160ba86a5a03f41bec8e9f6ec00b6ffe7d45c395b4c5958dc",
+      "symbols": [
+        {
+          "name": "HardwareProfile",
+          "line": 8,
+          "kind": "ClassDef"
+        }
+      ]
+    },
+    {
+      "path": "src/moro/main.py",
+      "lines": 121,
+      "sha256": "37324f791ee4ae0b4180a52d8da4d484f151d6d0fe061ec79841754f9e40b837",
+      "symbols": [
+        {
+          "name": "version_callback",
+          "line": 35,
+          "kind": "FunctionDef"
+        },
+        {
+          "name": "main",
+          "line": 42,
+          "kind": "FunctionDef"
+        },
+        {
+          "name": "version_command",
+          "line": 116,
+          "kind": "FunctionDef"
+        }
+      ]
+    },
+    {
+      "path": "src/moro/models/__init__.py",
+      "lines": 1,
+      "sha256": "a41c47eef76b72a9e511802e7d37bd5c5318f4120e42182fb39fa0a759846322",
+      "symbols": []
+    },
+    {
+      "path": "src/moro/models/loading.py",
+      "lines": 34,
+      "sha256": "c17ddb9221bfbe0f257460c64e3c1857b625625a875d64ed5a1889ca560e195b",
+      "symbols": [
+        {
+          "name": "resolve_model_reference",
+          "line": 6,
+          "kind": "FunctionDef"
+        },
+        {
+          "name": "model_load_options",
+          "line": 31,
+          "kind": "FunctionDef"
+        }
+      ]
+    },
+    {
+      "path": "src/moro/recipes/__init__.py",
+      "lines": 1,
+      "sha256": "382f185ed848a24822d860fd6126dae6e3254fcb0e7813f7439be4f85e2626a0",
+      "symbols": []
+    },
+    {
+      "path": "src/moro/recipes/engine.py",
+      "lines": 314,
+      "sha256": "3a3303c0e0a33efd035108b2f7b6fb28e13b26f659c00c5d81bb85167e4c6247",
+      "symbols": [
+        {
+          "name": "RecipeSuggestion",
+          "line": 19,
+          "kind": "ClassDef"
+        },
+        {
+          "name": "_get_target_modules",
+          "line": 56,
+          "kind": "FunctionDef"
+        },
+        {
+          "name": "suggest_recipe",
+          "line": 66,
+          "kind": "FunctionDef"
+        },
+        {
+          "name": "predict_peak_vram_gb",
+          "line": 219,
+          "kind": "FunctionDef"
+        },
+        {
+          "name": "RecipeEngine",
+          "line": 252,
+          "kind": "ClassDef"
+        }
+      ]
+    },
+    {
+      "path": "src/moro/recipes/mixing.py",
+      "lines": 139,
+      "sha256": "8153fc7fdcc89484eaa77afc9b72935128686332865329a7853bd4e95d163c23",
+      "symbols": [
+        {
+          "name": "MixingStrategy",
+          "line": 29,
+          "kind": "ClassDef"
+        },
+        {
+          "name": "calculate_mixing_strategy",
+          "line": 54,
+          "kind": "FunctionDef"
+        },
+        {
+          "name": "estimate_jargon_divergence",
+          "line": 122,
+          "kind": "FunctionDef"
+        }
+      ]
+    },
+    {
+      "path": "src/moro/recipes/presets.py",
+      "lines": 155,
+      "sha256": "4cf820ec3e4405e9220dbc29e1388ed5d59658834cb881c34fe7e6fd2836e316",
+      "symbols": [
+        {
+          "name": "RecipePreset",
+          "line": 15,
+          "kind": "ClassDef"
+        },
+        {
+          "name": "get_preset_for_vram",
+          "line": 142,
+          "kind": "FunctionDef"
+        }
+      ]
+    },
+    {
+      "path": "src/moro/recipes/rules.py",
+      "lines": 86,
+      "sha256": "9554b6bc4828b6e5fc3219191ed8c52d7614ba720311fd5ce0fbaa7767ff5fa4",
+      "symbols": [
+        {
+          "name": "infer_parameter_billions",
+          "line": 11,
+          "kind": "FunctionDef"
+        },
+        {
+          "name": "estimate_memory",
+          "line": 37,
+          "kind": "FunctionDef"
+        },
+        {
+          "name": "estimate_config_memory",
+          "line": 68,
+          "kind": "FunctionDef"
+        }
+      ]
+    },
+    {
+      "path": "src/moro/registry/__init__.py",
+      "lines": 1,
+      "sha256": "d7265ab84d0b5795947a0a9f898b7fe65454a62911c0bf1bb7fa94cddc933d12",
+      "symbols": []
+    },
+    {
+      "path": "src/moro/registry/manager.py",
+      "lines": 184,
+      "sha256": "db19d67463cd56c070db1a68b3195baa351cb0b5948149e4efb74102421e5f53",
+      "symbols": [
+        {
+          "name": "ModelRegistry",
+          "line": 19,
+          "kind": "ClassDef"
+        }
+      ]
+    },
+    {
+      "path": "src/moro/release/__init__.py",
+      "lines": 5,
+      "sha256": "64133e8ebb3371af00b1bf36e4da330e733b7cdb3265b28610c7ebf40f1e3551",
+      "symbols": []
+    },
+    {
+      "path": "src/moro/release/manager.py",
+      "lines": 84,
+      "sha256": "50168d8393fa9de995c98ad3c47bbeb56e8c531eb8eb7832d8fb27ad19bd0cb0",
+      "symbols": [
+        {
+          "name": "ReleaseManager",
+          "line": 20,
+          "kind": "ClassDef"
+        }
+      ]
+    },
+    {
+      "path": "src/moro/runtime/__init__.py",
+      "lines": 19,
+      "sha256": "ddd21e19e03fee917ed0d9a033398fc6871245327bfb26cff09a725e374c570f",
+      "symbols": []
+    },
+    {
+      "path": "src/moro/runtime/orchestrator.py",
+      "lines": 868,
+      "sha256": "ed23d178226a240ced65af10346a27420180a677297faa4c175c678087365dc0",
+      "symbols": [
+        {
+          "name": "ExecutionState",
+          "line": 32,
+          "kind": "ClassDef"
+        },
+        {
+          "name": "ExecutionPhase",
+          "line": 46,
+          "kind": "ClassDef"
+        },
+        {
+          "name": "ExecutionContext",
+          "line": 63,
+          "kind": "ClassDef"
+        },
+        {
+          "name": "MoroRuntimeOrchestrator",
+          "line": 167,
+          "kind": "ClassDef"
+        },
+        {
+          "name": "get_runtime",
+          "line": 852,
+          "kind": "FunctionDef"
+        },
+        {
+          "name": "reset_runtime",
+          "line": 865,
+          "kind": "FunctionDef"
+        }
+      ]
+    },
+    {
+      "path": "src/moro/security/__init__.py",
+      "lines": 1,
+      "sha256": "71e525a490615b3ed052ab46614ea970e39a0bd18855f47d2c77d419837495c1",
+      "symbols": []
+    },
+    {
+      "path": "src/moro/security/hook.py",
+      "lines": 204,
+      "sha256": "370bb941b8da9906497ae1830942ce227cb9839b7fc7c8cdaf8f87d432b8a0b9",
+      "symbols": [
+        {
+          "name": "_is_safe_path",
+          "line": 99,
+          "kind": "FunctionDef"
+        },
+        {
+          "name": "get_staged_files",
+          "line": 104,
+          "kind": "FunctionDef"
+        },
+        {
+          "name": "check_secrets",
+          "line": 116,
+          "kind": "FunctionDef"
+        },
+        {
+          "name": "check_pii_in_data",
+          "line": 137,
+          "kind": "FunctionDef"
+        },
+        {
+          "name": "main",
+          "line": 164,
+          "kind": "FunctionDef"
+        }
+      ]
+    },
+    {
+      "path": "src/moro/services/__init__.py",
+      "lines": 1,
+      "sha256": "70406c43e8d655893c3a71ffef2d0de1803211f4547473a743879927055dfd1b",
+      "symbols": []
+    },
+    {
+      "path": "src/moro/services/orchestrator.py",
+      "lines": 513,
+      "sha256": "d0cb8f672abb7ba1710ea6dc7e290c9a5570d955f8fd561c2bfecf187526699f",
+      "symbols": [
+        {
+          "name": "is_port_open",
+          "line": 28,
+          "kind": "FunctionDef"
+        },
+        {
+          "name": "ServiceDefinition",
+          "line": 37,
+          "kind": "ClassDef"
+        },
+        {
+          "name": "ServiceStatusList",
+          "line": 65,
+          "kind": "ClassDef"
+        },
+        {
+          "name": "ServiceOrchestrator",
+          "line": 97,
+          "kind": "ClassDef"
+        }
+      ]
+    },
+    {
+      "path": "src/moro/state/__init__.py",
+      "lines": 6,
+      "sha256": "c4a187fd3b34d47c958d92b7ded90ff0127bde7261599d507bd449443ebfb33c",
+      "symbols": []
+    },
+    {
+      "path": "src/moro/state/manager.py",
+      "lines": 564,
+      "sha256": "8ede69e6783061b9bb975f8f74f809eba5f1350d33ab9df052652fc0985de2e4",
+      "symbols": [
+        {
+          "name": "StateManager",
+          "line": 25,
+          "kind": "ClassDef"
+        }
+      ]
+    },
+    {
+      "path": "src/moro/state/schema.py",
+      "lines": 234,
+      "sha256": "2684617a8c889c2d0c0557325a77d535d61922ac8be79c1b2f050cc3093a9b13",
+      "symbols": [
+        {
+          "name": "NodeType",
+          "line": 15,
+          "kind": "ClassDef"
+        },
+        {
+          "name": "EdgeType",
+          "line": 30,
+          "kind": "ClassDef"
+        },
+        {
+          "name": "NodeStatus",
+          "line": 45,
+          "kind": "ClassDef"
+        },
+        {
+          "name": "initialize_state_db",
+          "line": 205,
+          "kind": "FunctionDef"
+        },
+        {
+          "name": "get_state_db",
+          "line": 222,
+          "kind": "FunctionDef"
+        }
+      ]
+    },
+    {
+      "path": "src/moro/storage/__init__.py",
+      "lines": 1,
+      "sha256": "7372f9b74a3db76114d77f2a3740d057914439b68c053db4409bfb5c80227cc5",
+      "symbols": []
+    },
+    {
+      "path": "src/moro/storage/db.py",
+      "lines": 380,
+      "sha256": "933528e40d933491138a46eec9d814646e2f3c3a174be1c5d12d39c2ce4cdc55",
+      "symbols": [
+        {
+          "name": "utcnow",
+          "line": 11,
+          "kind": "FunctionDef"
+        },
+        {
+          "name": "get_db_path",
+          "line": 16,
+          "kind": "FunctionDef"
+        },
+        {
+          "name": "get_connection",
+          "line": 20,
+          "kind": "FunctionDef"
+        },
+        {
+          "name": "ensure_schema",
+          "line": 33,
+          "kind": "FunctionDef"
+        },
+        {
+          "name": "get_or_create_project",
+          "line": 129,
+          "kind": "FunctionDef"
+        },
+        {
+          "name": "get_or_create_dataset_source",
+          "line": 153,
+          "kind": "FunctionDef"
+        },
+        {
+          "name": "add_dataset_version",
+          "line": 191,
+          "kind": "FunctionDef"
+        },
+        {
+          "name": "get_latest_dataset_version",
+          "line": 220,
+          "kind": "FunctionDef"
+        },
+        {
+          "name": "create_run",
+          "line": 232,
+          "kind": "FunctionDef"
+        },
+        {
+          "name": "update_run_status",
+          "line": 266,
+          "kind": "FunctionDef"
+        },
+        {
+          "name": "get_latest_run",
+          "line": 304,
+          "kind": "FunctionDef"
+        },
+        {
+          "name": "list_runs",
+          "line": 311,
+          "kind": "FunctionDef"
+        },
+        {
+          "name": "add_eval_run",
+          "line": 323,
+          "kind": "FunctionDef"
+        },
+        {
+          "name": "add_artifact",
+          "line": 363,
+          "kind": "FunctionDef"
+        }
+      ]
+    },
+    {
+      "path": "src/moro/storage/state_graph.py",
+      "lines": 157,
+      "sha256": "a5c4e7877991fef1f5bd890caa649b41f55c118a9ae2fcc76907a79d4e980d4e",
+      "symbols": [
+        {
+          "name": "StateGraphManager",
+          "line": 19,
+          "kind": "ClassDef"
+        }
+      ]
+    },
+    {
+      "path": "src/moro/templates/__init__.py",
+      "lines": 1,
+      "sha256": "a8c5ce41c84a252ee283451632219396322863e7ceb9e1a6bb21aadd174465b1",
+      "symbols": []
+    },
+    {
+      "path": "src/moro/templates/project.py",
+      "lines": 161,
+      "sha256": "2a227a04bb9c170420d9f687f03dd14040833a5ac59a3e51a79d539c3e58894d",
+      "symbols": [
+        {
+          "name": "readme_template",
+          "line": 32,
+          "kind": "FunctionDef"
+        },
+        {
+          "name": "default_moro_yaml",
+          "line": 65,
+          "kind": "FunctionDef"
+        }
+      ]
+    },
+    {
+      "path": "src/moro/training/__init__.py",
+      "lines": 1,
+      "sha256": "221e42dae1103fef8f8adc1fb7b85dc0f13ced4f9ecb5b6fd8489bd6ecf617d1",
+      "symbols": []
+    },
+    {
+      "path": "src/moro/training/async_runner.py",
+      "lines": 26,
+      "sha256": "8e0d3504a947661a71c462bacaadff455acb788d76f9073ba9f0ff19887384db",
+      "symbols": [
+        {
+          "name": "AsyncTrainingRunner",
+          "line": 9,
+          "kind": "ClassDef"
+        }
+      ]
+    },
+    {
+      "path": "src/moro/training/backend.py",
+      "lines": 56,
+      "sha256": "16c11f8da30a1cdca4aa46cf87f67a8b45a95fa3845ff6da474498403d45d132",
+      "symbols": [
+        {
+          "name": "TrainingBackend",
+          "line": 14,
+          "kind": "ClassDef"
+        }
+      ]
+    },
+    {
+      "path": "src/moro/training/hf_backend.py",
+      "lines": 341,
+      "sha256": "9ab2381eaa74643a928f4e0cce7a328bd0698276872342204b21bf402fb97c8e",
+      "symbols": [
+        {
+          "name": "_require_imports",
+          "line": 22,
+          "kind": "FunctionDef"
+        },
+        {
+          "name": "HuggingFaceBackend",
+          "line": 40,
+          "kind": "ClassDef"
+        }
+      ]
+    },
+    {
+      "path": "src/moro/training/locking.py",
+      "lines": 27,
+      "sha256": "cc0acc49b5afa247ba4122ca8bd5a1672cb6f531c091cfaa9d1670de6eb47135",
+      "symbols": [
+        {
+          "name": "training_lock",
+          "line": 12,
+          "kind": "FunctionDef"
+        }
+      ]
+    },
+    {
+      "path": "src/moro/training/recovery.py",
+      "lines": 166,
+      "sha256": "4a1389d0f72167e7f9a6bf1d4ca770ea2aa0f552a8a9ffecd6e10738961ba31a",
+      "symbols": [
+        {
+          "name": "apply_oom_recovery_protocol",
+          "line": 30,
+          "kind": "FunctionDef"
+        },
+        {
+          "name": "summarize_recovery",
+          "line": 159,
+          "kind": "FunctionDef"
+        }
+      ]
+    },
+    {
+      "path": "src/moro/training/runner.py",
+      "lines": 97,
+      "sha256": "c24d5439d66e2e1ebefdf23d67367387c49cd2bdfab860772c0c9c7240758004",
+      "symbols": [
+        {
+          "name": "TrainingResult",
+          "line": 14,
+          "kind": "ClassDef"
+        },
+        {
+          "name": "training_config",
+          "line": 39,
+          "kind": "FunctionDef"
+        },
+        {
+          "name": "TrainingRunner",
+          "line": 68,
+          "kind": "ClassDef"
+        }
+      ]
+    },
+    {
+      "path": "src/moro/ui/__init__.py",
+      "lines": 1,
+      "sha256": "1c9c368c524556fdc12049b3057b611f0cd8ec16a7123ab88abec24fa2e1c49e",
+      "symbols": []
+    },
+    {
+      "path": "src/moro/ui/server.py",
+      "lines": 1278,
+      "sha256": "3afc8c2e638d02c7f51b92068df48b8c347e5777fb00029e3e2634cb069acaa8",
+      "symbols": [
+        {
+          "name": "check_port_open",
+          "line": 29,
+          "kind": "FunctionDef"
+        },
+        {
+          "name": "get_local_services",
+          "line": 37,
+          "kind": "FunctionDef"
+        },
+        {
+          "name": "get_project_state",
+          "line": 104,
+          "kind": "FunctionDef"
+        },
+        {
+          "name": "query_ollama",
+          "line": 193,
+          "kind": "FunctionDef"
+        },
+        {
+          "name": "DashboardRequestHandler",
+          "line": 209,
+          "kind": "ClassDef"
+        },
+        {
+          "name": "start_server",
+          "line": 1264,
+          "kind": "FunctionDef"
+        }
+      ]
+    },
+    {
+      "path": "src/moro/validation/__init__.py",
+      "lines": 1,
+      "sha256": "5a0513ad04f614f608d8519a55f20d0783eaab8a6c736485f4122608f6a14cc2",
+      "symbols": []
+    },
+    {
+      "path": "src/moro/validation/engine.py",
+      "lines": 236,
+      "sha256": "34bd677bcd9135d2bc70f67a2f14490d3e149b9d20d6ca0a305dce703ac3cf13",
+      "symbols": [
+        {
+          "name": "ValidationCheck",
+          "line": 27,
+          "kind": "ClassDef"
+        },
+        {
+          "name": "ValidationReport",
+          "line": 33,
+          "kind": "ClassDef"
+        },
+        {
+          "name": "validate_project",
+          "line": 43,
+          "kind": "FunctionDef"
+        }
+      ]
+    }
+  ]
+}

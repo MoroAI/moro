@@ -10,6 +10,13 @@ from __future__ import annotations
 import sqlite3
 from pathlib import Path
 
+from moro.analytics.columns import (
+    EXPERIMENT_METRIC_COLUMNS,
+    HYPERPARAM_COLUMNS,
+    resolve_hyperparam,
+    resolve_metric,
+)
+
 EXPERIMENT_TRACKING_SCHEMA = """
 -- Experiments table: One row per training run
 CREATE TABLE IF NOT EXISTS experiments (
@@ -279,3 +286,13 @@ def get_experiment_db(db_path: Path) -> sqlite3.Connection:
     conn.execute("PRAGMA foreign_keys=ON")
 
     return conn
+
+
+# Compatibility exports; the literal identifier mapping has one owner.
+
+HYPERPARAMETER_COLUMNS = frozenset(HYPERPARAM_COLUMNS)
+METRIC_COLUMNS = frozenset(EXPERIMENT_METRIC_COLUMNS)
+
+
+def validate_metric_identifier(value: str, *, hyperparameter: bool = False) -> str:
+    return resolve_hyperparam(value) if hyperparameter else resolve_metric(value)

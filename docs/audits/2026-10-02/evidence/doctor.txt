@@ -1,0 +1,19 @@
+                     MoroAI Environment Check                      
+┏━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━┓
+┃ Check          ┃ Value                                 ┃ Status ┃
+┡━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━┩
+│ Python version │ 3.14.6                                │   ✓    │
+│ PyTorch        │ not installed (optional for training) │   ⚠    │
+│ GPU            │ not detected — CPU mode only          │   ⚠    │
+│ VRAM           │ N/A                                   │   ⚠    │
+│ CUDA           │ not available                         │   ⚠    │
+│ CPU RAM        │ 64.0 GB                               │   ✓    │
+│ Disk           │ 250.0 GB free                         │   ✓    │
+└────────────────┴───────────────────────────────────────┴────────┘
+
+Recommended models for your hardware:
+  • Qwen/Qwen2.5-7B-Instruct
+  • meta-llama/Llama-3.1-8B-Instruct
+  • mistralai/Mistral-7B-Instruct-v0.3
+
+Critical: PyTorch is not installed. Install with: pip install 'moroai'

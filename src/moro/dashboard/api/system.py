@@ -4,7 +4,6 @@ MoroAI Dashboard System API.
 Provides endpoints for:
 - System and microservice health monitoring
 - Resource telemetry (CPU, RAM, GPU, Disk)
-- Interactive CLI terminal execution
 - moro.yaml configuration read & update
 - Real-time WebSocket health and log streaming
 """
@@ -12,12 +11,10 @@ Provides endpoints for:
 from __future__ import annotations
 
 import asyncio
-import os
 import subprocess
-import sys
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, HTTPException, Request, WebSocket, WebSocketDisconnect
 from pydantic import BaseModel
 
 from moro.dashboard.utils import get_project_root
@@ -40,21 +37,6 @@ class SystemHealth(BaseModel):
     active_runs: int
 
 
-class TerminalCommand(BaseModel):
-    """Command request to execute in workspace."""
-
-    command: str
-    cwd: str | None = None
-
-
-class TerminalResponse(BaseModel):
-    """Execution output from terminal command."""
-
-    stdout: str
-    stderr: str
-    return_code: int
-
-
 # ===================================================================
 # ENDPOINTS
 # ===================================================================
@@ -72,7 +54,11 @@ async def get_system_health() -> SystemHealth:
         import httpx
 
         async with httpx.AsyncClient(timeout=1.0) as client:
-            resp = await client.get("http://localhost:11434/api/tags")
+            import os
+
+            resp = await client.get(
+                os.environ.get("OLLAMA_BASE_URL", "http://127.0.0.1:11434") + "/api/tags"
+            )
             services["ollama"] = {"available": resp.status_code == 200}
     except Exception:
         services["ollama"] = {"available": False}
@@ -95,9 +81,9 @@ async def get_system_health() -> SystemHealth:
 
     # Resource usage
     resources: dict = {
-        "cpu_percent": 12.5,
-        "memory_percent": 45.0,
-        "disk_percent": 30.0,
+        "cpu_percent": None,
+        "memory_percent": None,
+        "disk_percent": None,
         "gpu": {"available": False},
     }
 
@@ -186,90 +172,76 @@ async def stop_service(service_name: str) -> dict:
         raise HTTPException(status_code=500, detail=str(exc))
 
 
-@router.post("/terminal/execute", response_model=TerminalResponse)
-async def execute_terminal_command(cmd: TerminalCommand) -> TerminalResponse:
-    """Execute a CLI command securely in the project workspace."""
-    project_root = get_project_root()
-    cwd = cmd.cwd or str(project_root)
-
-    command_str = cmd.command.strip()
-    if not (
-        command_str.startswith("moro")
-        or command_str.startswith("pytest")
-        or command_str.startswith("python")
-    ):
-        raise HTTPException(
-            status_code=400,
-            detail="Security restriction: only 'moro', 'pytest', or 'python' commands can be executed via terminal.",
-        )
-
-    # Use current python executable if running python or moro module
-    cmd_parts = command_str.split()
-    if cmd_parts[0] == "moro":
-        # Execute via current python interpreter as module
-        full_cmd = [sys.executable, "-m", "moro.main", *cmd_parts[1:]]
-    else:
-        full_cmd = cmd_parts
-
-    try:
-        result = subprocess.run(
-            full_cmd,
-            stdin=subprocess.DEVNULL,
-            capture_output=True,
-            text=True,
-            timeout=120,
-            cwd=cwd,
-            env={**os.environ, "PYTHONPATH": str(project_root / "src")},
-        )
-        return TerminalResponse(
-            stdout=result.stdout,
-            stderr=result.stderr,
-            return_code=result.returncode,
-        )
-    except subprocess.TimeoutExpired:
-        raise HTTPException(status_code=504, detail="Command execution timed out after 120s.")
-    except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"Execution error: {exc}")
-
-
 @router.get("/config")
-async def get_config() -> dict:
-    """Read the active project moro.yaml configuration."""
-    project_root = get_project_root()
-    config_path = project_root / "moro.yaml"
+async def get_config():
+    """Return only a validated configuration, with a revision for safe updates."""
+    import hashlib
 
-    if not config_path.exists():
-        return {
-            "project": {"name": "moro-project", "privacy_mode": "local_only"},
-            "dataset": {"source": "./data/raw/sample_data.jsonl", "format": "jsonl"},
-            "model": {"name": "Qwen/Qwen2.5-1.5B-Instruct", "quantization": "nf4"},
-            "training": {"learning_rate": 0.0002, "batch_size": 1, "epochs": 3},
-        }
+    import yaml
+    from starlette.responses import JSONResponse
 
+    from moro.config.models import MoroConfig
+
+    path = get_project_root() / "moro.yaml"
+    if path.is_symlink():
+        raise HTTPException(400, "Configuration must not be a symbolic link")
     try:
-        from moro.config.models import load_config
-
-        config = load_config(config_path)
-        return config.model_dump()
-    except Exception:
-        import yaml
-
-        with open(config_path, encoding="utf-8") as f:
-            return yaml.safe_load(f) or {}
+        raw = path.read_bytes()
+        config = MoroConfig.model_validate(yaml.safe_load(raw))
+    except Exception as exc:
+        raise HTTPException(422, "Project configuration is missing or invalid") from exc
+    return JSONResponse(
+        config.model_dump(mode="json"),
+        headers={"ETag": '"' + hashlib.sha256(raw).hexdigest() + '"'},
+    )
 
 
 @router.put("/config")
-async def update_config(config: dict) -> dict:
-    """Update and persist moro.yaml configuration."""
-    project_root = get_project_root()
-    config_path = project_root / "moro.yaml"
+async def update_config(config: dict, request: Request) -> dict:
+    """Validate first; serialize writers and replace only the revision read by the caller."""
+    import fcntl
+    import hashlib
+    import os
+    import tempfile
 
     import yaml
 
-    with open(config_path, "w", encoding="utf-8") as f:
-        yaml.dump(config, f, default_flow_style=False)
+    from moro.config.models import MoroConfig
 
-    return {"status": "updated", "message": "Configuration saved to moro.yaml"}
+    try:
+        validated = MoroConfig.model_validate(config)
+    except ValueError as exc:
+        raise HTTPException(
+            422, "Invalid Moro configuration; previous configuration retained"
+        ) from exc
+    expected = request.headers.get("if-match")
+    if expected is None:
+        raise HTTPException(428, "Read the configuration and supply its ETag in If-Match")
+    root = get_project_root()
+    state = root / ".moro"
+    if state.is_symlink():
+        raise HTTPException(400, "State directory must not be a symbolic link")
+    state.mkdir(mode=0o700, exist_ok=True)
+    fd = os.open(state / "config.lock", os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW, 0o600)
+    with os.fdopen(fd, "a") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        path = root / "moro.yaml"
+        if path.is_symlink() or not path.is_file():
+            raise HTTPException(400, "Configuration must be a regular file")
+        current = path.read_bytes()
+        if expected != '"' + hashlib.sha256(current).hexdigest() + '"':
+            raise HTTPException(412, "Configuration changed; reload before saving")
+        fd, temporary = tempfile.mkstemp(prefix=".moro-config-", dir=root)
+        try:
+            with os.fdopen(fd, "w") as stream:
+                yaml.safe_dump(validated.model_dump(mode="json"), stream, sort_keys=False)
+                stream.flush()
+                os.fsync(stream.fileno())
+            os.replace(temporary, path)
+        finally:
+            if os.path.exists(temporary):
+                os.unlink(temporary)
+    return {"status": "updated", "message": "Validated configuration saved"}
 
 
 # ===================================================================

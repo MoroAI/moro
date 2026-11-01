@@ -1,12 +1,14 @@
 """
-MoroAI Mission Control — Web Dashboard Server.
-Provides a local-first interactive visual interface for MoroAI operations,
-epistemic dataset analysis, recipe optimization, run benchmarking, DevSecOps guard,
-DPO continuous learning flywheel, and active local services monitor.
+MoroAI Mission Control — legacy Web Dashboard Server.
+
+Stdlib ``http.server`` fallback kept for environments without FastAPI/uvicorn.
+It is loopback-only, requires the installation Bearer token on every route,
+and sends no CORS headers. Prefer ``moro dashboard`` / ``moro ui``.
 """
 
 from __future__ import annotations
 
+import hmac
 import json
 import os
 import socket
@@ -18,12 +20,36 @@ from typing import Any
 
 import yaml
 
+from moro.core.net import is_loopback_host
 from moro.core.project import find_project_root, load_project_config
 from moro.data.privacy import _PATTERNS, redact_text
 from moro.hardware.detector import detect_hardware
 from moro.hardware.profile import HardwareProfile
 from moro.recipes.engine import suggest_recipe
 from moro.recipes.mixing import calculate_mixing_strategy
+
+
+def _legacy_token() -> str | None:
+    """Read-only view of the installation token (stdlib-only).
+
+    Mirrors ``moro.dashboard.security.access_token`` without importing FastAPI,
+    so this fallback keeps working exactly when FastAPI is unavailable.
+    Returns None when no usable token exists; callers must then deny access.
+    """
+    configured = os.environ.get("MORO_API_TOKEN", "")
+    if len(configured) >= 32:
+        return configured
+    try:
+        root = find_project_root()
+    except Exception:
+        root = None
+    if root is None:
+        return None
+    try:
+        token = (root / ".moro" / "web.token").read_text(encoding="utf-8").strip()
+    except OSError:
+        return None
+    return token if len(token) >= 32 else None
 
 
 def check_port_open(port: int, host: str = "127.0.0.1", timeout: float = 0.4) -> bool:
@@ -35,12 +61,12 @@ def check_port_open(port: int, host: str = "127.0.0.1", timeout: float = 0.4) ->
 
 
 def get_local_services() -> list[dict[str, Any]]:
-    """Probe all known local development services."""
+    """Probe the local services MoroAI actually manages."""
     services = [
         {
             "name": "MoroAI Mission Control",
-            "port": 8765,
-            "url": "http://localhost:8765",
+            "port": 8501,
+            "url": "http://localhost:8501",
             "category": "MoroAI",
             "description": "Visual operations, epistemic metrics, guard tester & recipe calculator",
         },
@@ -51,48 +77,6 @@ def get_local_services() -> list[dict[str, Any]]:
             "category": "Inference",
             "description": "Local model weights execution server & OpenAI-compatible API",
         },
-        {
-            "name": "Supabase Studio (Main)",
-            "port": 55323,
-            "url": "http://localhost:55323",
-            "category": "Database UI",
-            "description": "Postgres table editor, SQL editor, and database management",
-        },
-        {
-            "name": "Supabase Studio (Dev)",
-            "port": 54323,
-            "url": "http://localhost:54323",
-            "category": "Database UI",
-            "description": "Secondary Supabase Studio development instance",
-        },
-        {
-            "name": "Inbucket Local Mailbox",
-            "port": 54324,
-            "url": "http://localhost:54324",
-            "category": "Email Sandbox",
-            "description": "Local SMTP catch-all email viewer & debugging console",
-        },
-        {
-            "name": "Inbucket Mailbox (Alt)",
-            "port": 55324,
-            "url": "http://localhost:55324",
-            "category": "Email Sandbox",
-            "description": "Alternative local mail inbox",
-        },
-        {
-            "name": "Supabase Kong API Gateway",
-            "port": 54321,
-            "url": "http://localhost:54321",
-            "category": "API Gateway",
-            "description": "Unified REST & Auth API routing proxy for Supabase",
-        },
-        {
-            "name": "Local PostgreSQL",
-            "port": 5432,
-            "url": "postgres://localhost:5432",
-            "category": "Database",
-            "description": "Local PostgreSQL relational database engine",
-        },
     ]
 
     for svc in services:
@@ -102,9 +86,13 @@ def get_local_services() -> list[dict[str, Any]]:
 
 
 def get_project_state() -> dict[str, Any]:
-    """Retrieve metadata about the active project or mock a comprehensive state."""
+    """Retrieve metadata about the active project.
+
+    Returns real project data only; unknown collections are empty, never
+    fabricated samples.
+    """
     root = find_project_root()
-    cfg_data = {}
+    cfg_data: dict[str, Any] = {}
     if root:
         try:
             cfg = load_project_config()
@@ -115,78 +103,10 @@ def get_project_state() -> dict[str, Any]:
     return {
         "project_found": root is not None,
         "project_root": str(root) if root else None,
-        "config": cfg_data
-        or {
-            "project": {"name": "quantum_foundry", "privacy_mode": "local_only"},
-            "model": {"name": "Qwen/Qwen2.5-1.5B-Instruct", "quantization": "nf4"},
-            "adapter": {"type": "lora", "r": 16, "alpha": 32},
-            "training": {
-                "batch_size": 1,
-                "gradient_accumulation_steps": 16,
-                "optimizer": "adamw_torch",
-            },
-        },
-        "sample_runs": [
-            {
-                "id": "run_20260927_alpha",
-                "name": "qwen-quantum-lora-v1",
-                "status": "completed",
-                "train_loss": 1.84,
-                "val_loss": 1.71,
-                "peak_vram_gb": 4.2,
-                "tokens_per_sec": 128.4,
-                "steps": 250,
-                "created_at": "2026-09-27T21:15:00Z",
-            },
-            {
-                "id": "run_20260927_beta",
-                "name": "qwen-quantum-lora-v2-dpo",
-                "status": "completed",
-                "train_loss": 1.08,
-                "val_loss": 0.99,
-                "peak_vram_gb": 4.6,
-                "tokens_per_sec": 134.1,
-                "steps": 400,
-                "created_at": "2026-09-27T21:38:00Z",
-            },
-        ],
-        "epistemic_metrics": {
-            "total_samples": 420,
-            "train_samples": 336,
-            "val_samples": 42,
-            "eval_samples": 42,
-            "avg_entropy": 0.742,
-            "avg_quality_score": 0.814,
-            "mi_guard_preserved_samples": 18,
-            "classes": {
-                "ROBUST_FOUNDATION": 284,
-                "HARD_KNOWLEDGE": 96,
-                "NOISY_OUTLIER": 40,
-            },
-        },
-        "dpo_flywheel": {
-            "pending_logs": 0,
-            "processed_logs": 24,
-            "pairs_generated": 19,
-            "completed_epochs": 3,
-            "latest_epoch_id": "epoch_20260927_214131_b70db8",
-            "samples": [
-                {
-                    "prompt": "What is quantum superposition?",
-                    "chosen": "Superposition is a fundamental principle of quantum mechanics where a system simultaneously exists in multiple quantum states.",
-                    "rejected": "Superposition is magic.",
-                    "feedback_type": "EXPLICIT_HUMAN_CORRECTION",
-                    "confidence_delta": 0.45,
-                },
-                {
-                    "prompt": "Explain quantum entanglement simply.",
-                    "chosen": "Entanglement describes pairs or groups of particles interacting such that quantum states cannot be described independently.",
-                    "rejected": "Particles talk to each other through telepathy.",
-                    "feedback_type": "POSITIVE_REINFORCEMENT",
-                    "confidence_delta": 0.32,
-                },
-            ],
-        },
+        "config": cfg_data,
+        "sample_runs": [],
+        "epistemic_metrics": {},
+        "dpo_flywheel": {"samples": []},
     }
 
 
@@ -211,27 +131,59 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
         # Suppress routine log output to keep console tidy
         pass
 
-    def _send_cors_headers(self) -> None:
-        self.send_header("Access-Control-Allow-Origin", "*")
-        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-        self.send_header("Access-Control-Allow-Headers", "Content-Type")
+    def _send_security_headers(self) -> None:
+        # Deliberately no Access-Control-Allow-Origin: this loopback-only admin
+        # UI must never be callable cross-origin from an attacker's page.
+        self.send_header("X-Content-Type-Options", "nosniff")
+        self.send_header("Referrer-Policy", "no-referrer")
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("X-Frame-Options", "DENY")
+
+    def _is_authorized(self) -> bool:
+        expected = _legacy_token()
+        if not expected:
+            return False
+        authorization = self.headers.get("Authorization", "")
+        return authorization.startswith("Bearer ") and hmac.compare_digest(
+            authorization[7:].encode(), expected.encode()
+        )
+
+    def _deny(self) -> None:
+        self.send_response(401)
+        self.send_header("Content-Type", "application/json")
+        self._send_security_headers()
+        self.end_headers()
+        self.wfile.write(b'{"detail": "Authentication required"}')
+
+    def _require_auth(self) -> bool:
+        authorized = self._is_authorized()
+        if not authorized:
+            self._deny()
+        return authorized
 
     def do_OPTIONS(self) -> None:
+        if not self._require_auth():
+            return
         self.send_response(204)
-        self._send_cors_headers()
+        self.send_header("Allow", "GET, POST, HEAD, OPTIONS")
+        self._send_security_headers()
         self.end_headers()
 
     def do_HEAD(self) -> None:
+        if not self._require_auth():
+            return
         self.send_response(200)
         self.send_header("Content-Type", "text/html; charset=utf-8")
-        self._send_cors_headers()
+        self._send_security_headers()
         self.end_headers()
 
     def do_GET(self) -> None:
+        if not self._require_auth():
+            return
         if self.path == "/" or self.path.startswith("/?"):
             self.send_response(200)
             self.send_header("Content-Type", "text/html; charset=utf-8")
-            self._send_cors_headers()
+            self._send_security_headers()
             self.end_headers()
             html_bytes = HTML_PAGE.encode("utf-8")
             self.wfile.write(html_bytes)
@@ -240,7 +192,7 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
         if self.path == "/api/status":
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
-            self._send_cors_headers()
+            self._send_security_headers()
             self.end_headers()
             data = {
                 "hardware": detect_hardware(),
@@ -253,7 +205,7 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
         if self.path == "/api/services":
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
-            self._send_cors_headers()
+            self._send_security_headers()
             self.end_headers()
             services = get_local_services()
             self.wfile.write(json.dumps(services).encode("utf-8"))
@@ -262,7 +214,7 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
         if self.path == "/api/project":
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
-            self._send_cors_headers()
+            self._send_security_headers()
             self.end_headers()
             state = get_project_state()
             self.wfile.write(json.dumps(state).encode("utf-8"))
@@ -271,17 +223,20 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
         if self.path == "/api/ollama/status":
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
-            self._send_cors_headers()
+            self._send_security_headers()
             self.end_headers()
             tags = query_ollama("/api/tags")
             self.wfile.write(json.dumps(tags).encode("utf-8"))
             return
 
         self.send_response(404)
+        self._send_security_headers()
         self.end_headers()
         self.wfile.write(b"Not Found")
 
     def do_POST(self) -> None:
+        if not self._require_auth():
+            return
         content_length = int(self.headers.get("Content-Length", 0))
         body = self.rfile.read(content_length).decode("utf-8") if content_length > 0 else "{}"
         try:
@@ -314,7 +269,7 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
             }
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
-            self._send_cors_headers()
+            self._send_security_headers()
             self.end_headers()
             self.wfile.write(json.dumps(resp).encode("utf-8"))
             return
@@ -341,7 +296,7 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
             }
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
-            self._send_cors_headers()
+            self._send_security_headers()
             self.end_headers()
             self.wfile.write(json.dumps(resp).encode("utf-8"))
             return
@@ -352,12 +307,13 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
             res = query_ollama("/api/generate", {"model": model, "prompt": prompt, "stream": False})
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
-            self._send_cors_headers()
+            self._send_security_headers()
             self.end_headers()
             self.wfile.write(json.dumps(res).encode("utf-8"))
             return
 
         self.send_response(404)
+        self._send_security_headers()
         self.end_headers()
         self.wfile.write(b"Not Found")
 
@@ -1261,15 +1217,21 @@ HTML_PAGE = """<!DOCTYPE html>
 """
 
 
-def start_server(host: str = "127.0.0.1", port: int = 8765) -> ThreadingHTTPServer:
-    """Start the MoroAI Web Dashboard server."""
+def start_server(host: str = "127.0.0.1", port: int = 8501) -> ThreadingHTTPServer:
+    """Start the legacy MoroAI Web Dashboard server.
+
+    Loopback-only with no override: this fallback has no host allowlist or
+    session handling, so it must never bind a network-reachable address.
+    """
+    if not is_loopback_host(host):
+        raise ValueError(f"Refusing to bind legacy dashboard to non-loopback address {host!r}.")
     server_address = (host, port)
     httpd = ThreadingHTTPServer(server_address, DashboardRequestHandler)
     return httpd
 
 
 if __name__ == "__main__":
-    port = 8765
+    port = 8501
     server = start_server(port=port)
     print(f"MoroAI Mission Control listening on http://127.0.0.1:{port}")
     try:

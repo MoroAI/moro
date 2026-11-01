@@ -6,44 +6,21 @@
     <title>MoroAI Mission Control — Local Model Adaptation Foundry</title>
     
     <!-- Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-        tailwind.config = {
-            darkMode: 'class',
-            theme: {
-                extend: {
-                    colors: {
-                        'moro': {
-                            50: '#f0f9ff',
-                            100: '#e0f2fe',
-                            500: '#0ea5e9',
-                            600: '#0284c7',
-                            700: '#0369a1',
-                            900: '#0c4a6e',
-                            950: '#082f49',
-                        }
-                    }
-                }
-            }
-        }
-    </script>
-    
+    <link rel="stylesheet" href="/static/vendor/tailwind.css">
+
     <!-- HTMX -->
-    <script src="https://unpkg.com/htmx.org@1.9.12"></script>
+    <script src="/static/vendor/htmx.min.js"></script>
     
     <!-- Alpine.js -->
-    <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <script defer src="/static/vendor/alpine.min.js"></script>
     
     <!-- Chart.js -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    
-    <!-- xterm.js for terminal -->
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css">
-    <script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.js"></script>
+    <script src="/static/vendor/chart.umd.js"></script>
     
     <!-- Dropzone.js for file uploads -->
-    <link rel="stylesheet" href="https://unpkg.com/dropzone@5/dist/min/dropzone.min.css">
-    <script src="https://unpkg.com/dropzone@5/dist/min/dropzone.min.js"></script>
+    <link rel="stylesheet" href="/static/vendor/dropzone.min.css">
+    <script src="/static/vendor/dropzone.min.js"></script>
+    <script>Dropzone.autoDiscover = false;</script>
     
     <style>
         body { font-family: 'Inter', system-ui, -apple-system, sans-serif; }
@@ -95,12 +72,6 @@
         .status-offline { background: #ef4444; box-shadow: 0 0 10px #ef4444; }
         .status-warning { background: #f59e0b; box-shadow: 0 0 10px #f59e0b; }
         
-        .terminal-container { background: #0d1117; border-radius: 10px; overflow: hidden; border: 1px solid #30363d; }
-        .terminal-header { background: #161b22; padding: 10px 16px; display: flex; align-items: center; gap: 8px; border-bottom: 1px solid #30363d; }
-        .terminal-dot { width: 12px; height: 12px; border-radius: 50%; }
-        .terminal-dot.red { background: #ff5f56; }
-        .terminal-dot.yellow { background: #ffbd2e; }
-        .terminal-dot.green { background: #27c93f; }
     </style>
 </head>
 <body class="bg-gray-950 text-gray-100 min-h-screen" x-data="missionControl()" x-init="init()">
@@ -165,10 +136,10 @@
                             class="px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all">
                         📦 Export & Deploy
                     </button>
-                    <button @click="setTab('terminal')" 
-                            :class="activeTab === 'terminal' ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30' : 'text-gray-400 hover:text-white hover:bg-gray-800/50'"
+                    <button @click="setTab('operations')"
+                            :class="activeTab === 'operations' ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30' : 'text-gray-400 hover:text-white hover:bg-gray-800/50'"
                             class="px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all">
-                        💻 Terminal
+                        ⚙ Operations
                     </button>
                     <button @click="setTab('docs')" 
                             :class="activeTab === 'docs' ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30' : 'text-gray-400 hover:text-white hover:bg-gray-800/50'"
@@ -181,15 +152,15 @@
                 <div class="flex items-center gap-3">
                     <a href="http://localhost:11434" target="_blank" class="flex items-center gap-2 px-2.5 py-1 rounded-lg bg-gray-950 border border-gray-800 text-xs text-gray-300 hover:border-gray-700">
                         <span class="text-gray-400">Ollama</span>
-                        <span :class="systemStatus.ollama ? 'status-online' : 'status-offline'" class="w-2 h-2 rounded-full"></span>
+                        <span :class="statusDot(systemStatus.ollama)" class="w-2 h-2 rounded-full"></span>
                     </a>
-                    <a href="http://localhost:55323" target="_blank" class="flex items-center gap-2 px-2.5 py-1 rounded-lg bg-gray-950 border border-gray-800 text-xs text-gray-300 hover:border-gray-700">
-                        <span class="text-gray-400">Supabase</span>
-                        <span :class="systemStatus.docker ? 'status-online' : 'status-offline'" class="w-2 h-2 rounded-full"></span>
-                    </a>
-                    <div class="flex items-center gap-2 px-2.5 py-1 rounded-lg bg-gray-950 border border-gray-800 text-xs text-gray-300">
+                    <div class="flex items-center gap-2 px-2.5 py-1 rounded-lg bg-gray-950 border border-gray-800 text-xs text-gray-300" title="Docker daemon reachability via docker info">
+                        <span class="text-gray-400">Docker</span>
+                        <span :class="statusDot(systemStatus.docker)" class="w-2 h-2 rounded-full"></span>
+                    </div>
+                    <div class="flex items-center gap-2 px-2.5 py-1 rounded-lg bg-gray-950 border border-gray-800 text-xs text-gray-300" title="SQLite production stats readable via system overview">
                         <span class="text-gray-400">Database</span>
-                        <span class="status-online w-2 h-2 rounded-full"></span>
+                        <span :class="statusDot(systemStatus.database)" class="w-2 h-2 rounded-full"></span>
                     </div>
                 </div>
             </div>
@@ -203,6 +174,7 @@
         <!-- TAB 1: OVERVIEW                                          -->
         <!-- ======================================================== -->
         <div x-show="activeTab === 'overview'" x-transition>
+            <p x-show="overviewError" x-text="overviewError" role="alert" class="text-sm text-red-400 mb-4"></p>
             <!-- 6 Key Stat Cards -->
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 mb-6">
                 <!-- Training Runs -->
@@ -211,7 +183,7 @@
                         <span class="text-gray-400 text-xs font-semibold uppercase tracking-wider">Training Runs</span>
                         <span class="text-blue-400 text-lg">⚡</span>
                     </div>
-                    <p class="text-3xl font-extrabold text-white font-mono" x-text="overview.training?.runs_count ?? overview.runs?.length ?? 2">2</p>
+                    <p class="text-3xl font-extrabold text-white font-mono" x-text="overview.training?.runs_count ?? overview.runs?.length ?? '—'">—</p>
                     <p class="text-xs text-gray-500 mt-1">Recorded in SQLite</p>
                 </div>
                 
@@ -221,8 +193,8 @@
                         <span class="text-gray-400 text-xs font-semibold uppercase tracking-wider">Ollama Models</span>
                         <span class="text-green-400 text-lg">🦙</span>
                     </div>
-                    <p class="text-3xl font-extrabold text-white font-mono" x-text="overview.ollama?.models?.length ?? 1">1</p>
-                    <p class="text-xs text-green-400/90 mt-1">Engine v0.34.4 online</p>
+                    <p class="text-3xl font-extrabold text-white font-mono" x-text="overview.ollama?.models?.length ?? '—'">—</p>
+                    <p class="text-xs text-green-400/90 mt-1"><span x-text="overview.ollama?.available === true ? 'Responding' : 'Not verified'">Not verified</span></p>
                 </div>
                 
                 <!-- Production Logs -->
@@ -231,7 +203,7 @@
                         <span class="text-gray-400 text-xs font-semibold uppercase tracking-wider">Production Logs</span>
                         <span class="text-purple-400 text-lg">💬</span>
                     </div>
-                    <p class="text-3xl font-extrabold text-white font-mono" x-text="overview.database?.total_logs ?? 24">24</p>
+                    <p class="text-3xl font-extrabold text-white font-mono" x-text="overview.database?.total_logs ?? '—'">—</p>
                     <p class="text-xs text-yellow-400/90 mt-1"><span x-text="overview.database?.pending_logs ?? 0">0</span> pending</p>
                 </div>
                 
@@ -241,8 +213,8 @@
                         <span class="text-gray-400 text-xs font-semibold uppercase tracking-wider">DPO Pairs</span>
                         <span class="text-orange-400 text-lg">🔄</span>
                     </div>
-                    <p class="text-3xl font-extrabold text-white font-mono" x-text="overview.flywheel?.pairs_generated ?? 19">19</p>
-                    <p class="text-xs text-gray-500 mt-1">Autonomous alignment</p>
+                    <p class="text-3xl font-extrabold text-white font-mono" x-text="overview.flywheel?.pairs_generated ?? '—'">—</p>
+                    <p class="text-xs text-gray-500 mt-1">Recorded preference extraction</p>
                 </div>
                 
                 <!-- Docker Containers -->
@@ -251,8 +223,8 @@
                         <span class="text-gray-400 text-xs font-semibold uppercase tracking-wider">Containers</span>
                         <span class="text-cyan-400 text-lg">🐳</span>
                     </div>
-                    <p class="text-3xl font-extrabold text-white font-mono" x-text="overview.docker?.containers?.length ?? 21">21</p>
-                    <p class="text-xs text-cyan-400/90 mt-1">Daemon active</p>
+                    <p class="text-3xl font-extrabold text-white font-mono" x-text="overview.docker?.containers?.length ?? '—'">—</p>
+                    <p class="text-xs text-cyan-400/90 mt-1"><span x-text="overview.docker?.available === true ? 'Responding' : 'Not verified'">Not verified</span></p>
                 </div>
                 
                 <!-- Active Training Status -->
@@ -262,8 +234,8 @@
                         <span :class="overview.training?.active ? 'text-green-400 animate-pulse' : 'text-blue-400'">●</span>
                     </div>
                     <p class="text-2xl font-extrabold font-mono" :class="overview.training?.active ? 'text-green-400' : 'text-blue-400'" 
-                       x-text="overview.training?.active ? 'TRAINING' : 'READY'">READY</p>
-                    <p class="text-xs text-gray-500 mt-1">Hardware: 64GB RAM</p>
+                       x-text="overview.training ? 'CHECK RUN' : 'UNVERIFIED'">UNVERIFIED</p>
+                    <p class="text-xs text-gray-500 mt-1">Execution readiness requires preflight</p>
                 </div>
             </div>
             
@@ -281,7 +253,7 @@
                                 </h2>
                                 <p class="text-xs text-gray-400">Local-first end-to-end lineage graph and pipeline status</p>
                             </div>
-                            <span class="text-xs font-mono text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded">All Nodes Operational</span>
+                            <span class="text-xs font-mono text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded">Architecture overview</span>
                         </div>
                         
                         <!-- Visual Node Diagram -->
@@ -292,7 +264,6 @@
                                     <div class="w-12 h-12 bg-blue-500/20 rounded-xl mx-auto mb-2 flex items-center justify-center text-xl">📊</div>
                                     <p class="text-xs font-bold text-white">Data Compiler</p>
                                     <p class="text-[10px] text-gray-400">PPMI + MI Guard</p>
-                                    <span class="inline-block w-2 h-2 rounded-full status-online mt-2"></span>
                                 </div>
                                 
                                 <!-- Pillar 2 -->
@@ -300,7 +271,6 @@
                                     <div class="w-12 h-12 bg-indigo-500/20 rounded-xl mx-auto mb-2 flex items-center justify-center text-xl">⚡</div>
                                     <p class="text-xs font-bold text-white">Recipe Engine</p>
                                     <p class="text-[10px] text-gray-400">Auto-Ratio α / β</p>
-                                    <span class="inline-block w-2 h-2 rounded-full status-online mt-2"></span>
                                 </div>
                                 
                                 <!-- Pillar 3 -->
@@ -308,7 +278,6 @@
                                     <div class="w-12 h-12 bg-purple-500/20 rounded-xl mx-auto mb-2 flex items-center justify-center text-xl">🔍</div>
                                     <p class="text-xs font-bold text-white">Eval Harness</p>
                                     <p class="text-[10px] text-gray-400">Perturbation Test</p>
-                                    <span class="inline-block w-2 h-2 rounded-full status-online mt-2"></span>
                                 </div>
                                 
                                 <!-- Pillar 4 -->
@@ -316,7 +285,6 @@
                                     <div class="w-12 h-12 bg-orange-500/20 rounded-xl mx-auto mb-2 flex items-center justify-center text-xl">🚀</div>
                                     <p class="text-xs font-bold text-white">Deployment</p>
                                     <p class="text-[10px] text-gray-400">GGUF / Ollama</p>
-                                    <span class="inline-block w-2 h-2 rounded-full status-online mt-2"></span>
                                 </div>
                                 
                                 <!-- Pillar 5 -->
@@ -324,7 +292,6 @@
                                     <div class="w-12 h-12 bg-cyan-500/20 rounded-xl mx-auto mb-2 flex items-center justify-center text-xl">🔄</div>
                                     <p class="text-xs font-bold text-white">DPO Flywheel</p>
                                     <p class="text-[10px] text-gray-400">Auto Preference</p>
-                                    <span class="inline-block w-2 h-2 rounded-full status-online mt-2"></span>
                                 </div>
                                 
                                 <!-- Ollama Server -->
@@ -332,7 +299,7 @@
                                     <div class="w-12 h-12 bg-yellow-500/20 rounded-xl mx-auto mb-2 flex items-center justify-center text-xl">🦙</div>
                                     <p class="text-xs font-bold text-white">Ollama Daemon</p>
                                     <p class="text-[10px] text-gray-400">:11434 Host</p>
-                                    <span class="inline-block w-2 h-2 rounded-full status-online mt-2"></span>
+                                    <p class="text-[10px] mt-1 font-mono" :class="overview.ollama?.available === true ? 'text-emerald-400' : (overview.ollama?.available === false ? 'text-rose-400' : 'text-gray-500')" x-text="overview.ollama?.available === true ? 'Responding' : (overview.ollama?.available === false ? 'Unreachable' : 'Not verified')"></p>
                                 </div>
                             </div>
                         </div>
@@ -347,13 +314,13 @@
                             <button @click="fetchRecentLogs()" class="text-xs text-blue-400 hover:text-blue-300 font-medium">Refresh</button>
                         </div>
                         <div class="space-y-3">
-                            <template x-for="log in recentLogs" :key="log.session_id || log.log_id || Math.random()">
+                            <template x-for="log in recentLogs" :key="log.log_id">
                                 <div class="flex items-start gap-3 p-3 bg-gray-950/70 border border-gray-800/80 rounded-xl hover:border-gray-700 transition-all">
                                     <span class="text-xl mt-0.5" x-text="log.user_rating > 0 ? '👍' : (log.human_correction ? '✏️' : '💬')">💬</span>
                                     <div class="flex-1 min-w-0">
                                         <div class="flex items-center gap-2 mb-1">
                                             <span class="font-mono text-xs text-blue-400" x-text="log.session_id || 'session-live'">session-live</span>
-                                            <span class="text-[10px] text-gray-500" x-text="log.timestamp || 'just now'">just now</span>
+                                            <span class="text-[10px] text-gray-500" x-text="log.created_at || log.timestamp || 'timestamp unavailable'">just now</span>
                                         </div>
                                         <p class="text-xs text-gray-300 font-medium truncate" x-text="'Prompt: ' + log.prompt"></p>
                                         <p class="text-xs text-gray-400 truncate mt-0.5" x-text="'Completion: ' + log.completion"></p>
@@ -378,43 +345,43 @@
                             <span>⚡</span> Foundry Quick Actions
                         </h2>
                         <div class="space-y-2.5">
-                            <button @click="triggerCommand('moro train')" 
+                            <button @click="setTab('operations'); operationName = 'start_training'"
                                     class="w-full flex items-center justify-between px-4 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white rounded-xl shadow-md transition-all text-left group">
                                 <div class="flex items-center gap-3">
                                     <span class="text-lg">⚡</span>
                                     <div>
                                         <p class="font-semibold text-xs text-white">Start Fine-Tuning</p>
-                                        <p class="text-[10px] text-blue-200">Run moro train</p>
+                                        <p class="text-[10px] text-blue-200">Choose a compiled dataset</p>
                                     </div>
                                 </div>
                                 <span class="text-xs text-blue-200 group-hover:translate-x-1 transition-transform">→</span>
                             </button>
                             
-                            <button @click="triggerCommand('moro eval compare')" 
+                            <button @click="showLocalInstruction('Use moro eval compare in a local terminal. Comparative release gates are not implemented.')"
                                     class="w-full flex items-center justify-between px-4 py-3 bg-gray-900 hover:bg-gray-800 border border-gray-800 hover:border-gray-700 text-white rounded-xl transition-all text-left group">
                                 <div class="flex items-center gap-3">
                                     <span class="text-lg">🔍</span>
                                     <div>
-                                        <p class="font-semibold text-xs text-white">Run Evaluation Harness</p>
+                                        <p class="font-semibold text-xs text-white">Evaluation instructions</p>
                                         <p class="text-[10px] text-gray-400">Compare base vs tuned model</p>
                                     </div>
                                 </div>
                                 <span class="text-xs text-gray-400 group-hover:translate-x-1 transition-transform">→</span>
                             </button>
                             
-                            <button @click="triggerCommand('moro flywheel run')" 
+                            <button @click="showLocalInstruction('Use moro flywheel run in a local terminal to extract reviewed corrections. Automatic training is not implemented.')"
                                     class="w-full flex items-center justify-between px-4 py-3 bg-gray-900 hover:bg-gray-800 border border-gray-800 hover:border-gray-700 text-white rounded-xl transition-all text-left group">
                                 <div class="flex items-center gap-3">
                                     <span class="text-lg">🔄</span>
                                     <div>
-                                        <p class="font-semibold text-xs text-white">Execute DPO Flywheel</p>
-                                        <p class="text-[10px] text-gray-400">Extract preference pairs & retrain</p>
+                                        <p class="font-semibold text-xs text-white">Feedback extraction instructions</p>
+                                        <p class="text-[10px] text-gray-400">Extract reviewed preference pairs</p>
                                     </div>
                                 </div>
                                 <span class="text-xs text-gray-400 group-hover:translate-x-1 transition-transform">→</span>
                             </button>
                             
-                            <button @click="triggerCommand('moro export')" 
+                            <button @click="showLocalInstruction('Choose a format below. Export runs through the gated local CLI.')"
                                     class="w-full flex items-center justify-between px-4 py-3 bg-gray-900 hover:bg-gray-800 border border-gray-800 hover:border-gray-700 text-white rounded-xl transition-all text-left group">
                                 <div class="flex items-center gap-3">
                                     <span class="text-lg">🚀</span>
@@ -437,14 +404,14 @@
                             <div class="p-3 bg-blue-950/40 border border-blue-900/60 rounded-xl">
                                 <p class="text-xs font-bold text-blue-300">Catastrophic Forgetting Guard</p>
                                 <p class="text-[11px] text-gray-400 mt-1">
-                                    Always preserve the Auto-Ratio replay split (<code class="text-blue-400 font-mono">α=65% / β=35%</code>) when fine-tuning small LLMs on narrow domain corpora to prevent reasoning degradation.
+                                    Evaluate domain and general-capability holdouts before selecting a training mixture. Replay and KL suggestions are not wired into the training objective.
                                 </p>
                             </div>
                             
                             <div class="p-3 bg-emerald-950/40 border border-emerald-900/60 rounded-xl">
                                 <p class="text-xs font-bold text-emerald-300">MI Guard Edge-Case Preservation</p>
                                 <p class="text-[11px] text-gray-400 mt-1">
-                                    High entropy samples are not automatically discarded. Mutual information and Resnik IC rescue rare domain facts from pruning.
+                                    Compression, glossary overlap and token rarity are filtering heuristics. Review retained and rejected examples; these scores do not verify factual accuracy.
                                 </p>
                             </div>
                         </div>
@@ -463,7 +430,7 @@
                     <h2 class="text-xl font-bold text-white flex items-center gap-2">
                         <span>📁</span> Dataset Foundry & Epistemic Curation
                     </h2>
-                    <p class="text-xs text-gray-400">Ingest domain data, inspect mutual information distributions, and build training-ready splits.</p>
+                    <p class="text-xs text-gray-400">Ingest domain data, inspect quality heuristics, and build training-ready splits.</p>
                 </div>
                 <div class="flex items-center gap-3">
                     <button @click="fetchDatasets()" class="px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-xs font-semibold rounded-lg text-gray-200 transition-all">
@@ -491,9 +458,10 @@
                                 📥
                             </div>
                             <p class="text-sm font-semibold text-gray-200">Drop files here or click to browse</p>
-                            <p class="text-[11px] text-gray-500 mt-1">Supports .jsonl, .json, .csv, .txt</p>
+                            <p class="text-[11px] text-gray-500 mt-1">Supports .jsonl, .json, .csv, .txt · Maximum 10 MiB per file</p>
                         </div>
                     </form>
+                    <p x-show="datasetError" x-text="datasetError" role="alert" class="text-xs text-red-300"></p>
 
                     <div class="p-3 bg-gray-950/70 border border-gray-800 rounded-xl flex items-center justify-between">
                         <label for="auto-compile-chk" class="text-xs text-gray-300 font-medium cursor-pointer">
@@ -503,8 +471,8 @@
                     </div>
 
                     <div class="text-[11px] text-gray-400 space-y-1 bg-blue-950/20 border border-blue-900/40 p-3 rounded-xl">
-                        <p class="font-semibold text-blue-300">💡 Epistemic Validation:</p>
-                        <p>Uploaded corpora are validated against schema standards and prepared for Shannon entropy & MI Guard filtering.</p>
+                        <p class="font-semibold text-blue-300">Upload validation</p>
+                        <p>Uploads are checked for size, UTF-8 content and supported record format. Compilation applies the configured dataset checks; upload acceptance does not establish accuracy or privacy.</p>
                     </div>
                 </div>
 
@@ -645,180 +613,102 @@
         <!-- TAB 2: TRAINING MONITOR                                  -->
         <!-- ======================================================== -->
         <div x-show="activeTab === 'training'" x-transition>
-            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
-                <!-- Training Loss Curves -->
-                <div class="lg:col-span-2 mission-card rounded-xl p-6">
-                    <div class="flex justify-between items-center mb-4">
-                        <h2 class="text-base font-bold text-white flex items-center gap-2">
-                            <span>📈</span> Loss Telemetry & Convergence Monitoring
-                        </h2>
-                        <span class="text-xs font-mono text-emerald-400">Zero Spikes Detected</span>
+            <div class="mission-card rounded-xl p-6 space-y-4">
+                <h2 class="text-base font-bold text-white">Recorded training runs</h2>
+                <p class="text-xs text-gray-400">Step telemetry is not available. Process cancellation and checkpoint resume are not implemented: closing this page does not stop training, and runs cannot be resumed. Inspect a run by ID in Operations; compare measured metrics in Analytics.</p>
+                <p x-show="!overview.runs?.length" class="text-sm text-gray-400">No training runs recorded.</p>
+                <template x-for="run in overview.runs || []" :key="run.run_id">
+                    <div class="p-4 bg-gray-950 rounded-xl border border-gray-800">
+                        <p class="text-sm text-white" x-text="run.run_id"></p>
+                        <p class="text-xs text-gray-400" x-text="run.model_name + ' · recorded state: ' + run.status"></p>
+                        <p class="text-xs text-gray-300" x-text="'Train loss: ' + (run.train_loss ?? 'not measured') + ' · Validation loss: ' + (run.validation_loss ?? 'not measured')"></p>
                     </div>
-                    <div class="h-64 relative">
-                        <canvas id="trainingChart"></canvas>
-                    </div>
-                </div>
-                
-                <!-- Active Run Telemetry Cards -->
-                <div class="mission-card rounded-xl p-6 space-y-4">
-                    <h2 class="text-base font-bold text-white">Active Run Status</h2>
-                    <div class="p-3 bg-gray-950 rounded-lg border border-gray-800">
-                        <p class="text-xs text-gray-400">Model Name</p>
-                        <p class="text-sm font-bold font-mono text-blue-400">Qwen/Qwen2.5-1.5B-Instruct</p>
-                    </div>
-                    <div class="grid grid-cols-2 gap-3">
-                        <div class="p-3 bg-gray-950 rounded-lg border border-gray-800">
-                            <p class="text-xs text-gray-400">Peak VRAM</p>
-                            <p class="text-lg font-bold font-mono text-emerald-400">4.2 GB</p>
-                        </div>
-                        <div class="p-3 bg-gray-950 rounded-lg border border-gray-800">
-                            <p class="text-xs text-gray-400">Throughput</p>
-                            <p class="text-lg font-bold font-mono text-cyan-400">128 tok/s</p>
-                        </div>
-                    </div>
-                    <div class="p-3 bg-gray-950 rounded-lg border border-gray-800">
-                        <p class="text-xs text-gray-400">LoRA Configuration</p>
-                        <p class="text-xs font-mono text-gray-300">r=16, alpha=32, target=all-linear</p>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- Runs History Table -->
-            <div class="mission-card rounded-xl p-6">
-                <h2 class="text-base font-bold text-white mb-4">Training Runs History</h2>
-                <div class="overflow-x-auto">
-                    <table class="w-full text-left text-xs font-mono">
-                        <thead class="border-b border-gray-800 text-gray-400">
-                            <tr>
-                                <th class="py-2.5">Run ID</th>
-                                <th>Name</th>
-                                <th>Status</th>
-                                <th>Train Loss</th>
-                                <th>Val Loss</th>
-                                <th>Peak VRAM</th>
-                                <th>Throughput</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-gray-800/60">
-                            <tr>
-                                <td class="py-3 text-blue-400">run_20260927_beta</td>
-                                <td class="text-white">qwen-quantum-lora-v2-dpo</td>
-                                <td><span class="px-2 py-0.5 rounded bg-emerald-950 text-emerald-400 border border-emerald-800">COMPLETED</span></td>
-                                <td>1.08</td>
-                                <td class="font-bold text-white">0.99</td>
-                                <td>4.6 GB</td>
-                                <td>134 tok/s</td>
-                            </tr>
-                            <tr>
-                                <td class="py-3 text-blue-400">run_20260927_alpha</td>
-                                <td class="text-white">qwen-quantum-lora-v1</td>
-                                <td><span class="px-2 py-0.5 rounded bg-emerald-950 text-emerald-400 border border-emerald-800">COMPLETED</span></td>
-                                <td>1.84</td>
-                                <td class="font-bold text-white">1.71</td>
-                                <td>4.2 GB</td>
-                                <td>128 tok/s</td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
+                </template>
             </div>
         </div>
-        
-        <!-- ======================================================== -->
-        <!-- TAB 3: REGISTRY & OLLAMA                                 -->
-        <!-- ======================================================== -->
+
         <div x-show="activeTab === 'models'" x-transition>
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <!-- Local Model Registry -->
-                <div class="mission-card rounded-xl p-6">
-                    <div class="flex justify-between items-center mb-4">
-                        <h2 class="text-base font-bold text-white">Model Registry & Lineage</h2>
-                        <span class="text-xs text-gray-400 font-mono">2 Models Registered</span>
-                    </div>
-                    <div class="space-y-3">
-                        <div class="p-4 bg-gray-950 rounded-xl border border-gray-800">
-                            <div class="flex justify-between items-start">
-                                <div>
-                                    <h3 class="text-sm font-bold text-white">qwen-quantum-v2</h3>
-                                    <p class="text-xs text-gray-400 mt-0.5">Base: Qwen/Qwen2.5-1.5B-Instruct · Quantization: none</p>
-                                </div>
-                                <span class="px-2 py-0.5 rounded bg-blue-950 text-blue-400 text-xs font-mono">ACTIVE RELEASE</span>
-                            </div>
-                            <div class="mt-3 flex gap-4 text-xs font-mono text-gray-400">
-                                <span>Val Loss: <strong class="text-white">0.99</strong></span>
-                                <span>Robustness: <strong class="text-emerald-400">98.4%</strong></span>
-                                <span>Gate: <strong class="text-emerald-400">PASS</strong></span>
+                <div class="mission-card rounded-xl p-6 space-y-4">
+                    <h2 class="text-base font-bold text-white">Recorded models</h2>
+                    <p x-show="registryError" x-text="registryError" role="alert" class="text-sm text-red-400"></p>
+                    <p x-show="registryMessage" x-text="registryMessage" class="text-sm text-emerald-400"></p>
+                    <p x-show="!registryModels.length && !registryError" class="text-sm text-gray-400">No models registered.</p>
+                    <template x-for="model in registryModels" :key="model.model_id">
+                        <div class="p-4 bg-gray-950 rounded-xl border border-gray-800 space-y-1">
+                            <p class="text-sm text-white" x-text="model.model_name || model.model_id"></p>
+                            <p class="text-xs text-gray-400" x-text="'Recorded status: ' + model.status + (model.is_production ? ' · production' : '')"></p>
+                            <p class="text-xs text-gray-400" x-text="'Evaluation pass rate: ' + (model.eval_pass_rate === null || model.eval_pass_rate === undefined ? 'not measured' : (model.eval_pass_rate * 100).toFixed(1) + '%')"></p>
+                            <p class="text-xs text-gray-400" x-text="'Evaluation delta: ' + (model.eval_delta === null || model.eval_delta === undefined ? 'not measured' : ((model.eval_delta > 0 ? '+' : '') + (model.eval_delta * 100).toFixed(1) + '%'))"></p>
+                            <div class="flex gap-2 pt-2">
+                                <button @click="promoteModel(model.model_id)" :disabled="registryBusy" class="px-3 py-1 bg-emerald-600/20 hover:bg-emerald-600/40 disabled:opacity-50 text-emerald-300 rounded text-xs font-medium transition-all">Select for production</button>
+                                <button @click="archiveModel(model.model_id)" :disabled="registryBusy" class="px-3 py-1 bg-gray-800 hover:bg-gray-700 disabled:opacity-50 text-gray-300 rounded text-xs font-medium transition-all">Archive</button>
                             </div>
                         </div>
-                        
-                        <div class="p-4 bg-gray-950 rounded-xl border border-gray-800">
-                            <div class="flex justify-between items-start">
-                                <div>
-                                    <h3 class="text-sm font-bold text-white">qwen-quantum-v1</h3>
-                                    <p class="text-xs text-gray-400 mt-0.5">Base: Qwen/Qwen2.5-1.5B-Instruct · Quantization: nf4</p>
-                                </div>
-                                <span class="px-2 py-0.5 rounded bg-gray-800 text-gray-400 text-xs font-mono">ARCHIVED</span>
-                            </div>
-                            <div class="mt-3 flex gap-4 text-xs font-mono text-gray-400">
-                                <span>Val Loss: <strong class="text-white">1.71</strong></span>
-                                <span>Robustness: <strong class="text-yellow-400">91.2%</strong></span>
-                            </div>
-                        </div>
-                    </div>
+                    </template>
                 </div>
-                
-                <!-- Ollama Models Manager -->
-                <div class="mission-card rounded-xl p-6">
-                    <div class="flex justify-between items-center mb-4">
-                        <h2 class="text-base font-bold text-white">Ollama Daemon Models</h2>
-                        <a href="http://localhost:11434" target="_blank" class="text-xs text-blue-400 hover:underline">API :11434 ↗</a>
-                    </div>
-                    <div class="space-y-3">
-                        <div class="flex items-center justify-between p-3 bg-gray-950 rounded-xl border border-gray-800">
-                            <div>
-                                <p class="text-sm font-bold text-white font-mono">qwen2.5:1.5b</p>
-                                <p class="text-xs text-gray-400">986 MB · Modified: recently</p>
-                            </div>
-                            <button @click="triggerCommand('docker exec moro-ollama ollama run qwen2.5:1.5b')" 
-                                    class="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-semibold">
-                                Test Prompt
-                            </button>
+                <div class="space-y-6">
+                    <div class="mission-card rounded-xl p-6 space-y-4">
+                        <h2 class="text-base font-bold text-white">Compare recorded models</h2>
+                        <p class="text-xs text-gray-400">Comparison requires a measured pass rate for both models. Unmeasured models are rejected with 409, not ranked.</p>
+                        <div class="grid grid-cols-2 gap-3">
+                            <label class="block text-xs text-gray-300">Model A
+                                <select x-model="compareModelA" class="w-full bg-gray-900 rounded-lg p-2 mt-1 text-sm">
+                                    <option value="">Select…</option>
+                                    <template x-for="model in registryModels" :key="'a-' + model.model_id">
+                                        <option :value="model.model_id" x-text="model.model_name || model.model_id"></option>
+                                    </template>
+                                </select>
+                            </label>
+                            <label class="block text-xs text-gray-300">Model B
+                                <select x-model="compareModelB" class="w-full bg-gray-900 rounded-lg p-2 mt-1 text-sm">
+                                    <option value="">Select…</option>
+                                    <template x-for="model in registryModels" :key="'b-' + model.model_id">
+                                        <option :value="model.model_id" x-text="model.model_name || model.model_id"></option>
+                                    </template>
+                                </select>
+                            </label>
                         </div>
+                        <button @click="compareRegistryModels()" :disabled="compareBusy || !compareModelA || !compareModelB" class="px-4 py-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white rounded-lg text-xs font-semibold" x-text="compareBusy ? 'Comparing…' : 'Compare'"></button>
+                        <p x-show="compareError" x-text="compareError" role="alert" class="text-sm text-red-400"></p>
+                        <pre x-show="modelComparison" x-text="modelComparison" class="text-xs whitespace-pre-wrap overflow-auto max-h-64 bg-gray-950 rounded-lg p-3 border border-gray-800"></pre>
+                    </div>
+                    <div class="mission-card rounded-xl p-6 space-y-4">
+                        <h2 class="text-base font-bold text-white">Ollama inventory</h2>
+                        <p x-show="!overview.ollama?.available" class="text-sm text-gray-400">Ollama is unavailable or has not been checked.</p>
+                        <p x-show="overview.ollama?.available && !overview.ollama?.models?.length" class="text-sm text-gray-400">No models installed.</p>
+                        <template x-for="model in overview.ollama?.models || []" :key="model.name">
+                            <p class="text-sm text-white" x-text="model.name"></p>
+                        </template>
                     </div>
                 </div>
             </div>
         </div>
-        
-        <!-- ======================================================== -->
-        <!-- TAB 4: EVALUATION                                        -->
-        <!-- ======================================================== -->
+
         <div x-show="activeTab === 'eval'" x-transition>
-            <div class="mission-card rounded-xl p-6">
-                <h2 class="text-base font-bold text-white mb-4">Adversarial Robustness & Drift Metrics</h2>
-                <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-                    <div class="p-4 bg-gray-950 rounded-xl border border-gray-800">
-                        <p class="text-xs text-gray-400">Golden Pass Rate</p>
-                        <p class="text-2xl font-bold font-mono text-emerald-400">100.0%</p>
-                    </div>
-                    <div class="p-4 bg-gray-950 rounded-xl border border-gray-800">
-                        <p class="text-xs text-gray-400">Perturbed Pass Rate</p>
-                        <p class="text-2xl font-bold font-mono text-blue-400">98.4%</p>
-                    </div>
-                    <div class="p-4 bg-gray-950 rounded-xl border border-gray-800">
-                        <p class="text-xs text-gray-400">Asymmetric Hallucination Penalty</p>
-                        <p class="text-2xl font-bold font-mono text-purple-400">0.02</p>
-                    </div>
-                    <div class="p-4 bg-gray-950 rounded-xl border border-gray-800">
-                        <p class="text-xs text-gray-400">Wasserstein Drift</p>
-                        <p class="text-2xl font-bold font-mono text-cyan-400">0.041</p>
-                    </div>
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div class="mission-card rounded-xl p-6 space-y-4">
+                    <h2 class="text-base font-bold text-white">Run evaluation suite</h2>
+                    <p class="text-xs text-gray-400">Runs the harness against a recorded training run and persists the result. The suite path must be inside the project.</p>
+                    <form @submit.prevent="runEvaluation()" class="space-y-3">
+                        <label class="block text-sm">Training run ID <input x-model="runEvalRunId" required maxlength="128" :disabled="runEvalBusy" class="w-full bg-gray-900 rounded-lg p-2"></label>
+                        <label class="block text-sm">Suite path <input x-model="runEvalSuite" required maxlength="256" :disabled="runEvalBusy" class="w-full bg-gray-900 rounded-lg p-2 font-mono text-xs" placeholder="eval/support-golden-v1.yaml"></label>
+                        <button :disabled="runEvalBusy" class="px-4 py-2 bg-blue-600 rounded-lg disabled:opacity-50" x-text="runEvalBusy ? 'Running…' : 'Run evaluation'"></button>
+                    </form>
+                </div>
+                <div class="mission-card rounded-xl p-6 space-y-4">
+                    <h2 class="text-base font-bold text-white">Recorded evaluation evidence</h2>
+                    <p class="text-xs text-gray-400">Enter a training run ID to inspect its persisted evaluation. Missing evidence is not a passing score.</p>
+                    <form @submit.prevent="fetchEvaluation()" class="space-y-3">
+                        <label class="block text-sm">Training run ID <input x-model="evaluationRunId" required maxlength="128" class="w-full bg-gray-900 rounded-lg p-2"></label>
+                        <button class="px-4 py-2 bg-blue-600 rounded-lg">Load recorded results</button>
+                    </form>
+                    <p x-show="evaluationError" x-text="evaluationError" role="alert" class="text-sm text-red-400"></p>
+                    <pre x-text="evaluationOutput" class="text-xs whitespace-pre-wrap overflow-auto max-h-96"></pre>
                 </div>
             </div>
         </div>
-        
-        <!-- ======================================================== -->
-        <!-- TAB: EXPERIMENT TRACKING & VISUAL ANALYTICS              -->
-        <!-- ======================================================== -->
+
         <div x-show="activeTab === 'analytics'" x-transition>
             <!-- Analytics Header & Toolbar -->
             <div class="mission-card rounded-xl p-6 mb-6">
@@ -887,7 +777,7 @@
                                     <td class="px-4 py-3 text-xs font-semibold font-mono"
                                           :class="exp.eval_delta > 0 ? 'text-emerald-400' : (exp.eval_delta < 0 ? 'text-rose-400' : 'text-gray-400')"
                                           x-text="exp.eval_delta !== null && exp.eval_delta !== undefined ? (exp.eval_delta > 0 ? '+' : '') + (exp.eval_delta * 100).toFixed(1) + '%' : '-'"></td>
-                                    <td class="px-4 py-3 text-xs text-gray-300 font-mono" x-text="exp.final_train_loss ? Number(exp.final_train_loss).toFixed(4) : '-'"></td>
+                                    <td class="px-4 py-3 text-xs text-gray-300 font-mono" x-text="exp.final_train_loss !== null && exp.final_train_loss !== undefined ? Number(exp.final_train_loss).toFixed(4) : '-'"></td>
                                     <td class="px-4 py-3 text-xs text-gray-400 font-mono" x-text="formatDuration(exp.duration_seconds)"></td>
                                     <td class="px-4 py-3 text-xs text-gray-400" x-text="formatDate(exp.created_at)"></td>
                                 </tr>
@@ -1015,14 +905,33 @@
                         <h3 class="text-sm font-bold text-white flex items-center gap-2">
                             <span>🔬 Hyperparameter Effectiveness Matrix</span>
                         </h3>
-                        <span class="text-[11px] text-gray-400">Learning Rate vs LoRA Rank</span>
+                        <span class="text-[11px] text-gray-400" x-text="heatmapData ? (heatmapData.metric + ' vs ' + heatmapData.x_label + ' / ' + heatmapData.y_label) : 'Learning Rate vs LoRA Rank'">Learning Rate vs LoRA Rank</span>
                     </div>
-                    <div id="heatmapContainer" class="h-64 flex flex-col items-center justify-center border border-gray-800/60 rounded-lg p-4 bg-gray-950/40">
-                        <div class="text-center space-y-2">
-                            <div class="inline-flex p-3 bg-blue-500/10 rounded-full text-blue-400 text-xl">🧮</div>
-                            <p class="text-xs text-gray-300 font-medium">Correlation & Heatmap Matrix</p>
-                            <p class="text-[11px] text-gray-500 max-w-sm">Evaluates statistical Pearson coefficients between hyperparameters (learning rate, LoRA rank, warmup) and benchmark outcomes.</p>
-                        </div>
+                    <div id="heatmapContainer" class="min-h-64 max-h-80 overflow-auto border border-gray-800/60 rounded-lg p-4 bg-gray-950/40">
+                        <p x-show="heatmapError" x-text="heatmapError" class="text-xs text-gray-400 text-center py-8"></p>
+                        <p x-show="!heatmapData && !heatmapError" class="text-xs text-gray-500 text-center py-8">No measured experiments yet. Complete tracked runs with recorded hyperparameters to populate this matrix.</p>
+                        <template x-if="heatmapData && heatmapData.matrix">
+                            <table class="w-full text-xs text-center font-mono">
+                                <thead>
+                                    <tr>
+                                        <th class="p-1.5 text-gray-500" x-text="heatmapData.y_label + ' \\ ' + heatmapData.x_label"></th>
+                                        <template x-for="x in heatmapData.x_values" :key="'hx-' + x">
+                                            <th class="p-1.5 text-cyan-300 font-normal" x-text="x"></th>
+                                        </template>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <template x-for="(row, yi) in heatmapData.matrix" :key="'hy-' + yi">
+                                        <tr>
+                                            <td class="p-1.5 text-cyan-300" x-text="heatmapData.y_values[yi]"></td>
+                                            <template x-for="(val, xi) in row" :key="'hv-' + yi + '-' + xi">
+                                                <td class="p-1.5 rounded" :class="heatmapCell(val)" x-text="val === null || val === undefined ? '—' : ((val > 0 ? '+' : '') + (Number(val) * 100).toFixed(1) + '%')"></td>
+                                            </template>
+                                        </tr>
+                                    </template>
+                                </tbody>
+                            </table>
+                        </template>
                     </div>
                 </div>
 
@@ -1066,76 +975,93 @@
         <!-- TAB 5: DPO FLYWHEEL                                      -->
         <!-- ======================================================== -->
         <div x-show="activeTab === 'flywheel'" x-transition>
-            <div class="mission-card rounded-xl p-6">
-                <div class="flex justify-between items-center mb-4">
-                    <h2 class="text-base font-bold text-white">DPO Preference Pairs Synthesizer</h2>
-                    <button @click="triggerCommand('moro flywheel run')" class="px-3 py-1.5 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg text-xs font-semibold">
-                        Trigger Cycle
-                    </button>
-                </div>
-                <div class="space-y-4">
-                    <div class="p-4 bg-gray-950 border border-gray-800 rounded-xl">
-                        <span class="text-xs font-mono text-purple-400">EXPLICIT_HUMAN_CORRECTION · +0.45 Confidence Delta</span>
-                        <p class="text-sm font-semibold text-white mt-1">"What is quantum superposition?"</p>
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3 text-xs">
-                            <div class="p-3 bg-emerald-950/20 border border-emerald-800/40 rounded-lg">
-                                <span class="text-emerald-400 font-bold block mb-1">CHOSEN (Aligned):</span>
-                                <span class="text-gray-200">Superposition is a fundamental principle of quantum mechanics where a system exists simultaneously in multiple states.</span>
-                            </div>
-                            <div class="p-3 bg-rose-950/20 border border-rose-800/40 rounded-lg">
-                                <span class="text-rose-400 font-bold block mb-1">REJECTED (Sub-optimal):</span>
-                                <span class="text-gray-300">Superposition is magical teleportation.</span>
-                            </div>
-                        </div>
+            <div class="mission-card rounded-xl p-6 space-y-4">
+                <h2 class="text-base font-bold text-white">Recorded feedback preferences</h2>
+                <p class="text-xs text-gray-400">Explicit human corrections are eligible for extraction. A correction is not proof of truth; review it before training. Automatic training and deployment are not implemented.</p>
+                <button @click="extractFeedback()" :disabled="feedbackBusy" class="px-4 py-2 bg-blue-600 rounded-lg" x-text="feedbackBusy ? 'Extracting…' : 'Extract eligible corrections'"></button>
+                <p x-text="feedbackMessage" class="text-sm text-gray-400"></p>
+                <p x-show="feedbackError" x-text="feedbackError" role="alert" class="text-sm text-red-400"></p>
+                <p x-show="!feedbackPairs.length && !feedbackError" class="text-sm text-gray-400">No preference pairs recorded.</p>
+                <template x-for="pair in feedbackPairs" :key="pair.pair_id">
+                    <div class="p-4 bg-gray-950 rounded-xl border border-gray-800 space-y-2">
+                        <p class="text-xs text-gray-400" x-text="pair.feedback_type + ' · ' + pair.source_log_id"></p>
+                        <p class="text-sm text-white" x-text="pair.prompt"></p>
+                        <p class="text-sm text-emerald-400" x-text="'Correction: ' + pair.chosen"></p>
+                        <p class="text-sm text-gray-400" x-text="'Original: ' + pair.rejected"></p>
                     </div>
-                </div>
+                </template>
             </div>
         </div>
-        
-        <!-- ======================================================== -->
-        <!-- TAB 6: EXPORT & DEPLOY                                   -->
-        <!-- ======================================================== -->
+
         <div x-show="activeTab === 'deploy'" x-transition>
             <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div class="mission-card rounded-xl p-6">
                     <h3 class="text-sm font-bold text-white mb-2">LoRA Adapter</h3>
                     <p class="text-xs text-gray-400 mb-4">Export standalone safetensors weights + adapter_config.json</p>
-                    <button @click="triggerCommand('moro export --format adapter')" class="w-full py-2 bg-gray-800 hover:bg-gray-700 text-xs font-semibold rounded-lg">
+                    <button @click="showLocalInstruction('Run moro export --format adapter in a local terminal with a recorded, evaluated run.')" class="w-full py-2 bg-gray-800 hover:bg-gray-700 text-xs font-semibold rounded-lg">
                         Export Adapter
                     </button>
                 </div>
                 <div class="mission-card rounded-xl p-6">
                     <h3 class="text-sm font-bold text-white mb-2">Ollama Modelfile</h3>
                     <p class="text-xs text-gray-400 mb-4">Generate Modelfile with customized system prompt and parameters</p>
-                    <button @click="triggerCommand('moro export --format ollama')" class="w-full py-2 bg-gray-800 hover:bg-gray-700 text-xs font-semibold rounded-lg">
+                    <button @click="showLocalInstruction('Run moro export --format ollama in a local terminal with a recorded, evaluated run.')" class="w-full py-2 bg-gray-800 hover:bg-gray-700 text-xs font-semibold rounded-lg">
                         Export Ollama
                     </button>
                 </div>
                 <div class="mission-card rounded-xl p-6">
                     <h3 class="text-sm font-bold text-white mb-2">GGUF Quantization</h3>
                     <p class="text-xs text-gray-400 mb-4">Export conversion bash script for llama.cpp / Q4_K_M</p>
-                    <button @click="triggerCommand('moro export --format gguf')" class="w-full py-2 bg-gray-800 hover:bg-gray-700 text-xs font-semibold rounded-lg">
+                    <button @click="showLocalInstruction('Run moro export --format gguf in a local terminal with a recorded, evaluated run.')" class="w-full py-2 bg-gray-800 hover:bg-gray-700 text-xs font-semibold rounded-lg">
                         Export GGUF
                     </button>
                 </div>
             </div>
         </div>
         
-        <!-- ======================================================== -->
-        <!-- TAB 7: TERMINAL                                          -->
-        <!-- ======================================================== -->
-        <div x-show="activeTab === 'terminal'" x-transition>
-            <div class="terminal-container">
-                <div class="terminal-header">
-                    <span class="terminal-dot red"></span>
-                    <span class="terminal-dot yellow"></span>
-                    <span class="terminal-dot green"></span>
-                    <span class="text-xs font-mono text-gray-400 ml-2">MoroAI Foundry Console (zsh)</span>
-                </div>
-                <div id="terminal" class="h-[550px] p-2 bg-[#0d1117]"></div>
+        <!-- Validated operations; no command interpreter. -->
+        <div x-show="activeTab === 'operations'" x-transition>
+            <div class="mission-card rounded-xl p-6 space-y-4">
+                <h2 class="text-base font-bold text-white">Project operations</h2>
+                <p class="text-xs text-gray-400">Choose an operation and a recorded dataset or run. Training waits for completion; closing this page does not stop it.</p>
+                <form @submit.prevent="runOperation()" class="space-y-4">
+                    <label class="block text-sm">Operation
+                        <select x-model="operationName" :disabled="operationBusy" class="w-full bg-gray-900 rounded-lg p-2">
+                            <option value="list_datasets">List datasets</option>
+                            <option value="preview_dataset">Preview dataset</option>
+                            <option value="compile_dataset">Compile raw dataset</option>
+                            <option value="start_training">Train compiled dataset</option>
+                            <option value="get_job_status">Inspect training run</option>
+                            <option value="stop_job">Stop training run (verified 409: not implemented)</option>
+                            <option value="resume_job">Resume training run (verified 409: not implemented)</option>
+                        </select>
+                    </label>
+                    <label x-show="operationName !== 'list_datasets'" class="block text-sm">
+                        <span x-text="(operationName === 'get_job_status' || operationName === 'stop_job' || operationName === 'resume_job') ? 'Training run ID' : 'Dataset ID'"></span>
+                        <input x-model="operationId" :required="operationName !== 'list_datasets'" :disabled="operationBusy" maxlength="128" class="w-full bg-gray-900 rounded-lg p-2" placeholder="Copy an ID from the dataset list or training result">
+                    </label>
+                    <div x-show="operationName === 'start_training'" class="p-4 bg-gray-950 rounded-xl border border-gray-800 space-y-3">
+                        <p class="text-xs text-gray-400">Optional training hyperparameters. Blank fields are omitted; the trainer applies its own defaults. Only these fields are accepted.</p>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <label class="block text-xs text-gray-300">Model name <input x-model="trainingParams.model_name" :disabled="operationBusy" maxlength="128" class="w-full bg-gray-900 rounded-lg p-2 mt-1 text-sm" placeholder="default from moro.yaml"></label>
+                            <label class="block text-xs text-gray-300">Learning rate <input x-model="trainingParams.learning_rate" :disabled="operationBusy" inputmode="decimal" class="w-full bg-gray-900 rounded-lg p-2 mt-1 text-sm font-mono" placeholder="e.g. 0.0002"></label>
+                            <label class="block text-xs text-gray-300">Batch size <input x-model="trainingParams.batch_size" :disabled="operationBusy" inputmode="numeric" class="w-full bg-gray-900 rounded-lg p-2 mt-1 text-sm font-mono" placeholder="e.g. 4"></label>
+                            <label class="block text-xs text-gray-300">Epochs <input x-model="trainingParams.epochs" :disabled="operationBusy" inputmode="decimal" class="w-full bg-gray-900 rounded-lg p-2 mt-1 text-sm font-mono" placeholder="e.g. 1"></label>
+                            <label class="block text-xs text-gray-300">LoRA rank <input x-model="trainingParams.lora_r" :disabled="operationBusy" inputmode="numeric" class="w-full bg-gray-900 rounded-lg p-2 mt-1 text-sm font-mono" placeholder="e.g. 16"></label>
+                            <label class="block text-xs text-gray-300">LoRA alpha <input x-model="trainingParams.lora_alpha" :disabled="operationBusy" inputmode="numeric" class="w-full bg-gray-900 rounded-lg p-2 mt-1 text-sm font-mono" placeholder="e.g. 32"></label>
+                            <label class="block text-xs text-gray-300">Max sequence length <input x-model="trainingParams.max_seq_length" :disabled="operationBusy" inputmode="numeric" class="w-full bg-gray-900 rounded-lg p-2 mt-1 text-sm font-mono" placeholder="e.g. 2048"></label>
+                            <label class="flex items-center gap-2 text-xs text-gray-300 pt-5"><input type="checkbox" x-model="trainingParams.gradient_checkpointing" :disabled="operationBusy" class="w-4 h-4 rounded bg-gray-900 border-gray-700 text-blue-600 focus:ring-0"> Gradient checkpointing</label>
+                        </div>
+                    </div>
+                    <p x-show="operationName === 'stop_job'" class="text-xs text-yellow-400/90">Cancellation is not implemented. This operation verifies the run exists, then reports 409 without stopping anything.</p>
+                    <p x-show="operationName === 'resume_job'" class="text-xs text-yellow-400/90">Checkpoint resume is not implemented. This operation verifies the run exists, then reports 409 without starting anything.</p>
+                    <button type="submit" :disabled="operationBusy" class="px-4 py-2 bg-blue-600 rounded-lg" x-text="operationBusy ? 'Running…' : 'Run operation'"></button>
+                </form>
+                <p x-show="operationError" x-text="operationError" role="alert" class="text-sm text-red-400"></p>
+                <pre x-text="operationOutput" class="text-xs whitespace-pre-wrap overflow-auto max-h-96"></pre>
             </div>
         </div>
-        
+
         <!-- ======================================================== -->
         <!-- TAB 8: GUIDES & DOCS                                     -->
         <!-- ======================================================== -->
@@ -1149,15 +1075,15 @@
                 <div class="space-y-4 text-xs text-gray-300">
                     <div class="p-4 bg-gray-950 rounded-xl border border-gray-800">
                         <h3 class="font-bold text-blue-400 text-sm mb-1">1. The Epistemic Compiler</h3>
-                        <p>Raw text is normalized and filtered via Shannon entropy and PPMI. Any sample with borderline entropy is tested with the MI Guard to preserve rare domain knowledge.</p>
+                        <p>Supported conversation records are normalized and scored with compression, glossary and rarity heuristics. Raw documents require explicit question-and-answer preparation. Review filtering decisions before training.</p>
                     </div>
                     <div class="p-4 bg-gray-950 rounded-xl border border-gray-800">
                         <h3 class="font-bold text-indigo-400 text-sm mb-1">2. Catastrophic Forgetting Auto-Ratio Formula</h3>
-                        <p>Small models rapidly lose reasoning ability if trained purely on domain tokens. MoroAI computes α (domain) and β (general replay) alongside λ (KL penalty) to safeguard instruction adherence.</p>
+                        <p>Mixture suggestions are heuristic. Replay and KL regularization are not implemented in the trainer; use held-out evaluations to measure regression.</p>
                     </div>
                     <div class="p-4 bg-gray-950 rounded-xl border border-gray-800">
-                        <h3 class="font-bold text-cyan-400 text-sm mb-1">3. Autonomous DPO Flywheel</h3>
-                        <p>Production inference logs ingested via the webhook receiver are mined for implicit ratings and explicit user corrections, synthesizing pairwise DPO datasets automatically.</p>
+                        <h3 class="font-bold text-cyan-400 text-sm mb-1">3. Reviewed feedback extraction</h3>
+                        <p>The webhook records feedback for extraction. Explicit human corrections are used by default; synthetic heuristics require opt-in. Review preferences before training. An autonomous DPO trainer is not implemented.</p>
                     </div>
                 </div>
             </div>
@@ -1171,42 +1097,49 @@
             return {
                 activeTab: 'overview',
                 overview: {},
+                overviewError: '',
                 systemStatus: {
-                    docker: true,
-                    ollama: true,
-                    database: true,
+                    docker: null,
+                    ollama: null,
+                    database: null,
                 },
-                recentLogs: [
-                    {
-                        session_id: "sess-prod-001",
-                        prompt: "Explain quantum superposition simply.",
-                        completion: "Superposition is a fundamental principle of quantum mechanics where a system exists simultaneously in multiple states.",
-                        human_correction: null,
-                        user_rating: 1.0,
-                        is_processed: true,
-                        timestamp: "2 mins ago"
-                    },
-                    {
-                        session_id: "sess-prod-002",
-                        prompt: "What is quantum tunneling?",
-                        completion: "Tunneling is magic teleportation.",
-                        human_correction: "Tunneling is a quantum phenomenon where particles penetrate a potential energy barrier higher than their kinetic energy.",
-                        user_rating: -1.0,
-                        is_processed: true,
-                        timestamp: "8 mins ago"
-                    },
-                    {
-                        session_id: "sess-prod-003",
-                        prompt: "Define a qubit.",
-                        completion: "A qubit is the basic unit of quantum information.",
-                        human_correction: null,
-                        user_rating: 1.0,
-                        is_processed: false,
-                        timestamp: "12 mins ago"
-                    }
-                ],
-                term: null,
-                chart: null,
+                recentLogs: [],
+                operationName: 'list_datasets',
+                operationId: '',
+                operationBusy: false,
+                operationError: '',
+                operationOutput: '',
+                trainingParams: {
+                    model_name: '',
+                    learning_rate: '',
+                    batch_size: '',
+                    epochs: '',
+                    lora_r: '',
+                    lora_alpha: '',
+                    max_seq_length: '',
+                    gradient_checkpointing: false,
+                },
+                registryModels: [],
+                registryError: '',
+                registryMessage: '',
+                registryBusy: false,
+                compareModelA: '',
+                compareModelB: '',
+                modelComparison: '',
+                compareError: '',
+                compareBusy: false,
+                evaluationRunId: '',
+                evaluationError: '',
+                evaluationOutput: '',
+                runEvalRunId: '',
+                runEvalSuite: 'eval/support-golden-v1.yaml',
+                runEvalBusy: false,
+                heatmapData: null,
+                heatmapError: '',
+                feedbackPairs: [],
+                feedbackError: '',
+                feedbackMessage: '',
+                feedbackBusy: false,
                 analyticsExperiments: [],
                 selectedExpIds: [],
                 analyticsComparison: null,
@@ -1215,6 +1148,7 @@
                 lossCurvesChartInstance: null,
                 qualityTrendChartInstance: null,
                 datasets: [],
+                datasetError: '',
                 showDatasetModal: false,
                 datasetPreview: null,
                 autoCompileUpload: false,
@@ -1223,9 +1157,9 @@
                 init() {
                     this.fetchOverview();
                     this.fetchDatasets();
-                    this.initChart();
+                    this.fetchRecentLogs();
                     this.fetchAnalyticsData();
-                    setInterval(() => this.fetchOverview(), 8000);
+                    setInterval(() => { this.fetchOverview(); this.fetchRecentLogs(); }, 8000);
                 },
                 
                 setTab(tab) {
@@ -1234,14 +1168,11 @@
                         this.fetchDatasets();
                         this.$nextTick(() => this.initDropzone());
                     }
-                    if (tab === 'terminal') {
-                        this.$nextTick(() => this.initTerminal());
-                    }
-                    if (tab === 'training') {
-                        this.$nextTick(() => this.initChart());
-                    }
+                    if (tab === 'models') this.fetchRegistry();
+                    if (tab === 'flywheel') this.fetchFeedback();
                     if (tab === 'analytics') {
                         this.fetchAnalyticsData();
+                        this.fetchHeatmap();
                         this.$nextTick(() => {
                             this.renderLossCurves();
                             this.renderQualityTrend();
@@ -1271,19 +1202,22 @@
                         this.dropzoneInstance = new Dropzone('#dataset-upload-dropzone', {
                             url: '/api/datasets/upload',
                             paramName: 'file',
-                            maxFilesize: 500,
+                            maxFilesize: 10,
                             acceptedFiles: '.jsonl,.json,.csv,.txt',
                             sending: function(file, xhr, formData) {
                                 formData.append('auto_compile', self.autoCompileUpload);
                             },
                             success: function(file, response) {
+                                self.datasetError = '';
                                 self.fetchDatasets();
                                 setTimeout(() => {
                                     if (self.dropzoneInstance) self.dropzoneInstance.removeFile(file);
                                 }, 2500);
                             },
                             error: function(file, message) {
-                                console.error("Upload error:", message);
+                                const detail = message && typeof message === 'object' ? (message.detail ?? message) : message;
+                                self.datasetError = typeof detail === 'string' ? detail : (detail?.message || 'Upload failed');
+                                if (detail?.dataset_id) self.fetchDatasets();
                             }
                         });
                     } catch (e) {
@@ -1308,7 +1242,6 @@
                         const res = await fetch(`/api/datasets/${datasetId}/compile`, { method: 'POST' });
                         if (res.ok) {
                             this.fetchDatasets();
-                            this.triggerCommand('moro data build');
                         }
                     } catch (e) {
                         console.error("Compile error:", e);
@@ -1324,6 +1257,37 @@
                         }
                     } catch (e) {
                         console.error("Delete error:", e);
+                    }
+                },
+
+                statusDot(state) {
+                    if (state === true) return 'status-online';
+                    if (state === false) return 'status-offline';
+                    return 'status-warning';
+                },
+
+                heatmapCell(val) {
+                    if (val === null || val === undefined) return 'text-gray-600';
+                    if (val > 0.02) return 'bg-emerald-900/50 text-emerald-300';
+                    if (val < -0.02) return 'bg-rose-900/50 text-rose-300';
+                    return 'bg-gray-800/60 text-gray-300';
+                },
+
+                async fetchHeatmap() {
+                    this.heatmapError = '';
+                    try {
+                        const res = await fetch('/api/analytics/viz/hyperparameter-heatmap');
+                        if (!res.ok) throw new Error(`Heatmap unavailable (HTTP ${res.status})`);
+                        const data = await res.json();
+                        if (data.error) {
+                            this.heatmapData = null;
+                            this.heatmapError = data.error;
+                        } else {
+                            this.heatmapData = data;
+                        }
+                    } catch (e) {
+                        this.heatmapData = null;
+                        this.heatmapError = e.message || 'Heatmap unavailable';
                     }
                 },
 
@@ -1511,13 +1475,18 @@
                 async fetchOverview() {
                     try {
                         const res = await fetch('/api/system/overview');
+                        if (!res.ok) throw new Error(`Overview unavailable (HTTP ${res.status})`);
+                        this.overviewError = '';
                         if (res.ok) {
                             this.overview = await res.json();
-                            this.systemStatus.docker = this.overview.docker?.available ?? true;
-                            this.systemStatus.ollama = this.overview.ollama?.available ?? true;
+                            this.systemStatus.docker = this.overview.docker?.available ?? null;
+                            this.systemStatus.ollama = this.overview.ollama?.available ?? null;
+                            this.systemStatus.database = this.overview.database != null;
                         }
                     } catch (e) {
-                        console.log('Polling fallback active');
+                        this.overview = {};
+                        this.overviewError = e.message || 'Overview unavailable';
+                        this.systemStatus = {docker: null, ollama: null, database: null};
                     }
                 },
                 
@@ -1526,116 +1495,176 @@
                         const res = await fetch('/api/database/production/logs');
                         if (res.ok) {
                             const data = await res.json();
-                            if (data.logs && data.logs.length > 0) {
+                            if (Array.isArray(data.logs)) {
                                 this.recentLogs = data.logs;
                             }
                         }
                     } catch (e) {}
                 },
                 
-                async triggerCommand(cmd) {
-                    if (this.term) {
-                        this.term.writeln(`\\r\\n\\x1b[32m$ ${cmd}\\x1b[0m`);
+                showLocalInstruction(message) {
+                    window.alert(message);
+                },
+
+                trainingRequestBody() {
+                    const body = {dataset_id: this.operationId};
+                    const name = (this.trainingParams.model_name || '').trim();
+                    if (name) body.model_name = name;
+                    const numeric = (raw, integer) => {
+                        if (raw === '' || raw === null || raw === undefined) return undefined;
+                        const n = integer ? Number.parseInt(raw, 10) : Number(raw);
+                        return Number.isFinite(n) ? n : undefined;
+                    };
+                    for (const key of ['learning_rate', 'epochs']) {
+                        const n = numeric(this.trainingParams[key], false);
+                        if (n !== undefined) body[key] = n;
                     }
+                    for (const key of ['batch_size', 'lora_r', 'lora_alpha', 'max_seq_length']) {
+                        const n = numeric(this.trainingParams[key], true);
+                        if (n !== undefined) body[key] = n;
+                    }
+                    if (this.trainingParams.gradient_checkpointing === true) {
+                        body.gradient_checkpointing = true;
+                    }
+                    return body;
+                },
+
+                async runOperation() {
+                    if (this.operationBusy) return;
+                    const operation = this.operationName;
+                    let body;
+                    if (operation === 'list_datasets') {
+                        body = {limit: 50, offset: 0};
+                    } else if (operation === 'get_job_status' || operation === 'stop_job' || operation === 'resume_job') {
+                        body = {job_id: this.operationId};
+                    } else if (operation === 'start_training') {
+                        body = this.trainingRequestBody();
+                    } else {
+                        body = {dataset_id: this.operationId};
+                    }
+                    this.operationBusy = true;
+                    this.operationError = '';
+                    this.operationOutput = '';
                     try {
-                        const res = await fetch('/api/terminal/execute', {
+                        const response = await fetch(`/api/operations/${operation}`, {
                             method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ command: cmd })
+                            headers: {'Content-Type': 'application/json'},
+                            body: JSON.stringify(body)
                         });
-                        const data = await res.json();
-                        if (this.term) {
-                            this.term.writeln(data.output || 'Command executed.');
+                        const data = await response.json();
+                        if (!response.ok || data.ok !== true) {
+                            const detail = data.detail;
+                            const detailText = typeof detail === 'string' ? detail
+                                : (Array.isArray(detail) ? detail.map(e => ((e.loc || []).join('.') + ': ' + e.msg)).join('; ') : null);
+                            throw new Error(detailText || `Operation rejected (HTTP ${response.status})`);
                         }
-                        this.fetchOverview();
-                    } catch (e) {
-                        if (this.term) this.term.writeln('\\x1b[31mCommand execution error\\x1b[0m');
+                        this.operationOutput = JSON.stringify(data.payload, null, 2);
+                        await this.fetchDatasets();
+                    } catch (error) {
+                        this.operationError = error.message || 'Operation failed';
+                    } finally {
+                        this.operationBusy = false;
                     }
                 },
-                
-                initTerminal() {
-                    if (this.term) return;
-                    const el = document.getElementById('terminal');
-                    if (!el) return;
-                    
-                    this.term = new Terminal({
-                        cursorBlink: true,
-                        fontSize: 13,
-                        fontFamily: 'JetBrains Mono, Menlo, Monaco, monospace',
-                        theme: {
-                            background: '#0d1117',
-                            foreground: '#c9d1d9',
-                            cursor: '#58a6ff',
-                        },
-                    });
-                    this.term.open(el);
-                    this.term.writeln('\\x1b[36m┌────────────────────────────────────────────────────────┐\\x1b[0m');
-                    this.term.writeln('\\x1b[36m│          MoroAI Mission Control Terminal v0.1.0        │\\x1b[0m');
-                    this.term.writeln('\\x1b[36m└────────────────────────────────────────────────────────┘\\x1b[0m');
-                    this.term.writeln('Type commands like: \\x1b[33mmoro status\\x1b[0m, \\x1b[33mmoro doctor\\x1b[0m, \\x1b[33mmoro recipe suggest\\x1b[0m');
-                    this.term.writeln('');
-                    this.term.write('\\x1b[32mmoro> \\x1b[0m');
-                    
-                    let line = '';
-                    this.term.onData(e => {
-                        if (e === '\\r') {
-                            this.term.writeln('');
-                            if (line.trim()) {
-                                this.triggerCommand(line.trim());
-                            }
-                            line = '';
-                            this.term.write('\\x1b[32mmoro> \\x1b[0m');
-                        } else if (e === '\\u007F') {
-                            if (line.length > 0) {
-                                line = line.slice(0, -1);
-                                this.term.write('\\b \\b');
-                            }
-                        } else {
-                            line += e;
-                            this.term.write(e);
-                        }
-                    });
+
+                async fetchRegistry() {
+                    this.registryError = '';
+                    try {
+                        const response = await fetch('/api/models/');
+                        if (!response.ok) throw new Error(`Registry unavailable (HTTP ${response.status})`);
+                        this.registryModels = await response.json();
+                    } catch (error) { this.registryModels = []; this.registryError = error.message; }
                 },
-                
-                initChart() {
-                    const ctx = document.getElementById('trainingChart');
-                    if (!ctx || this.chart) return;
-                    
-                    this.chart = new Chart(ctx, {
-                        type: 'line',
-                        data: {
-                            labels: ['Step 0', 'Step 50', 'Step 100', 'Step 150', 'Step 200', 'Step 250', 'Step 300', 'Step 350', 'Step 400'],
-                            datasets: [
-                                {
-                                    label: 'Run 1: Baseline LoRA',
-                                    data: [2.40, 2.15, 1.98, 1.89, 1.82, 1.76, 1.74, 1.72, 1.71],
-                                    borderColor: '#f43f5e',
-                                    backgroundColor: 'rgba(244, 63, 94, 0.1)',
-                                    tension: 0.3,
-                                    borderWidth: 2,
-                                },
-                                {
-                                    label: 'Run 2: DPO Aligned Model',
-                                    data: [2.35, 1.85, 1.54, 1.32, 1.18, 1.09, 1.04, 1.01, 0.99],
-                                    borderColor: '#06b6d4',
-                                    backgroundColor: 'rgba(6, 182, 212, 0.1)',
-                                    tension: 0.3,
-                                    borderWidth: 2,
-                                }
-                            ]
-                        },
-                        options: {
-                            responsive: true,
-                            maintainAspectRatio: false,
-                            plugins: {
-                                legend: { labels: { color: '#94a3b8', font: { family: 'JetBrains Mono', size: 11 } } }
-                            },
-                            scales: {
-                                y: { grid: { color: 'rgba(255,255,255,0.06)' }, ticks: { color: '#64748b' } },
-                                x: { grid: { color: 'rgba(255,255,255,0.06)' }, ticks: { color: '#64748b' } }
-                            }
-                        }
-                    });
+
+                async promoteModel(modelId) {
+                    if (this.registryBusy) return;
+                    this.registryBusy = true; this.registryError = ''; this.registryMessage = '';
+                    try {
+                        const response = await fetch(`/api/models/${encodeURIComponent(modelId)}/promote`, {method: 'POST'});
+                        const data = await response.json();
+                        if (!response.ok) throw new Error(typeof data.detail === 'string' ? data.detail : `Selection rejected (HTTP ${response.status})`);
+                        this.registryMessage = data.message || `Model ${modelId} selected for production.`;
+                        await this.fetchRegistry();
+                    } catch (error) { this.registryError = error.message; }
+                    finally { this.registryBusy = false; }
+                },
+
+                async archiveModel(modelId) {
+                    if (this.registryBusy) return;
+                    this.registryBusy = true; this.registryError = ''; this.registryMessage = '';
+                    try {
+                        const response = await fetch(`/api/models/${encodeURIComponent(modelId)}/archive`, {method: 'POST'});
+                        const data = await response.json();
+                        if (!response.ok) throw new Error(typeof data.detail === 'string' ? data.detail : `Archive rejected (HTTP ${response.status})`);
+                        this.registryMessage = `Model ${modelId} archived.`;
+                        await this.fetchRegistry();
+                    } catch (error) { this.registryError = error.message; }
+                    finally { this.registryBusy = false; }
+                },
+
+                async compareRegistryModels() {
+                    if (this.compareBusy || !this.compareModelA || !this.compareModelB) return;
+                    this.compareBusy = true; this.compareError = ''; this.modelComparison = '';
+                    try {
+                        const response = await fetch(`/api/models/compare/${encodeURIComponent(this.compareModelA)}/${encodeURIComponent(this.compareModelB)}`);
+                        const data = await response.json();
+                        if (!response.ok) throw new Error(typeof data.detail === 'string' ? data.detail : `Comparison rejected (HTTP ${response.status})`);
+                        const fmt = (v) => (v === null || v === undefined) ? 'not measured' : (Number(v) * 100).toFixed(1) + '%';
+                        const m = data.comparison.metrics;
+                        this.modelComparison = `Winner: ${data.winner} (basis: ${data.winner_basis})\n`
+                            + `Pass rate — A: ${fmt(m.eval_pass_rate.model_a)}, B: ${fmt(m.eval_pass_rate.model_b)}\n`
+                            + `Delta — A: ${fmt(m.eval_delta.model_a)}, B: ${fmt(m.eval_delta.model_b)}`;
+                    } catch (error) { this.compareError = error.message; }
+                    finally { this.compareBusy = false; }
+                },
+
+                async runEvaluation() {
+                    if (this.runEvalBusy) return;
+                    this.runEvalBusy = true; this.evaluationError = ''; this.evaluationOutput = '';
+                    try {
+                        const response = await fetch('/api/evaluation/run', {
+                            method: 'POST',
+                            headers: {'Content-Type': 'application/json'},
+                            body: JSON.stringify({run_id: this.runEvalRunId, suite_path: this.runEvalSuite}),
+                        });
+                        const data = await response.json();
+                        if (!response.ok) throw new Error(typeof data.detail === 'string' ? data.detail : `Evaluation run rejected (HTTP ${response.status})`);
+                        this.evaluationOutput = JSON.stringify(data, null, 2);
+                        this.evaluationRunId = this.runEvalRunId;
+                    } catch (error) { this.evaluationError = error.message; }
+                    finally { this.runEvalBusy = false; }
+                },
+
+                async fetchEvaluation() {
+                    this.evaluationError = ''; this.evaluationOutput = '';
+                    try {
+                        const response = await fetch(`/api/evaluation/results/${encodeURIComponent(this.evaluationRunId)}`);
+                        const data = await response.json();
+                        if (!response.ok) throw new Error(data.detail || `Evaluation unavailable (HTTP ${response.status})`);
+                        this.evaluationOutput = JSON.stringify(data, null, 2);
+                    } catch (error) { this.evaluationError = error.message; }
+                },
+
+                async fetchFeedback() {
+                    this.feedbackError = '';
+                    try {
+                        const response = await fetch('/api/flywheel/pairs');
+                        if (!response.ok) throw new Error(`Feedback unavailable (HTTP ${response.status})`);
+                        this.feedbackPairs = (await response.json()).pairs;
+                    } catch (error) { this.feedbackPairs = []; this.feedbackError = error.message; }
+                },
+
+                async extractFeedback() {
+                    if (this.feedbackBusy) return;
+                    this.feedbackBusy = true; this.feedbackError = ''; this.feedbackMessage = '';
+                    try {
+                        const response = await fetch('/api/flywheel/cycle', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: '{}'});
+                        const data = await response.json();
+                        if (!response.ok) throw new Error(data.detail || `Extraction failed (HTTP ${response.status})`);
+                        this.feedbackMessage = `${data.status}: ${data.pairs_generated} pairs`;
+                        await this.fetchFeedback();
+                    } catch (error) { this.feedbackError = error.message; }
+                    finally { this.feedbackBusy = false; }
                 }
             };
         }

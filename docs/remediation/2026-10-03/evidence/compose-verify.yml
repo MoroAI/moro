@@ -1,0 +1,16 @@
+services:
+  ollama:
+    ports: !override
+      - "127.0.0.1:11435:11434"
+  dashboard:
+    image: moro-remediation:20261004
+    ports: !override
+      - "127.0.0.1:18501:8501"
+  gateway:
+    image: moro-remediation:20261004
+    ports: !override
+      - "127.0.0.1:18000:8000"
+  webhook:
+    image: moro-remediation:20261004
+    ports: !override
+      - "127.0.0.1:18001:8001"

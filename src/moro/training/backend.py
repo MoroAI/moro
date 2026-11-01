@@ -24,10 +24,10 @@ class TrainingBackend(ABC):
         ...
 
     @abstractmethod
-    def estimate_memory(self, config: MoroConfig) -> float:
+    def estimate_memory(self, config: MoroConfig) -> float | None:
         """
         Estimate peak VRAM usage in GB for the given config.
-        Returns 0.0 if estimation is not possible.
+        Returns None if model size is unknown.
         """
         ...
 

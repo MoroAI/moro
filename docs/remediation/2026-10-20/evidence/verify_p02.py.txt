@@ -1,0 +1,72 @@
+"""Live P0-2 probes against the persistent synthetic dev project only."""
+import hashlib
+import json
+import subprocess
+from datetime import datetime, timezone
+from pathlib import Path
+
+import httpx
+
+root = Path('/Users/mac/Dev/MoroAI/moro/.moro/dev/2026-10-19')
+project = root / 'project'
+out = root / 'p0-2'
+token = (project / '.moro/web.token').read_text().strip()
+results = {'time': datetime.now(timezone.utc).isoformat(), 'checks': []}
+raw = project / 'data/raw'
+original_entries = {p.name for p in raw.iterdir()}
+original_files = {p.name: hashlib.sha256(p.read_bytes()).hexdigest() for p in raw.iterdir() if p.is_file() and not p.is_symlink()}
+records = [json.loads(line) for line in (raw / 'support.jsonl').read_text().splitlines() if line.strip()]
+payload = json.dumps(records).encode()
+
+def check(name, response, code):
+    assert response.status_code == code, (name, response.status_code, response.text[:300])
+    results['checks'].append({'name': name, 'status': code})
+    return response
+
+for label, port in [('native', 8501), ('alternate', 8765), ('compose', 18501)]:
+    with httpx.Client(base_url=f'http://127.0.0.1:{port}', timeout=60, trust_env=False) as c:
+        check(label+' anonymous upload', c.post('/api/datasets/upload', files={'file':('a.jsonl',b'{}\n')}), 401)
+        c.headers['Authorization'] = 'Bearer '+token
+        check(label+' legacy name traversal', c.post('/api/datasets/upload', files={'file':('a.txt',b'plain text')}, data={'name':'../../p02-escape.txt'}),400)
+        for name, data in [('a.exe',b'bad'), ('a.csv',b'a,b\n1\n'), ('a.txt',b'valid\x00binary'), ('a.json',b'[{},5]'), ('a.jsonl',b'{}\n'*360000+b'bad tail')]:
+            check(label+' rejects '+name, c.post('/api/datasets/upload',files={'file':(name,data)}),400)
+        check(label+' oversize', c.post('/api/datasets/upload',files={'file':('a.txt',b'x'*(10*1024*1024+1))}),413)
+        r=check(label+' metadata-only traversal upload',c.post('/api/datasets/upload',files={'file':('records.json',payload)},data={'display_name':'../../P02 synthetic records'}),200)
+        item=r.json(); sid=item['dataset_id']
+        assert item['sha256']==hashlib.sha256(payload).hexdigest()
+        path=raw/Path(item['path']).name
+        assert path.read_bytes()==payload and path.stat().st_mode & 0o777 == 0o600
+        metadata_path=raw/f'.{path.name}.metadata'
+        metadata=json.loads(metadata_path.read_text())
+        assert metadata['sha256']==item['sha256'] and metadata_path.stat().st_mode & 0o777 == 0o600
+        listed=check(label+' persisted display metadata',c.get('/api/datasets/'),200).json()
+        found=next(x for x in listed if x['id']==sid)
+        assert found['name']=='.._.._P02 synthetic records' and found['row_count']==len(records)
+        assert found['upload_sha256']==item['sha256']
+        preview=check(label+' JSON record preview',c.get(f'/api/datasets/{sid}/preview',params={'limit':1}),200).json()
+        assert preview['row_count']==len(records) and preview['sample_rows']==records[:1]
+        check(label+' metadata cannot be previewed',c.get(f'/api/datasets/{metadata_path.name}/preview'),404)
+        compiled=check(label+' real uploaded JSON compilation',c.post(f'/api/datasets/{sid}/compile',json={}),200).json()
+        assert compiled['status']=='compiled' and compiled['version_id']
+        check(label+' delete uploaded source',c.delete(f'/api/datasets/{sid}'),200)
+        assert not path.exists() and not metadata_path.exists()
+        batch=check(label+' mixed batch reports outcomes',c.post('/api/datasets/upload/multiple',files=[('files',('ok.jsonl',b'{"x":1}\n')),('files',('bad.csv',b'prose')),('files',('ok2.jsonl',b'{"x":2}\n'))]),200).json()
+        assert batch['total_uploaded']==2 and [x['status'] for x in batch['results']]==['uploaded','rejected','uploaded']
+        for x in batch['results']:
+            if x['status']=='uploaded':
+                check(label+' batch source cleanup',c.delete('/api/datasets/'+x['dataset_id']),200)
+        for parameter in ['x_param','y_param','metric']:
+            r=check(label+' SQL expression rejected '+parameter,c.get('/api/analytics/viz/hyperparameter-heatmap',params={parameter:'learning_rate || (SELECT value FROM p02_probe_marker LIMIT 1)'}),400)
+            assert 'SELECT' not in r.text and 'PRIVATE_MARKER' not in r.text
+        check(label+' allowed analytics columns',c.get('/api/analytics/viz/hyperparameter-heatmap',params={'x_param':'weight_decay','y_param':'lora_dropout','metric':'tokens_per_second'}),200)
+assert {p.name for p in raw.iterdir()} == original_entries
+assert {p.name: hashlib.sha256(p.read_bytes()).hexdigest() for p in raw.iterdir() if p.is_file() and not p.is_symlink()} == original_files
+assert not (project/'p02-escape.txt').exists()
+results['raw_files_preserved'] = True
+results['containers'] = []
+for name in ['moro-remediation-dashboard-1','moro-remediation-gateway-1','moro-remediation-webhook-1','moro-remediation-ollama-1','moro-remediation-flywheel-1','moro-audit-20261002-cpu-dev','moro-audit-20261002-ollama']:
+    d=json.loads(subprocess.check_output(['docker','inspect',name]))[0]
+    assert d['State']['Running'],name
+    results['containers'].append({'name':name,'image':d['Image'],'running':d['State']['Running'],'ports':d['NetworkSettings']['Ports']})
+(out/'live-p02.json').write_text(json.dumps(results,indent=2)+'\n')
+print('Passed',len(results['checks']),'live P0-2 checks; preexisting raw files preserved; seven owned containers running.')

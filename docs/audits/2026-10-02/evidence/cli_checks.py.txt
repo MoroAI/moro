@@ -1,0 +1,18 @@
+import json,os,subprocess
+from pathlib import Path
+import yaml
+root=Path('/tmp/moro-audit-20261002/dev'); py='/Users/mac/Dev/MoroAI/moro/.venv/bin/python'
+source=root/'data/raw/audit.jsonl'
+source.write_text(''.join(json.dumps({'prompt':f'Question {i}: reach audit{i}@example.com','completion':f'Answer {i}: this is a unique response about topic {i}.'})+'\n' for i in range(20)))
+cfg=yaml.safe_load((root/'moro.yaml').read_text()); cfg['dataset']['source']='data/raw/audit.jsonl';cfg['dataset']['pii_scan']=True
+(root/'moro.yaml').write_text(yaml.safe_dump(cfg))
+commands=[['import',str(source)],['data','build'],['data','report','--format','json'],['train','--dry-run'],['recipe','suggest'],['validate'],['flywheel','run','--json'],['services','status','--json'],['doctor','--privacy'],['recipe','generate'],['release','verify'],['data','build','--mi-guard-threshold','0.85'],['train','--auto-heal']]
+results=[]
+for args in commands:
+ p=subprocess.run([py,'-m','moro.main',*args],cwd=root,capture_output=True,text=True,timeout=30)
+ results.append({'args':args,'exit_code':p.returncode,'stdout':p.stdout,'stderr':p.stderr})
+versions=list((root/'data/versions').glob('*/dataset.jsonl'))
+Path('/tmp/moro-audit-20261002/cli-checks.json').write_text(json.dumps(results,indent=2))
+print(json.dumps([{'args':x['args'],'exit_code':x['exit_code']} for x in results],indent=2))
+print('PII survives CLI pii_scan:',any('audit0@example.com' in p.read_text() for p in versions))
+print('Plain SQLite headers:',[(str(p.relative_to(root)),p.read_bytes()[:16].decode('ascii',errors='replace')) for p in (root/'.moro').glob('*.db')])

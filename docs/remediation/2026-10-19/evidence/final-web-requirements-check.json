@@ -1,0 +1,7 @@
+{
+  "external_packages": 32,
+  "matches_final_image_freeze": true,
+  "fastapi": "0.149.0",
+  "earlier_scan_fastapi": "0.147.0",
+  "scope": "Fresh advisory scan of final image pip freeze; local Moro distribution excluded"
+}

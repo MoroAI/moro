@@ -56,6 +56,9 @@ training:
         f.write('{"prompt": "Hello", "completion": "Hi"}\n')
         f.write('{"prompt": "What is 2+2?", "completion": "4"}\n')
 
+    with sample_file.open("a") as stream:
+        stream.write('{"prompt":"Explain testing", "completion":"Tests check expected behavior"}\n')
+
     monkeypatch.setattr("moro.dashboard.mission_control.get_project_root", lambda: tmp_path)
     monkeypatch.setattr("moro.dashboard.utils.get_project_root", lambda: tmp_path)
     monkeypatch.setattr("moro.dashboard.api.datasets.get_project_root", lambda: tmp_path)
@@ -66,7 +69,12 @@ training:
     monkeypatch.setattr("moro.dashboard.api.evaluation.get_project_root", lambda: tmp_path)
     monkeypatch.setattr("moro.dashboard.api.flywheel.get_project_root", lambda: tmp_path)
 
-    return TestClient(mission_app)
+    monkeypatch.setenv("MORO_API_TOKEN", "test-token-" + "a" * 32)
+    return TestClient(
+        mission_app,
+        base_url="http://127.0.0.1",
+        headers={"Authorization": "Bearer test-token-" + "a" * 32},
+    )
 
 
 class TestDashboardHtmlAndHealth:
@@ -119,15 +127,40 @@ class TestDatasetsApi:
         response = client.get("/api/datasets/ds_test/preview")
         assert response.status_code == 200
         data = response.json()
-        assert data["row_count"] == 2
+        assert data["row_count"] == 3
         assert "prompt" in data["columns"]
-        assert len(data["sample_rows"]) == 2
+        assert len(data["sample_rows"]) == 3
 
     def test_compile_dataset(self, client: TestClient):
         response = client.post("/api/datasets/ds_test/compile")
         assert response.status_code == 200
         data = response.json()
-        assert data["status"] == "compiling"
+        assert data["status"] == "compiled"
+        assert data["version_id"].startswith("ds_")
+
+    def test_compiled_version_preview_and_immutability(self, client: TestClient):
+        result = client.post("/api/datasets/ds_test/compile")
+        assert result.status_code == 200, result.text
+        version = result.json()["version_id"]
+        assert any(d["id"] == version for d in client.get("/api/datasets/").json())
+        preview = client.get(f"/api/datasets/{version}/preview?limit=1")
+        assert preview.status_code == 200, preview.text
+        assert len(preview.json()["sample_rows"]) == 1
+        assert "messages" in preview.json()["columns"]
+        assert client.delete(f"/api/datasets/{version}").status_code == 409
+        assert client.post(f"/api/datasets/{version}/compile").status_code == 409
+        assert client.get(f"/api/datasets/{version}/preview").status_code == 200
+
+    def test_corrupt_version_cannot_be_previewed(self, client: TestClient, tmp_path: Path):
+        result = client.post("/api/datasets/ds_test/compile")
+        assert result.status_code == 200, result.text
+        version = result.json()["version_id"]
+        (tmp_path / "data/versions" / version / "dataset.jsonl").write_text("tampered\n")
+        assert client.get(f"/api/datasets/{version}/preview").status_code == 409
+
+    @pytest.mark.parametrize("limit", [0, -1, 101])
+    def test_preview_limit_is_bounded(self, client: TestClient, limit: int):
+        assert client.get(f"/api/datasets/ds_test/preview?limit={limit}").status_code == 422
 
     def test_delete_dataset(self, client: TestClient, tmp_path: Path):
         # Create disposable dataset
@@ -159,27 +192,11 @@ class TestTrainingApi:
                 "epochs": 1,
             },
         )
-        assert response.status_code == 200
-        data = response.json()
-        run_id = data["run_id"]
-        assert data["status"] == "started"
-
-        # Check run in list
+        assert response.status_code == 422
         runs_resp = client.get("/api/training/runs")
         assert runs_resp.status_code == 200
-        runs = runs_resp.json()
-        assert any(r["run_id"] == run_id for r in runs)
-
-        # Check metrics
-        metrics_resp = client.get(f"/api/training/runs/{run_id}/metrics")
-        assert metrics_resp.status_code == 200
-        metrics = metrics_resp.json()
-        assert "current_step" in metrics
-
-        # Stop training
-        stop_resp = client.post(f"/api/training/runs/{run_id}/stop")
-        assert stop_resp.status_code == 200
-        assert stop_resp.json()["status"] == "cancelled"
+        assert not any(r["status"] == "completed" for r in runs_resp.json())
+        assert client.post("/api/training/runs/missing/stop").status_code == 404
 
 
 class TestModelsApi:
@@ -189,23 +206,21 @@ class TestModelsApi:
         response = client.get("/api/models/")
         assert response.status_code == 200
         models = response.json()
-        assert len(models) >= 1
+        assert models == []
 
-    def test_promote_and_compare_models(self, client: TestClient):
-        models = client.get("/api/models/").json()
-        model_id = models[0]["model_id"]
+    def test_missing_models_cannot_be_promoted_or_compared(self, client: TestClient):
+        assert client.post("/api/models/missing/promote").status_code == 404
+        assert client.get("/api/models/compare/missing/missing").status_code == 404
 
-        # Promote
-        promote_resp = client.post(f"/api/models/{model_id}/promote")
-        assert promote_resp.status_code == 200
-        assert promote_resp.json()["is_production"] is True
+    def test_zero_score_remains_zero(self, client: TestClient, tmp_path):
+        import json
 
-        # Compare model with itself or another
-        comp_resp = client.get(f"/api/models/compare/{model_id}/{model_id}")
-        assert comp_resp.status_code == 200
-        comp_data = comp_resp.json()
-        assert "winner" in comp_data
-        assert comp_data["winner"] == model_id
+        directory = tmp_path / "releases/zero-score"
+        directory.mkdir()
+        (directory / "metadata.json").write_text(json.dumps({"eval_results": {"pass_rate": 0.0}}))
+        response = client.get("/api/models/")
+        assert response.status_code == 200
+        assert response.json()[0]["eval_pass_rate"] == 0.0
 
 
 class TestDeploymentApi:
@@ -223,23 +238,8 @@ class TestDeploymentApi:
             "/api/deployment/deploy",
             json={"model_id": "test_model_v1", "target": "ollama"},
         )
-        assert deploy_resp.status_code == 200
-        dep = deploy_resp.json()
-        assert dep["status"] == "running"
-
-        # Test prompt
-        test_resp = client.post(
-            "/api/deployment/ollama/test",
-            params={"model_name": "test_model_v1", "prompt": "What is MoroAI?"},
-        )
-        assert test_resp.status_code == 200
-        test_data = test_resp.json()
-        assert "response" in test_data
-        assert "latency_ms" in test_data
-
-        # Undeploy
-        undep_resp = client.post(f"/api/deployment/undeploy/{dep['deployment_id']}")
-        assert undep_resp.status_code == 200
+        assert deploy_resp.status_code == 501
+        assert client.post("/api/deployment/undeploy/missing").status_code == 404
 
 
 class TestSystemApi:
@@ -260,7 +260,9 @@ class TestSystemApi:
 
         # Update config
         cfg["project"]["seed"] = 1234
-        put_resp = client.put("/api/system/config", json=cfg)
+        put_resp = client.put(
+            "/api/system/config", json=cfg, headers={"If-Match": get_resp.headers["etag"]}
+        )
         assert put_resp.status_code == 200
         assert put_resp.json()["status"] == "updated"
 
@@ -269,16 +271,14 @@ class TestSystemApi:
             "/api/system/terminal/execute",
             json={"command": "moro version"},
         )
-        assert response.status_code == 200
-        data = response.json()
-        assert "moro" in data["stdout"] or data["return_code"] == 0
+        assert response.status_code == 404
 
     def test_terminal_execution_disallowed(self, client: TestClient):
         response = client.post(
             "/api/system/terminal/execute",
             json={"command": "rm -rf /"},
         )
-        assert response.status_code == 400
+        assert response.status_code == 404
 
 
 class TestEvaluationAndFlywheelApi:
@@ -292,12 +292,9 @@ class TestEvaluationAndFlywheelApi:
             "/api/evaluation/run",
             json={"run_id": "test_eval_run", "suite_path": "eval/test.yaml"},
         )
-        assert run_resp.status_code == 200
-        assert run_resp.json()["status"] == "completed"
-
+        assert run_resp.status_code in (404, 422)
         results_resp = client.get("/api/evaluation/results/test_eval_run")
-        assert results_resp.status_code == 200
-        assert "pass_rate" in results_resp.json()
+        assert results_resp.status_code == 404
 
     def test_flywheel_workflow(self, client: TestClient):
         status_resp = client.get("/api/flywheel/status")
@@ -305,7 +302,7 @@ class TestEvaluationAndFlywheelApi:
 
         cycle_resp = client.post("/api/flywheel/cycle")
         assert cycle_resp.status_code == 200
-        assert cycle_resp.json()["status"] in ["completed", "skipped"]
+        assert cycle_resp.json()["status"] in ["extracted", "skipped"]
 
         pairs_resp = client.get("/api/flywheel/pairs")
         assert pairs_resp.status_code == 200

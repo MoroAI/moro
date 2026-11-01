@@ -222,34 +222,31 @@ def predict_peak_vram_gb(
     max_seq_length: int = 2048,
     batch_size: int = 1,
     lora_r: int = 16,
-) -> float:
-    """Predict peak VRAM in GB for model training.
-
-    Calibrated against empirical GPU allocation benchmarks:
-    - 1.5B (nf4, seq=1024, b=1, r=16): ~3.15 GB (error ~1.6% vs 3.20 actual)
-    - 3B (nf4, seq=2048, b=1, r=32): ~5.92 GB (error ~2.1% vs 5.80 actual)
-    - 7B (nf4, seq=2048, b=1, r=16): ~9.31 GB (error ~2.0% vs 9.50 actual)
-    """
-    clean_name = str(model_class).lower().strip()
-    if "1.5" in clean_name and max_seq_length <= 1024 and lora_r <= 16:
-        return 3.15
-    if "3" in clean_name and max_seq_length >= 2048 and lora_r >= 32:
-        return 5.92
-    if "7" in clean_name and max_seq_length >= 2048 and lora_r <= 16:
-        return 9.31
-
-    try:
-        b = float(clean_name.replace("b", "").replace("m", "e-3"))
-    except ValueError:
-        b = 7.0
-
-    bytes_per_param = {"nf4": 0.65, "int8": 1.1, "fp16": 2.0, "none": 2.0}.get(quantization, 0.65)
-    weights = b * bytes_per_param
-    seq_ratio = max_seq_length / 1024.0
-    act = 0.45 * seq_ratio * batch_size * (b**0.65)
-    lora = 0.08 * (lora_r / 16.0) * b
-    overhead = 1.45
-    return round(weights + act + lora + overhead, 2)
+) -> float | None:
+    """Uncalibrated estimate using the shared planner; not an accuracy benchmark."""
+    billions, _ = infer_parameter_billions(model_class)
+    if billions is None:
+        return None
+    if quantization == "fp16":
+        quantization = "none"
+    if quantization not in {"none", "nf4", "int8"}:
+        raise ValueError("Unsupported quantization")
+    return round(
+        sum(
+            estimate_memory(
+                billions,
+                quantization=quantization,
+                precision="bf16",
+                sequence_length=max_seq_length,
+                batch_size=batch_size,
+                rank=lora_r,
+                module_count=7,
+                checkpointing=True,
+                optimizer="paged_adamw_8bit",
+            ).values()
+        ),
+        3,
+    )
 
 
 class RecipeEngine:
@@ -268,28 +265,35 @@ class RecipeEngine:
         gpu_vram_gb: float | None = None,
     ) -> dict[str, Any]:
         """Generate a training recipe tailored to dataset and target model."""
-        chosen_model = model_name or target_model or "test-model"
-        vram = gpu_vram_gb or predict_peak_vram_gb(model_class=chosen_model, quantization="nf4")
+        from moro.config.loader import load_config
+        from moro.hardware.detector import detect_hardware
+        from moro.training.runner import training_config
 
+        cfg = (
+            training_config(self.project_root, config or {})
+            if config
+            else load_config(self.project_root / "moro.yaml")
+        )
+        chosen_model = model_name or target_model or cfg.model.name
+        cfg.model.name = chosen_model
+        suggestion = suggest_recipe(
+            HardwareProfile.model_validate(detect_hardware()),
+            model_name=chosen_model,
+            target_vram=gpu_vram_gb,
+            config=cfg,
+        )
         recipe = {
+            **cfg.training.model_dump(mode="json"),
             "model_name": chosen_model,
-            "target_model": chosen_model,
             "dataset_id": dataset_id,
-            "quantization": "nf4",
-            "adapter_type": "lora",
-            "lora_r": 8,
-            "lora_alpha": 16,
-            "target_modules": _get_target_modules(chosen_model),
-            "batch_size": 1,
-            "gradient_accumulation_steps": 4,
-            "learning_rate": 0.0002,
-            "epochs": 1,
-            "max_seq_length": 512,
-            "optimizer": "paged_adamw_8bit",
-            "gradient_checkpointing": True,
-            "precision": "bf16",
-            "estimated_vram_gb": vram,
-            "total_steps": 10,
+            "quantization": suggestion.quantization,
+            "lora_r": cfg.adapter.r,
+            "lora_alpha": cfg.adapter.alpha,
+            "target_modules": cfg.adapter.target_modules,
+            "max_seq_length": cfg.dataset.max_seq_length,
+            "optimizer": suggestion.optimizer,
+            "precision": suggestion.precision,
+            "estimated_vram_gb": suggestion.estimated_vram_gb,
         }
 
         if self.state_manager is not None:

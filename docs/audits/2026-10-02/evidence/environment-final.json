@@ -1,0 +1,82 @@
+{
+  "captured_at_utc": "2026-10-02T17:25:53.425483+00:00",
+  "project": "/tmp/moro-audit-20261002/dev",
+  "http": {
+    "dashboard": {
+      "url": "http://127.0.0.1:8501/",
+      "status": 200,
+      "bytes": 102831
+    },
+    "ui": {
+      "url": "http://127.0.0.1:8765/",
+      "status": 200,
+      "bytes": 102831
+    },
+    "gateway": {
+      "url": "http://127.0.0.1:8000/health",
+      "status": 200,
+      "bytes": 130,
+      "json": {
+        "status": "healthy",
+        "service": "gateway",
+        "timestamp": "2026-10-02T17:25:53.723067+00:00",
+        "ollama_base_url": "http://127.0.0.1:11434"
+      }
+    },
+    "webhook": {
+      "url": "http://127.0.0.1:8001/health",
+      "status": 200,
+      "bytes": 126,
+      "json": {
+        "status": "healthy",
+        "database_path": "data/production_logs.db",
+        "database_exists": true,
+        "pending_logs": 0,
+        "total_logs": 1
+      }
+    },
+    "ollama": {
+      "url": "http://127.0.0.1:11434/api/tags",
+      "status": 200,
+      "bytes": 13,
+      "json": {
+        "models": []
+      }
+    }
+  },
+  "websocket_untrusted_origin": "HTTP/1.1 101 Switching Protocols",
+  "listeners": "COMMAND     PID USER   FD   TYPE             DEVICE SIZE/OFF NODE NAME\ncom.docke 16795  mac  151u  IPv4 0xa2076ccb0f3cfb45      0t0  TCP 127.0.0.1:11434 (LISTEN)\nPython    17653  mac    6u  IPv4 0x758978a5ac0bfe88      0t0  TCP 127.0.0.1:8501 (LISTEN)\nPython    17668  mac    6u  IPv4 0x7aec5b3efa50f1ef      0t0  TCP 127.0.0.1:8000 (LISTEN)\nPython    17717  mac    3u  IPv4 0x737d09b4f1ab5a30      0t0  TCP 127.0.0.1:8001 (LISTEN)\nPython    18077  mac    6u  IPv4 0x1305c7c914986339      0t0  TCP 127.0.0.1:8765 (LISTEN)\n",
+  "audit_containers": [
+    {
+      "name": "moro-audit-20261002-ollama",
+      "id": "cb3e4335f02ac839c428147f6f76695b39bd9162aacdf101b8815ba36a433038",
+      "image": "sha256:8262851b2846b87c649eddf3e76beb270c52f4d1bc94559f47efde16b0841551",
+      "status": "running",
+      "exit_code": 0,
+      "ports": {
+        "11434/tcp": [
+          {
+            "HostIp": "127.0.0.1",
+            "HostPort": "11434"
+          }
+        ]
+      }
+    },
+    {
+      "name": "moro-audit-20261002-cpu",
+      "id": "6aaf6dcfc4c8f91809fe3a5e54dae72da5cfc84509a5a53b5a9007f80b281132",
+      "image": "sha256:bab1b7ef4b450c81002278d035eff85ebe394ae94df904f7a3ba14f7e16e487b",
+      "status": "exited",
+      "exit_code": 1,
+      "ports": {}
+    },
+    {
+      "name": "moro-audit-20261002-cpu-dev",
+      "id": "8859318d9a8c7327d6ea80b971b32e0a2ebf7cb31ad76a1185fb998e0cf56039",
+      "image": "sha256:3bbf7118922b3169edc7e4ca221abf42a847728c3d3a482733d277179c058ab8",
+      "status": "running",
+      "exit_code": 0,
+      "ports": {}
+    }
+  ]
+}

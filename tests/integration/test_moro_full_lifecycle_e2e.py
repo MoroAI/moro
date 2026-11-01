@@ -508,7 +508,8 @@ def test_moro_full_lifecycle_master_e2e(tmp_path: Path, monkeypatch):
 
     with open(dpo_file) as f:
         lines = [json.loads(line) for line in f if line.strip()]
-        assert len(lines) >= 2
+        assert len(lines) == 1
+        assert lines[0]["feedback_type"] == "EXPLICIT_HUMAN_CORRECTION"
         for pair in lines:
             assert "prompt" in pair
             assert "chosen" in pair
@@ -518,7 +519,7 @@ def test_moro_full_lifecycle_master_e2e(tmp_path: Path, monkeypatch):
     # 15e. History shows completed epoch
     res_fw_hist = runner.invoke(app, ["flywheel", "history", "--db", str(flywheel_db)])
     assert res_fw_hist.exit_code == 0
-    assert "completed" in res_fw_hist.stdout
+    assert "extracted" in res_fw_hist.stdout
 
     # ---------------------------------------------------------
     # 16. moro analytics (list, show, trend, recommend)

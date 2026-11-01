@@ -618,11 +618,7 @@ class TestCompletePipeline:
         sample_eval_suite,
         sample_config,
     ):
-        """Test the complete pipeline from data to deployment.
-
-        This is the ultimate integration test that verifies
-        every subsystem works together.
-        """
+        """Invalid pipeline inputs must fail closed without a fabricated release."""
         from moro.runtime.orchestrator import MoroRuntimeOrchestrator
 
         orchestrator = MoroRuntimeOrchestrator(temp_project)
@@ -637,41 +633,11 @@ class TestCompletePipeline:
             )
         )
 
-        # Verify pipeline completed
-        assert results is not None
-        assert results["success"] is True
-        assert "pipeline_id" in results
-
-        # Verify all phases completed
-        phases = results["phases"]
-
-        assert "data_compilation" in phases
-        assert "recipe_generation" in phases
-        assert "training" in phases
-        assert "evaluation" in phases
-        assert "release" in phases
-
-        # Verify each phase succeeded
-        for phase_name, phase_result in phases.items():
-            assert phase_result["status"] == "completed", f"Phase {phase_name} failed"
-            assert "duration" in phase_result
-
-        # Verify data compilation produced a dataset
-        data_result = phases["data_compilation"]
-        assert "dataset_id" in data_result
-
-        # Verify training produced an experiment
-        training_result = phases["training"]
-        assert "experiment_id" in training_result
-
-        # Verify evaluation produced results
-        eval_result = phases["evaluation"]
-        assert "eval_id" in eval_result
-        assert "pass_rate" in eval_result
-
-        # Verify release produced a release
-        release_result = phases["release"]
-        assert "release_id" in release_result
+        # This fixture names a nonexistent model and uses an invalid config.
+        # It must not fabricate a successful training/evaluation/release chain.
+        assert results["success"] is False
+        assert "release" not in results["phases"]
+        assert not list((temp_project / "releases").iterdir())
 
 
 # ===================================================================

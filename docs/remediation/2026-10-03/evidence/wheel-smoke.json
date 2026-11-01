@@ -1,0 +1,12 @@
+{
+  "installed_module": "/tmp/moro-remediation-20261003/wheel-venv/lib/python3.12/site-packages/moro/dashboard/mission_control.py",
+  "assets_present": [
+    "templates/mission_control.html",
+    "static/vendor/alpine.min.js",
+    "static/vendor/tailwind.css",
+    "static/vendor/htmx.min.js"
+  ],
+  "hook_import": true,
+  "cli_exit": 0,
+  "cwd": "/private/tmp"
+}

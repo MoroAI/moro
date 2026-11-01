@@ -1,0 +1,21 @@
+{
+  "status": 200,
+  "marker_returned": true,
+  "body": {
+    "x_values": [
+      "0.0002MORO_SQL_AUDIT_MARKER"
+    ],
+    "y_values": [
+      16
+    ],
+    "matrix": [
+      [
+        0.1
+      ]
+    ],
+    "x_label": "learning_rate || (SELECT value FROM audit_marker LIMIT 1)",
+    "y_label": "lora_r",
+    "metric": "eval_delta",
+    "title": "eval_delta vs learning_rate || (SELECT value FROM audit_marker LIMIT 1) and lora_r"
+  }
+}

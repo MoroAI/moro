@@ -7,11 +7,36 @@ Optionally invokes the converter if llama_cpp_python is installed.
 
 from __future__ import annotations
 
-import shutil
+import re
+import shlex
 import subprocess
+import sys
 from pathlib import Path
 
 from moro.core.errors import ExportError
+
+
+def validate_conversion(quantization: str, project_name: str) -> None:
+    if quantization not in {
+        "f16",
+        "q4_0",
+        "q4_1",
+        "q5_0",
+        "q5_1",
+        "q8_0",
+        "q2_k",
+        "q3_k_s",
+        "q3_k_m",
+        "q3_k_l",
+        "q4_k_s",
+        "q4_k_m",
+        "q5_k_s",
+        "q5_k_m",
+        "q6_k",
+    }:
+        raise ExportError("Unsupported GGUF quantization")
+    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,127}", project_name):
+        raise ExportError("GGUF project name must be a safe filename slug")
 
 
 def write_gguf_script(
@@ -25,6 +50,7 @@ def write_gguf_script(
 
     Returns the script path.
     """
+    validate_conversion(quantization, project_name)
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
 
@@ -44,10 +70,10 @@ def write_gguf_script(
 set -euo pipefail
 
 LLAMA_CPP="${{LLAMA_CPP_PATH:-./llama.cpp}}"
-MERGED_MODEL="{merged_model_dir.resolve()}"
-OUTPUT_DIR="{out_dir.resolve()}"
-QUANTIZATION="{quantization}"
-MODEL_NAME="{project_name}"
+MERGED_MODEL={shlex.quote(str(merged_model_dir.resolve()))}
+OUTPUT_DIR={shlex.quote(str(out_dir.resolve()))}
+QUANTIZATION={shlex.quote(quantization)}
+MODEL_NAME={shlex.quote(project_name)}
 
 if [ ! -f "$LLAMA_CPP/convert_hf_to_gguf.py" ]; then
   echo "ERROR: llama.cpp not found at $LLAMA_CPP"
@@ -60,6 +86,11 @@ python "$LLAMA_CPP/convert_hf_to_gguf.py" \\
   --outtype f16 \\
   --outfile "$OUTPUT_DIR/${{MODEL_NAME}}-f16.gguf" \\
   "$MERGED_MODEL"
+
+if [ "$QUANTIZATION" = f16 ]; then
+  echo "F16 output is ready."
+  exit 0
+fi
 
 echo "→ Quantizing to $QUANTIZATION..."
 "$LLAMA_CPP/llama-quantize" \\
@@ -95,6 +126,7 @@ def convert_to_gguf_direct(
     Returns the path to the quantized GGUF file.
     """
     merged_model_dir = Path(merged_model_dir).resolve()
+    validate_conversion(quantization, project_name)
     out_dir = Path(out_dir)
     llama_cpp_path = Path(llama_cpp_path)
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -104,12 +136,10 @@ def convert_to_gguf_direct(
 
     if not converter.exists():
         raise ExportError(f"convert_hf_to_gguf.py not found in: {llama_cpp_path}")
-    if not quantizer.exists():
+    if quantization != "f16" and not quantizer.exists():
         raise ExportError(f"llama-quantize not found in: {llama_cpp_path}")
 
-    python = shutil.which("python3") or shutil.which("python")
-    if not python:
-        raise ExportError("Python interpreter not found in PATH.")
+    python = sys.executable
 
     f16_path = out_dir / f"{project_name}-f16.gguf"
 
@@ -125,14 +155,24 @@ def convert_to_gguf_direct(
             str(merged_model_dir),
         ],
         check=True,
+        timeout=3600,
     )
+
+    if quantization == "f16":
+        if not f16_path.is_file() or not f16_path.stat().st_size:
+            raise ExportError("Converter produced no F16 output")
+        return f16_path
 
     # Step 2: Quantize
     quant_path = out_dir / f"{project_name}-{quantization}.gguf"
     subprocess.run(
         [str(quantizer), str(f16_path), str(quant_path), quantization],
         check=True,
+        timeout=3600,
     )
+
+    if not quant_path.is_file() or not quant_path.stat().st_size:
+        raise ExportError("Quantizer produced no output")
 
     # Remove intermediate F16 to save disk
     if f16_path.exists() and quant_path.exists():

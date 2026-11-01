@@ -1,0 +1,341 @@
+{
+  "time": "2026-10-20T16:34:02.770140+00:00",
+  "checks": [
+    {
+      "name": "native anonymous upload",
+      "status": 401
+    },
+    {
+      "name": "native legacy name traversal",
+      "status": 400
+    },
+    {
+      "name": "native rejects a.exe",
+      "status": 400
+    },
+    {
+      "name": "native rejects a.csv",
+      "status": 400
+    },
+    {
+      "name": "native rejects a.txt",
+      "status": 400
+    },
+    {
+      "name": "native rejects a.json",
+      "status": 400
+    },
+    {
+      "name": "native rejects a.jsonl",
+      "status": 400
+    },
+    {
+      "name": "native oversize",
+      "status": 413
+    },
+    {
+      "name": "native metadata-only traversal upload",
+      "status": 200
+    },
+    {
+      "name": "native persisted display metadata",
+      "status": 200
+    },
+    {
+      "name": "native JSON record preview",
+      "status": 200
+    },
+    {
+      "name": "native metadata cannot be previewed",
+      "status": 404
+    },
+    {
+      "name": "native real uploaded JSON compilation",
+      "status": 200
+    },
+    {
+      "name": "native delete uploaded source",
+      "status": 200
+    },
+    {
+      "name": "native mixed batch reports outcomes",
+      "status": 200
+    },
+    {
+      "name": "native batch source cleanup",
+      "status": 200
+    },
+    {
+      "name": "native batch source cleanup",
+      "status": 200
+    },
+    {
+      "name": "native SQL expression rejected x_param",
+      "status": 400
+    },
+    {
+      "name": "native SQL expression rejected y_param",
+      "status": 400
+    },
+    {
+      "name": "native SQL expression rejected metric",
+      "status": 400
+    },
+    {
+      "name": "native allowed analytics columns",
+      "status": 200
+    },
+    {
+      "name": "alternate anonymous upload",
+      "status": 401
+    },
+    {
+      "name": "alternate legacy name traversal",
+      "status": 400
+    },
+    {
+      "name": "alternate rejects a.exe",
+      "status": 400
+    },
+    {
+      "name": "alternate rejects a.csv",
+      "status": 400
+    },
+    {
+      "name": "alternate rejects a.txt",
+      "status": 400
+    },
+    {
+      "name": "alternate rejects a.json",
+      "status": 400
+    },
+    {
+      "name": "alternate rejects a.jsonl",
+      "status": 400
+    },
+    {
+      "name": "alternate oversize",
+      "status": 413
+    },
+    {
+      "name": "alternate metadata-only traversal upload",
+      "status": 200
+    },
+    {
+      "name": "alternate persisted display metadata",
+      "status": 200
+    },
+    {
+      "name": "alternate JSON record preview",
+      "status": 200
+    },
+    {
+      "name": "alternate metadata cannot be previewed",
+      "status": 404
+    },
+    {
+      "name": "alternate real uploaded JSON compilation",
+      "status": 200
+    },
+    {
+      "name": "alternate delete uploaded source",
+      "status": 200
+    },
+    {
+      "name": "alternate mixed batch reports outcomes",
+      "status": 200
+    },
+    {
+      "name": "alternate batch source cleanup",
+      "status": 200
+    },
+    {
+      "name": "alternate batch source cleanup",
+      "status": 200
+    },
+    {
+      "name": "alternate SQL expression rejected x_param",
+      "status": 400
+    },
+    {
+      "name": "alternate SQL expression rejected y_param",
+      "status": 400
+    },
+    {
+      "name": "alternate SQL expression rejected metric",
+      "status": 400
+    },
+    {
+      "name": "alternate allowed analytics columns",
+      "status": 200
+    },
+    {
+      "name": "compose anonymous upload",
+      "status": 401
+    },
+    {
+      "name": "compose legacy name traversal",
+      "status": 400
+    },
+    {
+      "name": "compose rejects a.exe",
+      "status": 400
+    },
+    {
+      "name": "compose rejects a.csv",
+      "status": 400
+    },
+    {
+      "name": "compose rejects a.txt",
+      "status": 400
+    },
+    {
+      "name": "compose rejects a.json",
+      "status": 400
+    },
+    {
+      "name": "compose rejects a.jsonl",
+      "status": 400
+    },
+    {
+      "name": "compose oversize",
+      "status": 413
+    },
+    {
+      "name": "compose metadata-only traversal upload",
+      "status": 200
+    },
+    {
+      "name": "compose persisted display metadata",
+      "status": 200
+    },
+    {
+      "name": "compose JSON record preview",
+      "status": 200
+    },
+    {
+      "name": "compose metadata cannot be previewed",
+      "status": 404
+    },
+    {
+      "name": "compose real uploaded JSON compilation",
+      "status": 200
+    },
+    {
+      "name": "compose delete uploaded source",
+      "status": 200
+    },
+    {
+      "name": "compose mixed batch reports outcomes",
+      "status": 200
+    },
+    {
+      "name": "compose batch source cleanup",
+      "status": 200
+    },
+    {
+      "name": "compose batch source cleanup",
+      "status": 200
+    },
+    {
+      "name": "compose SQL expression rejected x_param",
+      "status": 400
+    },
+    {
+      "name": "compose SQL expression rejected y_param",
+      "status": 400
+    },
+    {
+      "name": "compose SQL expression rejected metric",
+      "status": 400
+    },
+    {
+      "name": "compose allowed analytics columns",
+      "status": 200
+    }
+  ],
+  "raw_files_preserved": true,
+  "containers": [
+    {
+      "name": "moro-remediation-dashboard-1",
+      "image": "sha256:24bfc29750ee2cdab3ebac66edc1101491992e7ba65e51e92932f39ee391f954",
+      "running": true,
+      "ports": {
+        "8501/tcp": [
+          {
+            "HostIp": "127.0.0.1",
+            "HostPort": "18501"
+          }
+        ]
+      }
+    },
+    {
+      "name": "moro-remediation-gateway-1",
+      "image": "sha256:24bfc29750ee2cdab3ebac66edc1101491992e7ba65e51e92932f39ee391f954",
+      "running": true,
+      "ports": {
+        "8000/tcp": [
+          {
+            "HostIp": "127.0.0.1",
+            "HostPort": "18000"
+          }
+        ]
+      }
+    },
+    {
+      "name": "moro-remediation-webhook-1",
+      "image": "sha256:24bfc29750ee2cdab3ebac66edc1101491992e7ba65e51e92932f39ee391f954",
+      "running": true,
+      "ports": {
+        "8001/tcp": [
+          {
+            "HostIp": "127.0.0.1",
+            "HostPort": "18001"
+          }
+        ]
+      }
+    },
+    {
+      "name": "moro-remediation-ollama-1",
+      "image": "sha256:8262851b2846b87c649eddf3e76beb270c52f4d1bc94559f47efde16b0841551",
+      "running": true,
+      "ports": {
+        "11434/tcp": [
+          {
+            "HostIp": "127.0.0.1",
+            "HostPort": "11435"
+          }
+        ]
+      }
+    },
+    {
+      "name": "moro-remediation-flywheel-1",
+      "image": "sha256:24bfc29750ee2cdab3ebac66edc1101491992e7ba65e51e92932f39ee391f954",
+      "running": true,
+      "ports": {
+        "8000/tcp": null,
+        "8001/tcp": null,
+        "8501/tcp": null
+      }
+    },
+    {
+      "name": "moro-audit-20261002-cpu-dev",
+      "image": "sha256:3bbf7118922b3169edc7e4ca221abf42a847728c3d3a482733d277179c058ab8",
+      "running": true,
+      "ports": {}
+    },
+    {
+      "name": "moro-audit-20261002-ollama",
+      "image": "sha256:8262851b2846b87c649eddf3e76beb270c52f4d1bc94559f47efde16b0841551",
+      "running": true,
+      "ports": {
+        "11434/tcp": [
+          {
+            "HostIp": "127.0.0.1",
+            "HostPort": "11434"
+          }
+        ]
+      }
+    }
+  ]
+}

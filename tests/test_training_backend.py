@@ -78,6 +78,7 @@ def test_training_api_wiring_and_zero_losses(tmp_path, monkeypatch, quantization
         ),
         "trl": NS(SFTConfig=lambda **kw: kw, SFTTrainer=Trainer),
     }
+    fake_modules["trl"].SFTConfig.__dataclass_fields__ = {"warmup_steps": None}
     for name, module in fake_modules.items():
         monkeypatch.setitem(sys.modules, name, module)
     monkeypatch.setattr(hf_backend, "_require_imports", lambda cfg: None)

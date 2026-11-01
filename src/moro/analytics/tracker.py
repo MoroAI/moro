@@ -542,16 +542,19 @@ class ExperimentTracker:
         limit: int = 100,
     ) -> dict[str, Any]:
         """Analyze correlations between hyperparameters and a target metric."""
+        from moro.analytics.columns import resolve_metric
+
+        metric_col = resolve_metric(metric_name)
         conn = self._get_conn()
         try:
             rows = conn.execute(
                 f"""
-                SELECT e.experiment_id, e.{metric_name} as target_metric,
+                SELECT e.experiment_id, e.{metric_col} as target_metric,
                        h.learning_rate, h.batch_size, h.lora_r, h.lora_alpha,
                        h.epochs, h.warmup_ratio, h.max_seq_length
                 FROM experiments e
                 JOIN hyperparameters h ON e.experiment_id = h.experiment_id
-                WHERE e.{metric_name} IS NOT NULL
+                WHERE e.{metric_col} IS NOT NULL
                 ORDER BY e.created_at DESC
                 LIMIT ?
                 """,
@@ -560,10 +563,6 @@ class ExperimentTracker:
 
             if len(rows) < 3:
                 return {"error": "Not enough data for correlation analysis", "count": len(rows)}
-
-            target_values = [
-                float(row["target_metric"]) for row in rows if row["target_metric"] is not None
-            ]
 
             correlations: dict[str, float | None] = {}
             hp_keys = [
@@ -577,7 +576,13 @@ class ExperimentTracker:
             ]
 
             for key in hp_keys:
-                hp_values = [float(row[key]) for row in rows if row[key] is not None]
+                paired = [
+                    (float(row[key]), float(row["target_metric"]))
+                    for row in rows
+                    if row[key] is not None and row["target_metric"] is not None
+                ]
+                hp_values = [x for x, _ in paired]
+                target_values = [y for _, y in paired]
                 if len(hp_values) < 3:
                     continue
                 try:

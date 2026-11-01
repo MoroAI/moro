@@ -305,7 +305,7 @@ def score_row_epistemic(
         zlib_entropy=round(entropy, 4),
         max_ppmi=round(ppmi, 4),
         resnik_ic=round(resnik_ic, 4),
-        local_vector_density=0.5,  # MinHash placeholder — future enhancement
+        local_vector_density=None,  # Not measured
     )
 
     # 3. Aggregate quality score (5 components)

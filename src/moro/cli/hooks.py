@@ -44,7 +44,6 @@ def install_hooks(
     This ensures that every commit is automatically scanned for:
       • Hardcoded secrets (API keys, private keys, OAuth tokens)
       • PII leaks in dataset files (.jsonl, .csv, .json)
-      • Unsafe eval configurations
 
     Requires the pre-commit package. MoroAI will install it automatically
     if not already present.
@@ -55,6 +54,13 @@ def install_hooks(
         console.print(f"[bold red]Error:[/bold red] {exc}")
         raise typer.Exit(code=1)
 
+    existing_hook = root / ".git" / "hooks" / "pre-commit"
+    if existing_hook.exists() and not force:
+        console.print(
+            "[red]Existing pre-commit hook retained. Use --force only to replace it.[/red]"
+        )
+        raise typer.Exit(code=1)
+
     pre_commit_config = root / ".pre-commit-config.yaml"
     if not pre_commit_config.exists():
         default_config = (
@@ -63,7 +69,7 @@ def install_hooks(
             "    hooks:\n"
             "      - id: moro-safety-check\n"
             "        name: MoroAI Safety & Secret Scanner\n"
-            "        entry: python scripts/hooks/pre_commit_safety_check.py\n"
+            "        entry: python -m moro.security.hook\n"
             "        language: system\n"
             "        pass_filenames: false\n"
             "        always_run: true\n"
@@ -76,9 +82,9 @@ def install_hooks(
     if not safety_script.exists():
         scripts_dir.mkdir(parents=True, exist_ok=True)
         # Create minimal self-contained scanner if not already copied
-        src_script = (
-            Path(__file__).resolve().parents[3] / "scripts" / "hooks" / "pre_commit_safety_check.py"
-        )
+        from moro.security import hook
+
+        src_script = Path(hook.__file__)
         if src_script.exists():
             safety_script.write_text(src_script.read_text(encoding="utf-8"), encoding="utf-8")
 
@@ -103,7 +109,7 @@ def install_hooks(
         if git_hooks_dir.exists():
             direct_hook = git_hooks_dir / "pre-commit"
             direct_hook.write_text(
-                "#!/bin/sh\npython scripts/hooks/pre_commit_safety_check.py\n",
+                "#!/bin/sh\n# Installed by MoroAI\npython -m moro.security.hook\n",
                 encoding="utf-8",
             )
             direct_hook.chmod(0o755)
@@ -179,7 +185,7 @@ def check_hooks(
     # Import and run the scanner directly
     sys.path.insert(0, str(root))
     try:
-        from scripts.hooks.pre_commit_safety_check import check_pii_in_data, check_secrets
+        from moro.security.hook import check_pii_in_data, check_secrets
     except ImportError:
         console.print(
             "[bold red]Error:[/bold red] Cannot import safety check script. "
@@ -225,6 +231,14 @@ def uninstall_hooks() -> None:
         console.print(f"[bold red]Error:[/bold red] {exc}")
         raise typer.Exit(code=1)
 
+    direct_hook = root / ".git" / "hooks" / "pre-commit"
+    if (
+        direct_hook.exists()
+        and "MoroAI" not in direct_hook.read_text()
+        and "moro" not in direct_hook.read_text()
+    ):
+        console.print("[red]Hook is not identified as MoroAI-owned; retained.[/red]")
+        raise typer.Exit(code=1)
     uninstalled = False
     try:
         result = subprocess.run(

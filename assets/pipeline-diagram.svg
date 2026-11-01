@@ -103,7 +103,7 @@
     
     <text x="18" y="72" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="11" fill="#e2e8f0">✓ VRAM Heuristic Engine</text>
     <text x="18" y="90" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="11" fill="#e2e8f0">✓ QLoRA 4-bit / 8-bit / 16-bit</text>
-    <text x="18" y="110" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="11" fill="#10b981">✓ 5-Step OOM Self-Heal</text>
+    <text x="18" y="110" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="11" fill="#10b981">✓ 1-Shot OOM Restart</text>
     <text x="18" y="130" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="11" fill="#94a3b8">✓ Loss &amp; Gradient Monitor</text>
     <text x="18" y="152" font-family="monospace" font-size="11" fill="#60a5fa">$ moro train</text>
   </g>

@@ -9,9 +9,10 @@ Provides endpoints for:
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from moro.dashboard.utils import get_project_root
@@ -36,9 +37,6 @@ class EvalResultItem(BaseModel):
     failed_cases: int
     pass_rate: float
     status: str = "completed"
-
-
-_eval_cache: dict[str, dict] = {}
 
 
 @router.get("/suites")
@@ -74,61 +72,35 @@ async def run_evaluation(request: EvalRunRequest) -> EvalResultItem:
 
     harness = EvalHarness(project_root)
 
-    # If suite file doesn't exist, create a temporary standard suite
-    if not suite_path.exists():
-        import yaml
+    root = project_root.resolve()
+    if not suite_path.resolve().is_relative_to(root) or suite_path.is_symlink():
+        raise HTTPException(422, "Evaluation suite must be inside the project")
+    if not suite_path.is_file():
+        raise HTTPException(404, "Evaluation suite not found")
+    from moro.core.errors import ConfigError, DependencyError, EvalError, ExportError
 
-        sample_suite = {
-            "name": "sample-eval-suite",
-            "cases": [
-                {
-                    "id": "c1",
-                    "messages": [{"role": "user", "content": "Explain LoRA."}],
-                    "expect": {"contains": ["rank", "adapter"]},
-                },
-                {
-                    "id": "c2",
-                    "messages": [{"role": "user", "content": "What is 2+2?"}],
-                    "expect": {"contains": ["4"]},
-                },
-                {
-                    "id": "c3",
-                    "messages": [{"role": "user", "content": "Summarize privacy mode."}],
-                    "expect": {"contains": ["local"]},
-                },
-            ],
-        }
-        suite_path.parent.mkdir(parents=True, exist_ok=True)
-        with open(suite_path, "w", encoding="utf-8") as f:
-            yaml.dump(sample_suite, f)
-
-    res = harness.run_evaluation(run_id=request.run_id, eval_suite_path=suite_path)
-    _eval_cache[request.run_id] = res
-
-    return EvalResultItem(
-        run_id=request.run_id,
-        suite_name=res.get("suite_name", "standard"),
-        total_cases=res.get("total_cases", 3),
-        passed_cases=res.get("passed_cases", 3),
-        failed_cases=res.get("failed_cases", 0),
-        pass_rate=res.get("pass_rate", 1.0),
-        status="completed",
-    )
+    try:
+        res = await harness.run_evaluation_async(request.run_id, suite_path)
+    except DependencyError as exc:
+        raise HTTPException(503, str(exc)) from exc
+    except (ConfigError, EvalError, ExportError) as exc:
+        raise HTTPException(422, str(exc)) from exc
+    return EvalResultItem(**res)
 
 
 @router.get("/results/{run_id}")
 async def get_eval_results(run_id: str) -> dict:
     """Get evaluation results for a training run."""
-    if run_id in _eval_cache:
-        return _eval_cache[run_id]
+    from moro.storage import db
 
-    # Return standard verified benchmark result if not cached
-    return {
-        "run_id": run_id,
-        "suite_name": "sample-eval-suite",
-        "total_cases": 10,
-        "passed_cases": 9,
-        "failed_cases": 1,
-        "pass_rate": 0.90,
-        "status": "completed",
-    }
+    conn = db.get_connection(get_project_root())
+    try:
+        row = conn.execute(
+            "SELECT result_json FROM eval_runs WHERE run_id=? ORDER BY created_at DESC LIMIT 1",
+            (run_id,),
+        ).fetchone()
+    finally:
+        conn.close()
+    if row is None:
+        raise HTTPException(404, "No recorded evaluation for this run")
+    return json.loads(row["result_json"])

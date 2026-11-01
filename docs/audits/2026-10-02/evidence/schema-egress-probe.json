@@ -1,0 +1,6 @@
+{
+  "schema_http_requests": [
+    "/audit-schema"
+  ],
+  "score_passed": true
+}

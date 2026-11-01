@@ -1,0 +1,124 @@
+[
+  {
+    "args": [
+      "import",
+      "/tmp/moro-audit-20261002/dev/data/raw/audit.jsonl"
+    ],
+    "exit_code": 0,
+    "stdout": "\u2713 Registered dataset source: audit (id: src_20261002122331_97c9)\n\nNext step: Run moro data build to normalize and split the dataset.\n",
+    "stderr": ""
+  },
+  {
+    "args": [
+      "data",
+      "build"
+    ],
+    "exit_code": 0,
+    "stdout": "\u2192  Reading from: /private/tmp/moro-audit-20261002/dev/data/raw/audit.jsonl\n\u2192  Ingested 20 raw rows\n\u2192  Normalized: 20 valid, 0 invalid\n\u2192  After cleaning: 20 rows (0 exact dups, 0 near-dups removed)\n\u26a0  20 rows flagged for possible PII\nDataset version: ds_4d67b0007d8b431eb1d6807078175829\n\n\u2713 Dataset built successfully! 20 rows across train=16 / val=2 / eval=2\n  Report saved to: \n/private/tmp/moro-audit-20261002/dev/data/versions/ds_4d67b0007d8b431eb1d6807078\n175829/report.json\n\nNext steps: Run moro data report or moro recipe suggest\n",
+    "stderr": ""
+  },
+  {
+    "args": [
+      "data",
+      "report",
+      "--format",
+      "json"
+    ],
+    "exit_code": 0,
+    "stdout": "{\n  \"rows_total\": 20,\n  \"rows_valid\": 20,\n  \"rows_invalid\": 0,\n  \"rows_deduplicated\": 0,\n  \"rows_near_duplicate\": 0,\n  \"train_rows\": 16,\n  \"validation_rows\": 2,\n  \"eval_rows\": 2,\n  \"avg_tokens\": 18.0,\n  \"p50_tokens\": 18.0,\n  \"p95_tokens\": 18.0,\n  \"max_tokens\": 18,\n  \"avg_quality_score\": 0.7857,\n  \"min_quality_score\": 0.7857,\n  \"quality_score_p50\": 0.7857,\n  \"privacy_warning_count\": 20,\n  \"warnings\": [\n    \"20 rows have possible PII/secrets \u2014 review before training.\"\n  ],\n  \"classification_counts\": {\n    \"NOISY_OUTLIER\": 20\n  },\n  \"mi_guard_count\": 0,\n  \"avg_zlib_entropy\": 0.9749,\n  \"avg_ppmi\": 0.0,\n  \"noisy_outlier_count\": 20,\n  \"boilerplate_count\": 0,\n  \"rare_edge_case_count\": 0\n}\n",
+    "stderr": ""
+  },
+  {
+    "args": [
+      "train",
+      "--dry-run"
+    ],
+    "exit_code": 0,
+    "stdout": "\u2192  Validating config and dataset\u2026\n\u2192  Estimated VRAM: 2.2 GB\n\n\u2713 Dry-run complete \u2014 no training performed.\n  Model:         Qwen/Qwen2.5-1.5B-Instruct\n  Quantization:  nf4\n  Est. VRAM:     2.2 GB\n",
+    "stderr": ""
+  },
+  {
+    "args": [
+      "recipe",
+      "suggest"
+    ],
+    "exit_code": 0,
+    "stdout": "                           Suggested Training Recipe                            \n\u250f\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2533\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2513\n\u2503 Setting                \u2503 Value                                               \u2503\n\u2521\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2547\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2529\n\u2502 Model                  \u2502 Qwen/Qwen2.5-1.5B-Instruct                          \u2502\n\u2502 Hardware tier          \u2502 cpu_only                                            \u2502\n\u2502 Quantization           \u2502 none                                                \u2502\n\u2502 LoRA rank (r)          \u2502 16                                                  \u2502\n\u2502 LoRA alpha             \u2502 32                                                  \u2502\n\u2502 Target modules         \u2502 q_proj, k_proj, v_proj, o_proj, gate_proj, up_proj, \u2502\n\u2502                        \u2502 down_proj                                           \u2502\n\u2502 Max sequence length    \u2502 1024                                                \u2502\n\u2502 Batch size             \u2502 1                                                   \u2502\n\u2502 Gradient accumulation  \u2502 16                                                  \u2502\n\u2502 Effective batch size   \u2502 16                                                  \u2502\n\u2502 Optimizer              \u2502 adamw_torch                                         \u2502\n\u2502 Gradient checkpointing \u2502 True                                                \u2502\n\u2502 Precision              \u2502 fp32                                                \u2502\n\u2502 Memory fit             \u2502 unknown                                             \u2502\n\u2502 Estimated memory (GiB) \u2502 8.54                                                \u2502\n\u2502 Parameter source       \u2502 model_name                                          \u2502\n\u2502 Confidence             \u2502 low                                                 \u2502\n\u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2534\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518\n  Preserved the selected model; no model substitution is performed.\n  Non-CUDA settings use unquantized weights, adamw_torch, and fp32.\n  Parameter count from model_name: 1.5 billion.\n\nWarnings:\n  \u26a0  Memory estimates are uncalibrated heuristics, not measured hardware \nvalidation.\n  \u26a0  CPU/MPS memory fit is unverified; the memory estimate is not dedicated \nVRAM.\n\n    Catastrophic Forgetting Guard    \n\u250f\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2533\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2513\n\u2503 Parameter                \u2503  Value \u2503\n\u2521\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2547\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2529\n\u2502 Domain data ratio (\u03b1)    \u2502  65.0% \u2502\n\u2502 General replay ratio (\u03b2) \u2502  35.0% \u2502\n\u2502 KL penalty \u03bb             \u2502 0.0620 \u2502\n\u2502 Model size               \u2502   1.5B \u2502\n\u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2534\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518\n  Model 1.5B \u2192 scale_factor=0.30. Jargon divergence=0.60 \u2192 \u03b2_raw=0.40, \n\u03b2_clamped=0.35. domain_ratio=0.65, replay_ratio=0.35, kl_lambda=0.0620.\n\nApply this recipe: moro recipe apply then moro train\n",
+    "stderr": ""
+  },
+  {
+    "args": [
+      "validate"
+    ],
+    "exit_code": 0,
+    "stdout": "                      MoroAI Pre-Flight Validation Report                       \n\u250f\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2533\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2533\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2513\n\u2503 Pre-Flight Check                 \u2503 Status \u2503 Details                          \u2503\n\u2521\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2547\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2547\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2529\n\u2502 Model Identifier                 \u2502 \u2713 PASS \u2502 Valid HuggingFace repository:    \u2502\n\u2502                                  \u2502        \u2502 Qwen/Qwen2.5-1.5B-Instruct       \u2502\n\u2502 Hardware Compatibility           \u2502 \u2713 PASS \u2502 CPU/MPS mode with 64.0 GB host   \u2502\n\u2502                                  \u2502        \u2502 RAM (Estimated: 3.1 GB).         \u2502\n\u2502 Dataset Source                   \u2502 \u2713 PASS \u2502 Dataset source file exists:      \u2502\n\u2502                                  \u2502        \u2502 audit.jsonl                      \u2502\n\u2502 Dataset Split Ratios             \u2502 \u2713 PASS \u2502 Split allocation: Train=80.0%,   \u2502\n\u2502                                  \u2502        \u2502 Val=10.0%, Eval=10.0%            \u2502\n\u2502 Eval Suite:                      \u2502 \u2713 PASS \u2502 Valid evaluation suite schema (3 \u2502\n\u2502 support-golden-v1.yaml           \u2502        \u2502 cases).                          \u2502\n\u2502 Safety Governance                \u2502 \u2713 PASS \u2502 Release safety gate enabled      \u2502\n\u2502                                  \u2502        \u2502 (requires PII clean & eval       \u2502\n\u2502                                  \u2502        \u2502 pass).                           \u2502\n\u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2534\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2534\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518\n\n\u2713 All pre-flight checks passed! Project is 100% ready for training and release.\n",
+    "stderr": ""
+  },
+  {
+    "args": [
+      "flywheel",
+      "run",
+      "--json"
+    ],
+    "exit_code": 0,
+    "stdout": "{\n  \"epoch_id\": \"epoch_20261002_122333_919c2a\",\n  \"logs_ingested\": 1,\n  \"pairs_generated\": 1,\n  \"pairs_by_type\": {\n    \"EXPLICIT_HUMAN_CORRECTION\": 1\n  },\n  \"initial_loss\": null,\n  \"final_loss\": null,\n  \"deployed\": false,\n  \"dataset_path\": \"/private/tmp/moro-audit-20261002/dev/data/dpo/dpo_epoch_20261002_122333_919c2a.jsonl\",\n  \"completed_at\": \"2026-10-02T12:23:33.690847+00:00\"\n}\n",
+    "stderr": ""
+  },
+  {
+    "args": [
+      "services",
+      "status",
+      "--json"
+    ],
+    "exit_code": 0,
+    "stdout": "[\n  {\n    \"name\": \"dashboard\",\n    \"type\": \"ui\",\n    \"port\": 8765,\n    \"url\": \"http://localhost:8765\",\n    \"running\": true,\n    \"healthy\": true,\n    \"pid\": null,\n    \"description\": \"Mission Control Web Operations Center\"\n  },\n  {\n    \"name\": \"ollama\",\n    \"type\": \"docker\",\n    \"port\": 11434,\n    \"url\": \"http://localhost:11434\",\n    \"running\": true,\n    \"healthy\": true,\n    \"pid\": null,\n    \"description\": \"Ollama LLM Engine & API\"\n  },\n  {\n    \"name\": \"webhook\",\n    \"type\": \"ingestion\",\n    \"port\": 8001,\n    \"url\": \"http://localhost:8001\",\n    \"running\": true,\n    \"healthy\": true,\n    \"pid\": null,\n    \"description\": \"Production Telemetry & Log Receiver\"\n  },\n  {\n    \"name\": \"gateway\",\n    \"type\": \"proxy\",\n    \"port\": 8000,\n    \"url\": \"http://localhost:8000\",\n    \"running\": true,\n    \"healthy\": true,\n    \"pid\": null,\n    \"description\": \"Feedback Gateway Proxy\"\n  }\n]\n",
+    "stderr": ""
+  },
+  {
+    "args": [
+      "doctor",
+      "--privacy"
+    ],
+    "exit_code": 2,
+    "stdout": "",
+    "stderr": "Usage: python -m moro.main doctor [OPTIONS]\nTry 'python -m moro.main doctor --help' for help.\n\u256d\u2500 Error \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u256e\n\u2502 No such option: --privacy                                                    \u2502\n\u2570\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u256f\n"
+  },
+  {
+    "args": [
+      "recipe",
+      "generate"
+    ],
+    "exit_code": 2,
+    "stdout": "",
+    "stderr": "Usage: python -m moro.main recipe [OPTIONS] COMMAND [ARGS]...\nTry 'python -m moro.main recipe --help' for help.\n\u256d\u2500 Error \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u256e\n\u2502 No such command 'generate'.                                                  \u2502\n\u2570\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u256f\n"
+  },
+  {
+    "args": [
+      "release",
+      "verify"
+    ],
+    "exit_code": 2,
+    "stdout": "",
+    "stderr": "Usage: python -m moro.main [OPTIONS] COMMAND [ARGS]...\nTry 'python -m moro.main --help' for help.\n\u256d\u2500 Error \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u256e\n\u2502 No such command 'release'.                                                   \u2502\n\u2570\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u256f\n"
+  },
+  {
+    "args": [
+      "data",
+      "build",
+      "--mi-guard-threshold",
+      "0.85"
+    ],
+    "exit_code": 2,
+    "stdout": "",
+    "stderr": "Usage: python -m moro.main data build [OPTIONS]\nTry 'python -m moro.main data build --help' for help.\n\u256d\u2500 Error \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u256e\n\u2502 No such option: --mi-guard-threshold                                         \u2502\n\u2570\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u256f\n"
+  },
+  {
+    "args": [
+      "train",
+      "--auto-heal"
+    ],
+    "exit_code": 2,
+    "stdout": "",
+    "stderr": "Usage: python -m moro.main train [OPTIONS]\nTry 'python -m moro.main train --help' for help.\n\u256d\u2500 Error \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u256e\n\u2502 No such option: --auto-heal                                                  \u2502\n\u2570\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u256f\n"
+  }
+]

@@ -108,3 +108,91 @@ def test_tiny_split_rejected():
 
     with pytest.raises(DatasetError, match="at least"):
         split_rows([object()])
+
+
+def test_sdk_and_cli_share_absolute_relative_source_identity(tmp_project, sample_jsonl):
+    import json
+
+    from moro.config.loader import load_config
+    from moro.data.compiler import DataCompiler
+    from moro.data.versions import select_snapshot
+
+    cfg = load_config(tmp_project / "moro.yaml")
+    source = tmp_project / cfg.dataset.source
+    source.parent.mkdir(parents=True, exist_ok=True)
+    source.write_bytes(sample_jsonl.read_bytes())
+    cfg.dataset.min_quality_score = 0
+    (tmp_project / "moro.yaml").write_text(cfg.model_dump_json())
+    version = DataCompiler(tmp_project).compile_dataset(source.resolve())
+    assert select_snapshot(tmp_project, cfg)[0]["version_id"] == version
+    assert (
+        json.loads((tmp_project / "data/versions" / version / "manifest.json").read_text())[
+            "dataset_version_id"
+        ]
+        == version
+    )
+
+
+def test_glossary_changes_invalidate_dataset_cache(tmp_project, sample_jsonl):
+    from moro.cli.data import compile_project
+    from moro.config.loader import load_config
+    from moro.data.versions import select_snapshot
+
+    cfg = load_config(tmp_project / "moro.yaml")
+    source = tmp_project / cfg.dataset.source
+    source.parent.mkdir(parents=True, exist_ok=True)
+    source.write_bytes(sample_jsonl.read_bytes())
+    cfg.dataset.min_quality_score = 0
+    glossary = tmp_project / "domain_glossary.txt"
+    glossary.write_text("first glossary")
+    compile_project(tmp_project, cfg)
+    assert select_snapshot(tmp_project, cfg)
+    glossary.write_text("changed glossary")
+    assert select_snapshot(tmp_project, cfg) is None
+
+
+def test_splits_keep_duplicates_together_and_ignore_source_order():
+    from moro.data.models import DatasetMessage, DatasetRow
+    from moro.data.splitter import split_rows
+
+    rows = [
+        DatasetRow(
+            id=str(i),
+            source="fixture",
+            messages=[
+                DatasetMessage(role="user", content=f"question {i // 2}"),
+                DatasetMessage(role="assistant", content=f"answer {i // 2}"),
+            ],
+        )
+        for i in range(12)
+    ]
+    first = split_rows(rows, seed=7)
+    second = split_rows(list(reversed(rows)), seed=7)
+    assert [{r.id for r in split} for split in first] == [{r.id for r in split} for split in second]
+    sets = [{r.messages[0].content for r in split} for split in first]
+    assert not (sets[0] & sets[1] or sets[0] & sets[2] or sets[1] & sets[2])
+
+
+def test_explicit_document_groups_stay_together_and_require_provenance():
+    from moro.core.errors import DatasetError
+    from moro.data.models import DatasetMessage, DatasetRow, DatasetRowMetadata
+    from moro.data.splitter import split_rows
+
+    rows = [
+        DatasetRow(
+            id=str(i),
+            source="fixture",
+            messages=[
+                DatasetMessage(role="user", content=f"q{i}"),
+                DatasetMessage(role="assistant", content=f"a{i}"),
+            ],
+            metadata=DatasetRowMetadata(group_id=f"document-{i // 3}"),
+        )
+        for i in range(12)
+    ]
+    splits = split_rows(rows, group_by="group_id")
+    groups = [{r.metadata.group_id for r in split} for split in splits]
+    assert not (groups[0] & groups[1] or groups[0] & groups[2] or groups[1] & groups[2])
+    rows[0].metadata.group_id = None
+    with pytest.raises(DatasetError, match="group_id"):
+        split_rows(rows, group_by="group_id")

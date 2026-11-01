@@ -77,7 +77,7 @@ moro train
 ```bash
 # In another terminal
 moro dashboard serve
-# Open http://localhost:8501 or http://localhost:8765
+# Open http://localhost:8501 (canonical dashboard port; moro ui uses the same default)
 ```
 
 ## Phase 4: Evaluation
@@ -158,7 +158,7 @@ moro services supervise &
 
 ### 7.1 Access Mission Control
 
-Open http://localhost:8501 or http://localhost:8765 in your browser.
+Open http://localhost:8501 in your browser.
 
 ### 7.2 View Logs
 

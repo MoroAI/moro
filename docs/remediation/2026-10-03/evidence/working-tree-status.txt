@@ -1,0 +1,79 @@
+ M .github/workflows/ci.yml
+ M .github/workflows/release.yml
+ M Dockerfile
+ M README.md
+ M docker-compose.yml
+ M pyproject.toml
+ M scripts/hooks/pre_commit_safety_check.py
+ M src/moro/analytics/schema.py
+ M src/moro/analytics/tracker.py
+ M src/moro/analytics/visualizations.py
+ M src/moro/cli/data.py
+ M src/moro/cli/deploy.py
+ M src/moro/cli/export.py
+ M src/moro/cli/hooks.py
+ M src/moro/cli/train.py
+ M src/moro/config/models.py
+ M src/moro/dashboard/api/datasets.py
+ M src/moro/dashboard/api/deployment.py
+ M src/moro/dashboard/api/evaluation.py
+ M src/moro/dashboard/api/models.py
+ M src/moro/dashboard/api/system.py
+ M src/moro/dashboard/api/training.py
+ M src/moro/dashboard/gateway.py
+ M src/moro/dashboard/mission_control.py
+ M src/moro/dashboard/templates/mission_control.html
+ M src/moro/data/clean.py
+ M src/moro/data/compiler.py
+ M src/moro/data/models.py
+ M src/moro/data/normalize.py
+ M src/moro/data/privacy.py
+ M src/moro/data/quality.py
+ M src/moro/data/splitter.py
+ M src/moro/data/versions.py
+ M src/moro/deploy/manager.py
+ M src/moro/eval/harness.py
+ M src/moro/eval/robustness.py
+ M src/moro/eval/scorers.py
+ M src/moro/export/gguf.py
+ M src/moro/export/ollama.py
+ M src/moro/flywheel/extractors/deterministic_extractor.py
+ M src/moro/flywheel/ingestors/sqlite_ingestor.py
+ M src/moro/flywheel/orchestrator.py
+ M src/moro/flywheel/webhook/receiver.py
+ M src/moro/recipes/engine.py
+ M src/moro/recipes/rules.py
+ M src/moro/release/manager.py
+ M src/moro/runtime/orchestrator.py
+ M src/moro/state/manager.py
+ M src/moro/training/async_runner.py
+ M src/moro/training/backend.py
+ M src/moro/training/hf_backend.py
+ M src/moro/training/runner.py
+ M src/moro/validation/engine.py
+ M tests/benchmarks/test_performance.py
+ M tests/integration/test_complete_pipeline.py
+ M tests/integration/test_moro_full_lifecycle_e2e.py
+ M tests/integration/test_training_cpu.py
+ M tests/test_analytics.py
+ M tests/test_dashboard_interactive.py
+ M tests/test_dataset_versions.py
+ M tests/test_eval_perturbations.py
+ M tests/test_export_eligibility.py
+ M tests/test_flywheel_cli.py
+ M tests/test_flywheel_extractor.py
+ M tests/test_flywheel_orchestrator.py
+ M tests/test_flywheel_webhook.py
+ M tests/test_hooks.py
+ M tests/test_mvp_pipeline.py
+ M tests/test_state_manager.py
+ M tests/test_training_backend.py
+?? .dockerignore
+?? docs/audits/
+?? docs/remediation/
+?? src/moro/dashboard/security.py
+?? src/moro/dashboard/static/
+?? src/moro/dashboard/uploads.py
+?? src/moro/security/
+?? src/moro/training/locking.py
+?? tests/test_security_boundaries.py

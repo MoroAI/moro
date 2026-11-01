@@ -6,8 +6,7 @@ on:
       - "v*"
 
 permissions:
-  contents: write
-  id-token: write
+  contents: read
 
 jobs:
   test:
@@ -22,7 +21,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install -e ".[dev]"
+          pip install -c requirements/eval.lock -e ".[dev,eval]"
 
       - name: Run tests
         run: pytest tests/ -v
@@ -31,6 +30,9 @@ jobs:
     needs: test
     runs-on: ubuntu-latest
     environment: pypi
+    permissions:
+      contents: write
+      id-token: write
 
     steps:
       - uses: actions/checkout@v4
@@ -46,9 +48,12 @@ jobs:
       - name: Build package
         run: python -m build
 
+      - name: Validate distribution metadata
+        run: python -m twine check dist/*
+
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
-        continue-on-error: true
+
 
       - name: Create GitHub Release
         env:

@@ -30,9 +30,9 @@ class QualityScoreBreakdown(BaseModel):
 class DomainQualityScores(BaseModel):
     """Domain-specific trust dimensions."""
 
-    factual_grounding_score: float = Field(default=1.0, ge=0.0, le=1.0)
-    logical_coherence_score: float = Field(default=1.0, ge=0.0, le=1.0)
-    instruction_strictness_score: float = Field(default=1.0, ge=0.0, le=1.0)
+    factual_grounding_score: float | None = Field(default=None, ge=0.0, le=1.0)
+    logical_coherence_score: float | None = Field(default=None, ge=0.0, le=1.0)
+    instruction_strictness_score: float | None = Field(default=None, ge=0.0, le=1.0)
 
 
 class InformationTheoreticMetrics(BaseModel):
@@ -52,8 +52,8 @@ class InformationTheoreticMetrics(BaseModel):
         default=0.0, ge=0.0, description="Domain glossary intersection density (PPMI proxy)"
     )
     resnik_ic: float = Field(default=0.0, ge=0.0, description="Rarest-token IDF (Resnik IC proxy)")
-    local_vector_density: float = Field(
-        default=0.5, ge=0.0, le=1.0, description="MinHash Jaccard density (outlier proxy)"
+    local_vector_density: float | None = Field(
+        default=None, ge=0.0, le=1.0, description="MinHash Jaccard density (outlier proxy)"
     )
 
     @property
@@ -104,8 +104,13 @@ class DatasetRowMetadata(BaseModel):
     pii_detected: bool = False
     privacy_flags: list[str] = Field(default_factory=list)
     duplicate_group: str | None = None
-    authority_tier: Literal["official", "draft", "superseded"] | None = "official"
+    authority_tier: Literal["official", "draft", "superseded"] | None = None
     jurisdiction: str | None = None
+
+    group_id: str | None = None
+    source_file: str | None = None
+    line_number: int | None = None
+    format: str | None = None
 
     # Raw extra fields for backward compatibility
     extra: dict[str, Any] = Field(default_factory=dict)

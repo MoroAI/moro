@@ -1,0 +1,34 @@
+                                                                                
+ Usage: python -m moro.main [OPTIONS] COMMAND [ARGS]...                         
+                                                                                
+ MoroAI — local-first model adaptation foundry.                                 
+                                                                                
+╭─ Options ────────────────────────────────────────────────────────────────────╮
+│ --version  -v        Show MoroAI version.                                    │
+│ --help               Show this message and exit.                             │
+╰──────────────────────────────────────────────────────────────────────────────╯
+╭─ Commands ───────────────────────────────────────────────────────────────────╮
+│ init       Initialize a new MoroAI project.                                  │
+│ status     Show current project status.                                      │
+│ doctor     Check environment and hardware readiness.                         │
+│ import     Import raw dataset files into the project.                        │
+│ train      Run fine-tuning.                                                  │
+│ export     Export run artifacts.                                             │
+│ deploy     Prepare local deployment artifacts.                               │
+│ diagnose   Diagnose failures and suggest fixes.                              │
+│ validate   Run pre-flight validation on project config and environment.      │
+│ ui         Launch the MoroAI Mission Control Web Dashboard.                  │
+│ version    Show MoroAI version.                                              │
+│ data       Dataset operations.                                               │
+│ recipe     Recipe suggestion.                                                │
+│ runs       Inspect recorded training runs.                                   │
+│ eval       Evaluation operations.                                            │
+│ hooks      Git hooks and repository governance commands.                     │
+│ guard      PII and secrets scanning and redaction.                           │
+│ flywheel   Continuous learning DPO flywheel operations.                      │
+│ registry   Model registry and lineage tracking.                              │
+│ services   Background services management (Dashboard, Ollama, Webhook).      │
+│ analytics  Experiment tracking and visual analytics commands.                │
+│ dashboard  MoroAI Mission Control Dashboard management.                      │
+╰──────────────────────────────────────────────────────────────────────────────╯
+

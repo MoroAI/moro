@@ -17,12 +17,41 @@ def source_fingerprint(source: Path) -> str:
     return sha256_directory(source) if source.is_dir() else sha256_file(source)
 
 
-def build_key(config: MoroConfig, source: Path, fingerprint: str, limit: int | None) -> str:
+def glossary_path(config: MoroConfig, root: Path) -> Path:
+    configured = config.dataset.domain_glossary
+    return (
+        (configured if configured.is_absolute() else root / configured)
+        if configured
+        else root / "domain_glossary.txt"
+    )
+
+
+def build_key(
+    config: MoroConfig, source: Path, fingerprint: str, limit: int | None, root: Path | None = None
+) -> str:
+    glossary = glossary_path(config, root or source.parent)
+    module_root = Path(__file__).parent
+    implementation = {
+        name: sha256_file(module_root / name)
+        for name in (
+            "ingest.py",
+            "normalize.py",
+            "clean.py",
+            "quality.py",
+            "privacy.py",
+            "splitter.py",
+            "models.py",
+            "versions.py",
+        )
+    }
+    implementation["cli/data.py"] = sha256_file(module_root.parent / "cli/data.py")
     return config_snapshot_hash(
         json.dumps(
             {
-                "compiler": 1,
-                "dataset": config.dataset.model_dump(mode="json"),
+                "compiler": 2,
+                "implementation": implementation,
+                "glossary_sha256": sha256_file(glossary) if glossary.is_file() else None,
+                "dataset": config.dataset.model_dump(mode="json", exclude={"source"}),
                 "source": str(source.resolve()),
                 "sha256": fingerprint,
                 "seed": config.project.seed,
@@ -58,7 +87,7 @@ def select_snapshot(root: Path, config: MoroConfig, limit: int | None = None):
         fingerprint = source_fingerprint(source)
     except (OSError, ValueError) as exc:
         raise DatasetError(f"Cannot fingerprint dataset source: {exc}") from exc
-    key = build_key(config, source, fingerprint, limit)
+    key = build_key(config, source, fingerprint, limit, root)
     conn = db.get_connection(root)
     try:
         row = conn.execute(
@@ -75,7 +104,9 @@ def select_snapshot(root: Path, config: MoroConfig, limit: int | None = None):
     return None
 
 
-def publish_snapshot(root, config, source, fingerprint, limit, rows, splits, stats, rejected):
+def publish_snapshot(
+    root, config, source, fingerprint, limit, rows, splits, stats, rejected, expected_build_key=None
+):
     version_id = "ds_" + uuid4().hex
     versions = root / "data" / "versions"
     versions.mkdir(parents=True, exist_ok=True)
@@ -104,12 +135,16 @@ def publish_snapshot(root, config, source, fingerprint, limit, rows, splits, sta
                 "dataset_version_id": version_id,
                 "source": str(source.resolve()),
                 "source_sha256": fingerprint,
-                "build_key": build_key(config, source, fingerprint, limit),
+                "build_key": build_key(config, source, fingerprint, limit, root),
                 "dataset": config.dataset.model_dump(mode="json"),
                 "seed": config.project.seed,
                 "limit": limit,
                 "files": {p.name: sha256_file(p) for p in stage.iterdir()},
             }
+            if expected_build_key is not None and manifest["build_key"] != expected_build_key:
+                raise DatasetError(
+                    "Compiler or glossary changed during build; retry with stable inputs."
+                )
             manifest_path = stage / "manifest.json"
             manifest_path.write_text(json.dumps(manifest, indent=2, ensure_ascii=False))
             if source_fingerprint(source) != fingerprint:

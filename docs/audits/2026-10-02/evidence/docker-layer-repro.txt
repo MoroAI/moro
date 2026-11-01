@@ -1,0 +1,33 @@
+Using Python 3.12.11 environment at: /tmp/moro-audit-20261002/docker-layer-env
+Resolved 1 package in 1ms
+   Building moroai @ file:///tmp/moro-audit-20261002/docker-layer
+  × Failed to build `moroai @ file:///tmp/moro-audit-20261002/docker-layer`
+  ├─▶ The build backend returned an error
+  ╰─▶ Call to `setuptools.build_meta.build_editable` failed (exit status: 1)
+
+      [stdout]
+      running egg_info
+
+      [stderr]
+      /Users/mac/.cache/uv/builds-v0/.tmpSUHzZd/lib/python3.12/site-packages/setuptools/dist.py:483:
+      SetuptoolsDeprecationWarning: Cannot find any files for the given
+      pattern.
+      !!
+
+      
+      ********************************************************************************
+              Pattern 'LICENSE' did not match any files.
+
+              By 2027-Feb-18, you need to update your project and remove
+      deprecated calls
+              or your builds will no longer be supported.
+      
+      ********************************************************************************
+
+      !!
+        for path in sorted(cls._find_pattern(pattern, enforce_match))
+      error: error in 'egg_base' option: 'src' does not exist or is not
+      a directory
+
+      hint: This usually indicates a problem with the package or the build
+      environment.

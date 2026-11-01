@@ -1,33 +1,19 @@
 FROM python:3.11-slim
-
-# Set working directory
-WORKDIR /app
-
-# Install system dependencies
-RUN apt-get update && apt-get install -y \
-    curl \
-    git \
-    && rm -rf /var/lib/apt/lists/*
-
-# Copy package metadata first for better layer caching
-COPY pyproject.toml .
-COPY README.md .
-
-# Install Python dependencies
-RUN pip install --no-cache-dir -e ".[train,dashboard]"
-
-# Copy source code
+ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
+WORKDIR /opt/moro
+RUN apt-get update && apt-get install -y --no-install-recommends curl git \
+    && rm -rf /var/lib/apt/lists/* \
+    && useradd --uid 10001 --create-home moro
+COPY pyproject.toml README.md LICENSE ./
+COPY requirements/eval.lock ./requirements/eval.lock
 COPY src/ ./src/
-
-# Create necessary operational directories
-RUN mkdir -p /app/data/raw /app/data/dpo /app/.moro /app/runs /app/releases /app/eval
-
-# Set environment variables
-ENV PYTHONPATH=/app/src
-ENV MORO_PROJECT_ROOT=/app
-
-# Expose microservice ports: Gateway (8000), Webhook (8001), Dashboard (8501)
+# Web services do not need the GPU training stack. Training uses its own environment.
+# Install the frozen eval lock first, then the package itself with --no-deps so the
+# image cannot drift from the lock (see requirements/README.md).
+RUN pip install --no-cache-dir -r requirements/eval.lock \
+    && pip install --no-cache-dir --no-deps . \
+    && mkdir /workspace && chown moro:moro /workspace
+USER moro
+WORKDIR /workspace
 EXPOSE 8000 8001 8501
-
-# Default command starts Mission Control Dashboard
 CMD ["python", "-m", "uvicorn", "moro.dashboard.mission_control:mission_app", "--host", "0.0.0.0", "--port", "8501"]

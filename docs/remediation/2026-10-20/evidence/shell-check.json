@@ -1,0 +1,4 @@
+{
+  "scope": "Literal shell=True keyword AST scan, not taint analysis",
+  "findings": []
+}

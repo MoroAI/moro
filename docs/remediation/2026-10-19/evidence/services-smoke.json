@@ -1,0 +1,468 @@
+{
+  "time": "2026-10-19T18:08:35.278611+00:00",
+  "checks": [
+    {
+      "name": "native anonymous overview",
+      "status": 401
+    },
+    {
+      "name": "native login page",
+      "status": 200
+    },
+    {
+      "name": "native login",
+      "status": 303
+    },
+    {
+      "name": "native authenticated dashboard",
+      "status": 200
+    },
+    {
+      "name": "native authenticated overview",
+      "status": 200
+    },
+    {
+      "name": "native packaged asset",
+      "status": 200
+    },
+    {
+      "name": "native cross origin",
+      "status": 403
+    },
+    {
+      "name": "native removed /api/terminal/execute",
+      "status": 404
+    },
+    {
+      "name": "native removed /api/system/terminal/execute",
+      "status": 404
+    },
+    {
+      "name": "native untrusted host",
+      "status": 403
+    },
+    {
+      "name": "native extra command rejected",
+      "status": 422
+    },
+    {
+      "name": "native traversal rejected",
+      "status": 422
+    },
+    {
+      "name": "native unknown operation",
+      "status": 404
+    },
+    {
+      "name": "native bounded list",
+      "status": 200
+    },
+    {
+      "name": "native real compile",
+      "status": 200
+    },
+    {
+      "name": "native immutable preview",
+      "status": 200
+    },
+    {
+      "name": "native missing training dataset",
+      "status": 422
+    },
+    {
+      "name": "native no invented job",
+      "status": 404
+    },
+    {
+      "name": "native models endpoint",
+      "status": 200
+    },
+    {
+      "name": "native no invented eval",
+      "status": 404
+    },
+    {
+      "name": "alternate anonymous overview",
+      "status": 401
+    },
+    {
+      "name": "alternate login page",
+      "status": 200
+    },
+    {
+      "name": "alternate login",
+      "status": 303
+    },
+    {
+      "name": "alternate authenticated dashboard",
+      "status": 200
+    },
+    {
+      "name": "alternate authenticated overview",
+      "status": 200
+    },
+    {
+      "name": "alternate packaged asset",
+      "status": 200
+    },
+    {
+      "name": "alternate cross origin",
+      "status": 403
+    },
+    {
+      "name": "alternate removed /api/terminal/execute",
+      "status": 404
+    },
+    {
+      "name": "alternate removed /api/system/terminal/execute",
+      "status": 404
+    },
+    {
+      "name": "alternate untrusted host",
+      "status": 403
+    },
+    {
+      "name": "alternate extra command rejected",
+      "status": 422
+    },
+    {
+      "name": "alternate traversal rejected",
+      "status": 422
+    },
+    {
+      "name": "alternate unknown operation",
+      "status": 404
+    },
+    {
+      "name": "alternate bounded list",
+      "status": 200
+    },
+    {
+      "name": "alternate real compile",
+      "status": 200
+    },
+    {
+      "name": "alternate immutable preview",
+      "status": 200
+    },
+    {
+      "name": "alternate missing training dataset",
+      "status": 422
+    },
+    {
+      "name": "alternate no invented job",
+      "status": 404
+    },
+    {
+      "name": "alternate models endpoint",
+      "status": 200
+    },
+    {
+      "name": "alternate no invented eval",
+      "status": 404
+    },
+    {
+      "name": "compose anonymous overview",
+      "status": 401
+    },
+    {
+      "name": "compose login page",
+      "status": 200
+    },
+    {
+      "name": "compose login",
+      "status": 303
+    },
+    {
+      "name": "compose authenticated dashboard",
+      "status": 200
+    },
+    {
+      "name": "compose authenticated overview",
+      "status": 200
+    },
+    {
+      "name": "compose packaged asset",
+      "status": 200
+    },
+    {
+      "name": "compose cross origin",
+      "status": 403
+    },
+    {
+      "name": "compose removed /api/terminal/execute",
+      "status": 404
+    },
+    {
+      "name": "compose removed /api/system/terminal/execute",
+      "status": 404
+    },
+    {
+      "name": "compose untrusted host",
+      "status": 403
+    },
+    {
+      "name": "compose extra command rejected",
+      "status": 422
+    },
+    {
+      "name": "compose traversal rejected",
+      "status": 422
+    },
+    {
+      "name": "compose unknown operation",
+      "status": 404
+    },
+    {
+      "name": "compose bounded list",
+      "status": 200
+    },
+    {
+      "name": "compose real compile",
+      "status": 200
+    },
+    {
+      "name": "compose immutable preview",
+      "status": 200
+    },
+    {
+      "name": "compose missing training dataset",
+      "status": 422
+    },
+    {
+      "name": "compose no invented job",
+      "status": 404
+    },
+    {
+      "name": "compose models endpoint",
+      "status": 200
+    },
+    {
+      "name": "compose no invented eval",
+      "status": 404
+    },
+    {
+      "name": "native gateway anonymous",
+      "status": 401
+    },
+    {
+      "name": "native real model inventory",
+      "status": 200,
+      "model_count": 0
+    },
+    {
+      "name": "native missing backend model",
+      "status": 502
+    },
+    {
+      "name": "compose gateway anonymous",
+      "status": 401
+    },
+    {
+      "name": "compose real model inventory",
+      "status": 200,
+      "model_count": 0
+    },
+    {
+      "name": "compose missing backend model",
+      "status": 502
+    },
+    {
+      "name": "native webhook health",
+      "status": 200
+    },
+    {
+      "name": "native webhook unauthenticated",
+      "status": 403
+    },
+    {
+      "name": "native feedback accepted",
+      "status": 200
+    },
+    {
+      "name": "native replay",
+      "status": 200
+    },
+    {
+      "name": "native conflicting replay",
+      "status": 409
+    },
+    {
+      "name": "native invalid rating",
+      "status": 422
+    },
+    {
+      "name": "native browser origin",
+      "status": 403
+    },
+    {
+      "name": "cli-http webhook health",
+      "status": 200
+    },
+    {
+      "name": "cli-http webhook unauthenticated",
+      "status": 403
+    },
+    {
+      "name": "cli-http feedback accepted",
+      "status": 200
+    },
+    {
+      "name": "cli-http replay",
+      "status": 200
+    },
+    {
+      "name": "cli-http conflicting replay",
+      "status": 409
+    },
+    {
+      "name": "cli-http invalid rating",
+      "status": 422
+    },
+    {
+      "name": "cli-http browser origin",
+      "status": 403
+    },
+    {
+      "name": "compose webhook health",
+      "status": 200
+    },
+    {
+      "name": "compose webhook unauthenticated",
+      "status": 403
+    },
+    {
+      "name": "compose feedback accepted",
+      "status": 200
+    },
+    {
+      "name": "compose replay",
+      "status": 200
+    },
+    {
+      "name": "compose conflicting replay",
+      "status": 409
+    },
+    {
+      "name": "compose invalid rating",
+      "status": 422
+    },
+    {
+      "name": "compose browser origin",
+      "status": 403
+    },
+    {
+      "name": "feedback actual status",
+      "status": 200
+    },
+    {
+      "name": "feedback actual extraction",
+      "status": 200
+    },
+    {
+      "name": "feedback actual pairs",
+      "status": 200
+    },
+    {
+      "name": "overview same feedback database",
+      "status": 200
+    }
+  ],
+  "containers": [
+    {
+      "name": "moro-remediation-dashboard-1",
+      "image": "sha256:fed68eb1e891cf869a90b95d8cc88c68e946fcc2a9a44bbce5923a0a2934ad21",
+      "user": "501:20",
+      "ports": {
+        "8501/tcp": [
+          {
+            "HostIp": "127.0.0.1",
+            "HostPort": "18501"
+          }
+        ]
+      },
+      "running": true,
+      "health": null
+    },
+    {
+      "name": "moro-remediation-gateway-1",
+      "image": "sha256:fed68eb1e891cf869a90b95d8cc88c68e946fcc2a9a44bbce5923a0a2934ad21",
+      "user": "501:20",
+      "ports": {
+        "8000/tcp": [
+          {
+            "HostIp": "127.0.0.1",
+            "HostPort": "18000"
+          }
+        ]
+      },
+      "running": true,
+      "health": null
+    },
+    {
+      "name": "moro-remediation-webhook-1",
+      "image": "sha256:fed68eb1e891cf869a90b95d8cc88c68e946fcc2a9a44bbce5923a0a2934ad21",
+      "user": "501:20",
+      "ports": {
+        "8001/tcp": [
+          {
+            "HostIp": "127.0.0.1",
+            "HostPort": "18001"
+          }
+        ]
+      },
+      "running": true,
+      "health": "healthy"
+    },
+    {
+      "name": "moro-remediation-ollama-1",
+      "image": "sha256:8262851b2846b87c649eddf3e76beb270c52f4d1bc94559f47efde16b0841551",
+      "user": "",
+      "ports": {
+        "11434/tcp": [
+          {
+            "HostIp": "127.0.0.1",
+            "HostPort": "11435"
+          }
+        ]
+      },
+      "running": true,
+      "health": "healthy"
+    },
+    {
+      "name": "moro-remediation-flywheel-1",
+      "image": "sha256:fed68eb1e891cf869a90b95d8cc88c68e946fcc2a9a44bbce5923a0a2934ad21",
+      "user": "501:20",
+      "ports": {
+        "8000/tcp": null,
+        "8001/tcp": null,
+        "8501/tcp": null
+      },
+      "running": true,
+      "health": null
+    },
+    {
+      "name": "moro-audit-20261002-cpu-dev",
+      "image": "sha256:3bbf7118922b3169edc7e4ca221abf42a847728c3d3a482733d277179c058ab8",
+      "user": "",
+      "ports": {},
+      "running": true,
+      "health": null
+    },
+    {
+      "name": "moro-audit-20261002-ollama",
+      "image": "sha256:8262851b2846b87c649eddf3e76beb270c52f4d1bc94559f47efde16b0841551",
+      "user": "",
+      "ports": {
+        "11434/tcp": [
+          {
+            "HostIp": "127.0.0.1",
+            "HostPort": "11434"
+          }
+        ]
+      },
+      "running": true,
+      "health": null
+    }
+  ]
+}

@@ -50,6 +50,7 @@ def normalize_rows(
                     source=str(source_file),
                     messages=messages,
                     metadata={
+                        "group_id": (raw.get("metadata") or {}).get("group_id"),
                         "source_file": str(source_file),
                         "line_number": line_number,
                         "format": raw.get("_format"),

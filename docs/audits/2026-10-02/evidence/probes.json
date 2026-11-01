@@ -1,0 +1,190 @@
+{
+  "/api/health": {
+    "status": 200,
+    "body": {
+      "status": "healthy",
+      "timestamp": "2026-10-02T12:19:32.950157+00:00",
+      "services": {
+        "docker": true,
+        "ollama": true,
+        "database": true
+      }
+    }
+  },
+  "/api/evaluation/results/does-not-exist": {
+    "status": 200,
+    "body": {
+      "run_id": "does-not-exist",
+      "suite_name": "sample-eval-suite",
+      "total_cases": 10,
+      "passed_cases": 9,
+      "failed_cases": 1,
+      "pass_rate": 0.9,
+      "status": "completed"
+    }
+  },
+  "/api/flywheel/status": {
+    "status": 200,
+    "body": {
+      "status": "active",
+      "feedback_files": 0,
+      "total_pairs_generated": 12,
+      "dpo_datasets": [],
+      "auto_deploy": false
+    }
+  },
+  "shell_prefix_bypass": {
+    "status": 200,
+    "marker_seen": true
+  },
+  "unauthenticated_python": {
+    "status": 200,
+    "body": {
+      "stdout": "673829\n",
+      "stderr": "",
+      "return_code": 0
+    }
+  },
+  "upload_traversal_extension_bypass": {
+    "status": 200,
+    "body": {
+      "dataset_id": "ds_audit-marker",
+      "name": "../../audit-marker.unsupported",
+      "path": "/private/tmp/moro-audit-20261002/dev/data/raw/../../audit-marker.unsupported",
+      "size_bytes": 22,
+      "message": "Dataset uploaded successfully. Size: 0.0 KB"
+    },
+    "outside_raw_exists": true
+  },
+  "cors_untrusted_origin": {
+    "status": 200,
+    "allow_origin": "https://untrusted.invalid",
+    "allow_credentials": "true"
+  },
+  "host_validation": {
+    "status": 200
+  },
+  "fake_deployment": {
+    "status": 200,
+    "body": {
+      "deployment_id": "dep_16267604",
+      "model_id": "nonexistent-model",
+      "target": "nonexistent-runtime",
+      "status": "running",
+      "endpoint": "http://localhost:11434/api/generate",
+      "started_at": "2026-10-02T12:19:33.255253+00:00"
+    }
+  },
+  "fake_training_start": {
+    "status": 200,
+    "body": {
+      "run_id": "run_8771b876",
+      "status": "started",
+      "message": "Training started for nonexistent-model (Run: run_8771b876)"
+    }
+  },
+  "fake_training_complete": {
+    "status": 200,
+    "body": {
+      "run_id": "run_8771b876",
+      "status": "completed",
+      "model_name": "nonexistent-model",
+      "dataset_id": "nonexistent-data",
+      "started_at": "2026-10-02T12:19:33.257686+00:00",
+      "completed_at": "2026-10-02T12:19:37.331592+00:00",
+      "current_step": 100,
+      "total_steps": 100,
+      "current_loss": 0.2,
+      "peak_vram_gb": 4.49,
+      "error": null
+    }
+  },
+  "gateway_missing_model": {
+    "status": 200,
+    "body": {
+      "id": "chatcmpl_1790943578",
+      "object": "chat.completion",
+      "created": 1790943578,
+      "model": "nonexistent-model",
+      "choices": [
+        {
+          "index": 0,
+          "message": {
+            "role": "assistant",
+            "content": "Hello! I am your MoroAI fine-tuned assistant."
+          },
+          "finish_reason": "stop"
+        }
+      ],
+      "usage": {
+        "prompt_tokens": 10,
+        "completion_tokens": 20,
+        "total_tokens": 30
+      }
+    },
+    "content_type": "application/json"
+  },
+  "webhook_no_auth": {
+    "status": 200,
+    "body": {
+      "status": "success",
+      "log_ids": [
+        "4e927444-45f4-4174-9d3d-e2b93ad5df61"
+      ],
+      "count": 1,
+      "message": "Log ingested successfully"
+    }
+  },
+  "sdk_compiler": {
+    "three_splits_identical": true,
+    "email_survives": true
+  },
+  "eval_missing_suite_sync": {
+    "run_id": "missing-run",
+    "suite_name": "test-suite",
+    "total_cases": 2,
+    "passed_cases": 1,
+    "failed_cases": 1,
+    "pass_rate": 0.5,
+    "status": "completed"
+  },
+  "eval_missing_suite_async": {
+    "eval_id": "eval_9660e260",
+    "pass_rate": 1.0,
+    "delta": 0.15,
+    "total_cases": 2,
+    "passed_cases": 2,
+    "suite_name": "default_suite",
+    "status": "completed"
+  },
+  "release_zero_score_missing_artifact": {
+    "release_id": "rel_791de955",
+    "version": "zero-score",
+    "manifest_path": "/var/folders/2s/yspjgr9j4vv9t0c9y3rt17j40000gn/T/moro-unit-probes-hg_8wl1t/releases/zero-score/manifest.json",
+    "status": "completed"
+  },
+  "sdk_training_without_model": {
+    "run_id": "exp_3a6580178c8a",
+    "status": "completed",
+    "output_dir": "/var/folders/2s/yspjgr9j4vv9t0c9y3rt17j40000gn/T/moro-unit-probes-hg_8wl1t/runs/exp_3a6580178c8a",
+    "final_loss": 1.5,
+    "duration_seconds": 1.0
+  },
+  "sdk_deploy_missing_release": {
+    "deployment_id": "dep_45cd2c71",
+    "endpoint": "http://localhost:11434/api/generate",
+    "target": "ollama",
+    "status": "completed"
+  },
+  "flywheel_unfetched_logs_lost": {
+    "logs_ingested": 1,
+    "pairs_generated": 1,
+    "pending_after": 0
+  },
+  "private_key_redaction": {
+    "flags": [
+      "private_key"
+    ],
+    "key_body_survives": true
+  }
+}

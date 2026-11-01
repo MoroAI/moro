@@ -1,0 +1,781 @@
+* Creating isolated environment: venv+pip...
+* Installing packages in isolated environment:
+  - setuptools>=77
+  - wheel
+* Getting build dependencies for sdist...
+running egg_info
+writing src/moroai.egg-info/PKG-INFO
+writing dependency_links to src/moroai.egg-info/dependency_links.txt
+writing entry points to src/moroai.egg-info/entry_points.txt
+writing requirements to src/moroai.egg-info/requires.txt
+writing top-level names to src/moroai.egg-info/top_level.txt
+reading manifest file 'src/moroai.egg-info/SOURCES.txt'
+reading manifest template 'MANIFEST.in'
+adding license file 'LICENSE'
+writing manifest file 'src/moroai.egg-info/SOURCES.txt'
+* Installed build dependency versions:
+  - setuptools==84.0.0
+  - wheel==0.48.0
+* Building sdist...
+running sdist
+running egg_info
+writing src/moroai.egg-info/PKG-INFO
+writing dependency_links to src/moroai.egg-info/dependency_links.txt
+writing entry points to src/moroai.egg-info/entry_points.txt
+writing requirements to src/moroai.egg-info/requires.txt
+writing top-level names to src/moroai.egg-info/top_level.txt
+reading manifest file 'src/moroai.egg-info/SOURCES.txt'
+reading manifest template 'MANIFEST.in'
+adding license file 'LICENSE'
+writing manifest file 'src/moroai.egg-info/SOURCES.txt'
+running check
+creating moroai-0.1.0
+creating moroai-0.1.0/docs
+creating moroai-0.1.0/examples
+creating moroai-0.1.0/examples/quickstart/data
+creating moroai-0.1.0/src/moro
+creating moroai-0.1.0/src/moro/analytics
+creating moroai-0.1.0/src/moro/cli
+creating moroai-0.1.0/src/moro/config
+creating moroai-0.1.0/src/moro/core
+creating moroai-0.1.0/src/moro/dashboard
+creating moroai-0.1.0/src/moro/dashboard/api
+creating moroai-0.1.0/src/moro/data
+creating moroai-0.1.0/src/moro/deploy
+creating moroai-0.1.0/src/moro/diagnose
+creating moroai-0.1.0/src/moro/eval
+creating moroai-0.1.0/src/moro/export
+creating moroai-0.1.0/src/moro/flywheel
+creating moroai-0.1.0/src/moro/flywheel/extractors
+creating moroai-0.1.0/src/moro/flywheel/generators
+creating moroai-0.1.0/src/moro/flywheel/ingestors
+creating moroai-0.1.0/src/moro/flywheel/storage
+creating moroai-0.1.0/src/moro/flywheel/webhook
+creating moroai-0.1.0/src/moro/hardware
+creating moroai-0.1.0/src/moro/models
+creating moroai-0.1.0/src/moro/recipes
+creating moroai-0.1.0/src/moro/registry
+creating moroai-0.1.0/src/moro/release
+creating moroai-0.1.0/src/moro/runtime
+creating moroai-0.1.0/src/moro/services
+creating moroai-0.1.0/src/moro/state
+creating moroai-0.1.0/src/moro/storage
+creating moroai-0.1.0/src/moro/templates
+creating moroai-0.1.0/src/moro/training
+creating moroai-0.1.0/src/moro/ui
+creating moroai-0.1.0/src/moro/validation
+creating moroai-0.1.0/src/moroai.egg-info
+creating moroai-0.1.0/tests
+creating moroai-0.1.0/tests/benchmarks
+creating moroai-0.1.0/tests/integration
+copying files to moroai-0.1.0...
+copying CONTRIBUTING.md -> moroai-0.1.0
+copying LICENSE -> moroai-0.1.0
+copying MANIFEST.in -> moroai-0.1.0
+copying README.md -> moroai-0.1.0
+copying pyproject.toml -> moroai-0.1.0
+copying docs/DEPLOYMENT_PLAYBOOK.md -> moroai-0.1.0/docs
+copying docs/engineering-status.md -> moroai-0.1.0/docs
+copying docs/export-safety.md -> moroai-0.1.0/docs
+copying docs/project-privacy-defaults.md -> moroai-0.1.0/docs
+copying docs/recipe-planning.md -> moroai-0.1.0/docs
+copying docs/release-gates.md -> moroai-0.1.0/docs
+copying docs/training-validation.md -> moroai-0.1.0/docs
+copying examples/support.jsonl -> moroai-0.1.0/examples
+copying examples/quickstart/data/sample_data.jsonl -> moroai-0.1.0/examples/quickstart/data
+copying src/moro/__init__.py -> moroai-0.1.0/src/moro
+copying src/moro/main.py -> moroai-0.1.0/src/moro
+copying src/moro/analytics/__init__.py -> moroai-0.1.0/src/moro/analytics
+copying src/moro/analytics/schema.py -> moroai-0.1.0/src/moro/analytics
+copying src/moro/analytics/tracker.py -> moroai-0.1.0/src/moro/analytics
+copying src/moro/analytics/visualizations.py -> moroai-0.1.0/src/moro/analytics
+copying src/moro/cli/__init__.py -> moroai-0.1.0/src/moro/cli
+copying src/moro/cli/analytics.py -> moroai-0.1.0/src/moro/cli
+copying src/moro/cli/dashboard.py -> moroai-0.1.0/src/moro/cli
+copying src/moro/cli/data.py -> moroai-0.1.0/src/moro/cli
+copying src/moro/cli/deploy.py -> moroai-0.1.0/src/moro/cli
+copying src/moro/cli/diagnose.py -> moroai-0.1.0/src/moro/cli
+copying src/moro/cli/doctor.py -> moroai-0.1.0/src/moro/cli
+copying src/moro/cli/eval.py -> moroai-0.1.0/src/moro/cli
+copying src/moro/cli/export.py -> moroai-0.1.0/src/moro/cli
+copying src/moro/cli/flywheel.py -> moroai-0.1.0/src/moro/cli
+copying src/moro/cli/guard.py -> moroai-0.1.0/src/moro/cli
+copying src/moro/cli/hooks.py -> moroai-0.1.0/src/moro/cli
+copying src/moro/cli/import_data.py -> moroai-0.1.0/src/moro/cli
+copying src/moro/cli/init.py -> moroai-0.1.0/src/moro/cli
+copying src/moro/cli/recipe.py -> moroai-0.1.0/src/moro/cli
+copying src/moro/cli/registry.py -> moroai-0.1.0/src/moro/cli
+copying src/moro/cli/runs.py -> moroai-0.1.0/src/moro/cli
+copying src/moro/cli/services.py -> moroai-0.1.0/src/moro/cli
+copying src/moro/cli/status.py -> moroai-0.1.0/src/moro/cli
+copying src/moro/cli/train.py -> moroai-0.1.0/src/moro/cli
+copying src/moro/cli/ui.py -> moroai-0.1.0/src/moro/cli
+copying src/moro/cli/validate.py -> moroai-0.1.0/src/moro/cli
+copying src/moro/config/__init__.py -> moroai-0.1.0/src/moro/config
+copying src/moro/config/loader.py -> moroai-0.1.0/src/moro/config
+copying src/moro/config/models.py -> moroai-0.1.0/src/moro/config
+copying src/moro/core/__init__.py -> moroai-0.1.0/src/moro/core
+copying src/moro/core/errors.py -> moroai-0.1.0/src/moro/core
+copying src/moro/core/hashing.py -> moroai-0.1.0/src/moro/core
+copying src/moro/core/ids.py -> moroai-0.1.0/src/moro/core
+copying src/moro/core/logging.py -> moroai-0.1.0/src/moro/core
+copying src/moro/core/paths.py -> moroai-0.1.0/src/moro/core
+copying src/moro/core/project.py -> moroai-0.1.0/src/moro/core
+copying src/moro/dashboard/__init__.py -> moroai-0.1.0/src/moro/dashboard
+copying src/moro/dashboard/gateway.py -> moroai-0.1.0/src/moro/dashboard
+copying src/moro/dashboard/mission_control.py -> moroai-0.1.0/src/moro/dashboard
+copying src/moro/dashboard/utils.py -> moroai-0.1.0/src/moro/dashboard
+copying src/moro/dashboard/api/__init__.py -> moroai-0.1.0/src/moro/dashboard/api
+copying src/moro/dashboard/api/datasets.py -> moroai-0.1.0/src/moro/dashboard/api
+copying src/moro/dashboard/api/deployment.py -> moroai-0.1.0/src/moro/dashboard/api
+copying src/moro/dashboard/api/evaluation.py -> moroai-0.1.0/src/moro/dashboard/api
+copying src/moro/dashboard/api/flywheel.py -> moroai-0.1.0/src/moro/dashboard/api
+copying src/moro/dashboard/api/models.py -> moroai-0.1.0/src/moro/dashboard/api
+copying src/moro/dashboard/api/system.py -> moroai-0.1.0/src/moro/dashboard/api
+copying src/moro/dashboard/api/training.py -> moroai-0.1.0/src/moro/dashboard/api
+copying src/moro/data/__init__.py -> moroai-0.1.0/src/moro/data
+copying src/moro/data/clean.py -> moroai-0.1.0/src/moro/data
+copying src/moro/data/compiler.py -> moroai-0.1.0/src/moro/data
+copying src/moro/data/ingest.py -> moroai-0.1.0/src/moro/data
+copying src/moro/data/models.py -> moroai-0.1.0/src/moro/data
+copying src/moro/data/normalize.py -> moroai-0.1.0/src/moro/data
+copying src/moro/data/privacy.py -> moroai-0.1.0/src/moro/data
+copying src/moro/data/quality.py -> moroai-0.1.0/src/moro/data
+copying src/moro/data/report.py -> moroai-0.1.0/src/moro/data
+copying src/moro/data/splitter.py -> moroai-0.1.0/src/moro/data
+copying src/moro/data/versions.py -> moroai-0.1.0/src/moro/data
+copying src/moro/deploy/__init__.py -> moroai-0.1.0/src/moro/deploy
+copying src/moro/deploy/manager.py -> moroai-0.1.0/src/moro/deploy
+copying src/moro/diagnose/__init__.py -> moroai-0.1.0/src/moro/diagnose
+copying src/moro/diagnose/analyzer.py -> moroai-0.1.0/src/moro/diagnose
+copying src/moro/eval/__init__.py -> moroai-0.1.0/src/moro/eval
+copying src/moro/eval/compare.py -> moroai-0.1.0/src/moro/eval
+copying src/moro/eval/harness.py -> moroai-0.1.0/src/moro/eval
+copying src/moro/eval/loader.py -> moroai-0.1.0/src/moro/eval
+copying src/moro/eval/models.py -> moroai-0.1.0/src/moro/eval
+copying src/moro/eval/perturbations.py -> moroai-0.1.0/src/moro/eval
+copying src/moro/eval/robustness.py -> moroai-0.1.0/src/moro/eval
+copying src/moro/eval/runner.py -> moroai-0.1.0/src/moro/eval
+copying src/moro/eval/scorers.py -> moroai-0.1.0/src/moro/eval
+copying src/moro/export/__init__.py -> moroai-0.1.0/src/moro/export
+copying src/moro/export/eligibility.py -> moroai-0.1.0/src/moro/export
+copying src/moro/export/gates.py -> moroai-0.1.0/src/moro/export
+copying src/moro/export/gguf.py -> moroai-0.1.0/src/moro/export
+copying src/moro/export/manifest.py -> moroai-0.1.0/src/moro/export
+copying src/moro/export/merge.py -> moroai-0.1.0/src/moro/export
+copying src/moro/export/ollama.py -> moroai-0.1.0/src/moro/export
+copying src/moro/export/paths.py -> moroai-0.1.0/src/moro/export
+copying src/moro/flywheel/__init__.py -> moroai-0.1.0/src/moro/flywheel
+copying src/moro/flywheel/architecture.py -> moroai-0.1.0/src/moro/flywheel
+copying src/moro/flywheel/models.py -> moroai-0.1.0/src/moro/flywheel
+copying src/moro/flywheel/orchestrator.py -> moroai-0.1.0/src/moro/flywheel
+copying src/moro/flywheel/extractors/__init__.py -> moroai-0.1.0/src/moro/flywheel/extractors
+copying src/moro/flywheel/extractors/deterministic_extractor.py -> moroai-0.1.0/src/moro/flywheel/extractors
+copying src/moro/flywheel/generators/__init__.py -> moroai-0.1.0/src/moro/flywheel/generators
+copying src/moro/flywheel/generators/grounded_generator.py -> moroai-0.1.0/src/moro/flywheel/generators
+copying src/moro/flywheel/ingestors/__init__.py -> moroai-0.1.0/src/moro/flywheel/ingestors
+copying src/moro/flywheel/ingestors/sqlite_ingestor.py -> moroai-0.1.0/src/moro/flywheel/ingestors
+copying src/moro/flywheel/storage/__init__.py -> moroai-0.1.0/src/moro/flywheel/storage
+copying src/moro/flywheel/storage/schema.py -> moroai-0.1.0/src/moro/flywheel/storage
+copying src/moro/flywheel/webhook/__init__.py -> moroai-0.1.0/src/moro/flywheel/webhook
+copying src/moro/flywheel/webhook/receiver.py -> moroai-0.1.0/src/moro/flywheel/webhook
+copying src/moro/hardware/__init__.py -> moroai-0.1.0/src/moro/hardware
+copying src/moro/hardware/detector.py -> moroai-0.1.0/src/moro/hardware
+copying src/moro/hardware/profile.py -> moroai-0.1.0/src/moro/hardware
+copying src/moro/models/__init__.py -> moroai-0.1.0/src/moro/models
+copying src/moro/models/loading.py -> moroai-0.1.0/src/moro/models
+copying src/moro/recipes/__init__.py -> moroai-0.1.0/src/moro/recipes
+copying src/moro/recipes/engine.py -> moroai-0.1.0/src/moro/recipes
+copying src/moro/recipes/mixing.py -> moroai-0.1.0/src/moro/recipes
+copying src/moro/recipes/presets.py -> moroai-0.1.0/src/moro/recipes
+copying src/moro/recipes/rules.py -> moroai-0.1.0/src/moro/recipes
+copying src/moro/registry/__init__.py -> moroai-0.1.0/src/moro/registry
+copying src/moro/registry/manager.py -> moroai-0.1.0/src/moro/registry
+copying src/moro/release/__init__.py -> moroai-0.1.0/src/moro/release
+copying src/moro/release/manager.py -> moroai-0.1.0/src/moro/release
+copying src/moro/runtime/__init__.py -> moroai-0.1.0/src/moro/runtime
+copying src/moro/runtime/orchestrator.py -> moroai-0.1.0/src/moro/runtime
+copying src/moro/services/__init__.py -> moroai-0.1.0/src/moro/services
+copying src/moro/services/orchestrator.py -> moroai-0.1.0/src/moro/services
+copying src/moro/state/__init__.py -> moroai-0.1.0/src/moro/state
+copying src/moro/state/manager.py -> moroai-0.1.0/src/moro/state
+copying src/moro/state/schema.py -> moroai-0.1.0/src/moro/state
+copying src/moro/storage/__init__.py -> moroai-0.1.0/src/moro/storage
+copying src/moro/storage/db.py -> moroai-0.1.0/src/moro/storage
+copying src/moro/storage/state_graph.py -> moroai-0.1.0/src/moro/storage
+copying src/moro/templates/__init__.py -> moroai-0.1.0/src/moro/templates
+copying src/moro/templates/project.py -> moroai-0.1.0/src/moro/templates
+copying src/moro/training/__init__.py -> moroai-0.1.0/src/moro/training
+copying src/moro/training/async_runner.py -> moroai-0.1.0/src/moro/training
+copying src/moro/training/backend.py -> moroai-0.1.0/src/moro/training
+copying src/moro/training/hf_backend.py -> moroai-0.1.0/src/moro/training
+copying src/moro/training/recovery.py -> moroai-0.1.0/src/moro/training
+copying src/moro/training/runner.py -> moroai-0.1.0/src/moro/training
+copying src/moro/ui/__init__.py -> moroai-0.1.0/src/moro/ui
+copying src/moro/ui/server.py -> moroai-0.1.0/src/moro/ui
+copying src/moro/validation/__init__.py -> moroai-0.1.0/src/moro/validation
+copying src/moro/validation/engine.py -> moroai-0.1.0/src/moro/validation
+copying src/moroai.egg-info/PKG-INFO -> moroai-0.1.0/src/moroai.egg-info
+copying src/moroai.egg-info/SOURCES.txt -> moroai-0.1.0/src/moroai.egg-info
+copying src/moroai.egg-info/dependency_links.txt -> moroai-0.1.0/src/moroai.egg-info
+copying src/moroai.egg-info/entry_points.txt -> moroai-0.1.0/src/moroai.egg-info
+copying src/moroai.egg-info/requires.txt -> moroai-0.1.0/src/moroai.egg-info
+copying src/moroai.egg-info/top_level.txt -> moroai-0.1.0/src/moroai.egg-info
+copying tests/conftest.py -> moroai-0.1.0/tests
+copying tests/test_analytics.py -> moroai-0.1.0/tests
+copying tests/test_cli.py -> moroai-0.1.0/tests
+copying tests/test_config.py -> moroai-0.1.0/tests
+copying tests/test_dashboard_interactive.py -> moroai-0.1.0/tests
+copying tests/test_data_clean.py -> moroai-0.1.0/tests
+copying tests/test_data_inspect.py -> moroai-0.1.0/tests
+copying tests/test_data_normalize.py -> moroai-0.1.0/tests
+copying tests/test_data_quality.py -> moroai-0.1.0/tests
+copying tests/test_data_quality_epistemic.py -> moroai-0.1.0/tests
+copying tests/test_dataset_versions.py -> moroai-0.1.0/tests
+copying tests/test_diagnose.py -> moroai-0.1.0/tests
+copying tests/test_diagnose_enhanced.py -> moroai-0.1.0/tests
+copying tests/test_eval_compare.py -> moroai-0.1.0/tests
+copying tests/test_eval_perturbations.py -> moroai-0.1.0/tests
+copying tests/test_eval_scorers.py -> moroai-0.1.0/tests
+copying tests/test_export_eligibility.py -> moroai-0.1.0/tests
+copying tests/test_export_merge_gguf.py -> moroai-0.1.0/tests
+copying tests/test_export_safety.py -> moroai-0.1.0/tests
+copying tests/test_flywheel_cli.py -> moroai-0.1.0/tests
+copying tests/test_flywheel_extractor.py -> moroai-0.1.0/tests
+copying tests/test_flywheel_orchestrator.py -> moroai-0.1.0/tests
+copying tests/test_flywheel_storage.py -> moroai-0.1.0/tests
+copying tests/test_flywheel_webhook.py -> moroai-0.1.0/tests
+copying tests/test_guard.py -> moroai-0.1.0/tests
+copying tests/test_hooks.py -> moroai-0.1.0/tests
+copying tests/test_model_loading.py -> moroai-0.1.0/tests
+copying tests/test_mvp_pipeline.py -> moroai-0.1.0/tests
+copying tests/test_paths.py -> moroai-0.1.0/tests
+copying tests/test_project_privacy.py -> moroai-0.1.0/tests
+copying tests/test_recipe_apply.py -> moroai-0.1.0/tests
+copying tests/test_recipe_engine.py -> moroai-0.1.0/tests
+copying tests/test_recipe_mixing.py -> moroai-0.1.0/tests
+copying tests/test_recipe_planning.py -> moroai-0.1.0/tests
+copying tests/test_registry.py -> moroai-0.1.0/tests
+copying tests/test_services.py -> moroai-0.1.0/tests
+copying tests/test_snapshot_hashing.py -> moroai-0.1.0/tests
+copying tests/test_state_graph.py -> moroai-0.1.0/tests
+copying tests/test_state_manager.py -> moroai-0.1.0/tests
+copying tests/test_storage.py -> moroai-0.1.0/tests
+copying tests/test_training_backend.py -> moroai-0.1.0/tests
+copying tests/test_training_recovery.py -> moroai-0.1.0/tests
+copying tests/test_validation.py -> moroai-0.1.0/tests
+copying tests/benchmarks/test_performance.py -> moroai-0.1.0/tests/benchmarks
+copying tests/integration/test_complete_pipeline.py -> moroai-0.1.0/tests/integration
+copying tests/integration/test_moro_full_lifecycle_e2e.py -> moroai-0.1.0/tests/integration
+copying tests/integration/test_training_cpu.py -> moroai-0.1.0/tests/integration
+Writing moroai-0.1.0/setup.cfg
+Creating tar archive
+removing 'moroai-0.1.0' (and everything under it)
+* Building wheel from sdist
+* Creating isolated environment: venv+pip...
+* Installing packages in isolated environment:
+  - setuptools>=77
+  - wheel
+* Getting build dependencies for wheel...
+running egg_info
+writing src/moroai.egg-info/PKG-INFO
+writing dependency_links to src/moroai.egg-info/dependency_links.txt
+writing entry points to src/moroai.egg-info/entry_points.txt
+writing requirements to src/moroai.egg-info/requires.txt
+writing top-level names to src/moroai.egg-info/top_level.txt
+reading manifest file 'src/moroai.egg-info/SOURCES.txt'
+reading manifest template 'MANIFEST.in'
+adding license file 'LICENSE'
+writing manifest file 'src/moroai.egg-info/SOURCES.txt'
+* Installed build dependency versions:
+  - setuptools==84.0.0
+  - wheel==0.48.0
+* Building wheel...
+running bdist_wheel
+running build
+running build_py
+creating build/lib/moro
+copying src/moro/__init__.py -> build/lib/moro
+copying src/moro/main.py -> build/lib/moro
+creating build/lib/moro/ui
+copying src/moro/ui/server.py -> build/lib/moro/ui
+copying src/moro/ui/__init__.py -> build/lib/moro/ui
+creating build/lib/moro/hardware
+copying src/moro/hardware/detector.py -> build/lib/moro/hardware
+copying src/moro/hardware/profile.py -> build/lib/moro/hardware
+copying src/moro/hardware/__init__.py -> build/lib/moro/hardware
+creating build/lib/moro/core
+copying src/moro/core/logging.py -> build/lib/moro/core
+copying src/moro/core/paths.py -> build/lib/moro/core
+copying src/moro/core/__init__.py -> build/lib/moro/core
+copying src/moro/core/errors.py -> build/lib/moro/core
+copying src/moro/core/ids.py -> build/lib/moro/core
+copying src/moro/core/hashing.py -> build/lib/moro/core
+copying src/moro/core/project.py -> build/lib/moro/core
+creating build/lib/moro/config
+copying src/moro/config/models.py -> build/lib/moro/config
+copying src/moro/config/__init__.py -> build/lib/moro/config
+copying src/moro/config/loader.py -> build/lib/moro/config
+creating build/lib/moro/deploy
+copying src/moro/deploy/__init__.py -> build/lib/moro/deploy
+copying src/moro/deploy/manager.py -> build/lib/moro/deploy
+creating build/lib/moro/training
+copying src/moro/training/runner.py -> build/lib/moro/training
+copying src/moro/training/backend.py -> build/lib/moro/training
+copying src/moro/training/recovery.py -> build/lib/moro/training
+copying src/moro/training/__init__.py -> build/lib/moro/training
+copying src/moro/training/hf_backend.py -> build/lib/moro/training
+copying src/moro/training/async_runner.py -> build/lib/moro/training
+creating build/lib/moro/runtime
+copying src/moro/runtime/__init__.py -> build/lib/moro/runtime
+copying src/moro/runtime/orchestrator.py -> build/lib/moro/runtime
+creating build/lib/moro/release
+copying src/moro/release/__init__.py -> build/lib/moro/release
+copying src/moro/release/manager.py -> build/lib/moro/release
+creating build/lib/moro/models
+copying src/moro/models/loading.py -> build/lib/moro/models
+copying src/moro/models/__init__.py -> build/lib/moro/models
+creating build/lib/moro/cli
+copying src/moro/cli/hooks.py -> build/lib/moro/cli
+copying src/moro/cli/services.py -> build/lib/moro/cli
+copying src/moro/cli/deploy.py -> build/lib/moro/cli
+copying src/moro/cli/import_data.py -> build/lib/moro/cli
+copying src/moro/cli/registry.py -> build/lib/moro/cli
+copying src/moro/cli/ui.py -> build/lib/moro/cli
+copying src/moro/cli/__init__.py -> build/lib/moro/cli
+copying src/moro/cli/export.py -> build/lib/moro/cli
+copying src/moro/cli/dashboard.py -> build/lib/moro/cli
+copying src/moro/cli/diagnose.py -> build/lib/moro/cli
+copying src/moro/cli/validate.py -> build/lib/moro/cli
+copying src/moro/cli/flywheel.py -> build/lib/moro/cli
+copying src/moro/cli/train.py -> build/lib/moro/cli
+copying src/moro/cli/guard.py -> build/lib/moro/cli
+copying src/moro/cli/analytics.py -> build/lib/moro/cli
+copying src/moro/cli/eval.py -> build/lib/moro/cli
+copying src/moro/cli/recipe.py -> build/lib/moro/cli
+copying src/moro/cli/init.py -> build/lib/moro/cli
+copying src/moro/cli/runs.py -> build/lib/moro/cli
+copying src/moro/cli/doctor.py -> build/lib/moro/cli
+copying src/moro/cli/data.py -> build/lib/moro/cli
+copying src/moro/cli/status.py -> build/lib/moro/cli
+creating build/lib/moro/state
+copying src/moro/state/__init__.py -> build/lib/moro/state
+copying src/moro/state/manager.py -> build/lib/moro/state
+copying src/moro/state/schema.py -> build/lib/moro/state
+creating build/lib/moro/diagnose
+copying src/moro/diagnose/analyzer.py -> build/lib/moro/diagnose
+copying src/moro/diagnose/__init__.py -> build/lib/moro/diagnose
+creating build/lib/moro/storage
+copying src/moro/storage/db.py -> build/lib/moro/storage
+copying src/moro/storage/state_graph.py -> build/lib/moro/storage
+copying src/moro/storage/__init__.py -> build/lib/moro/storage
+creating build/lib/moro/dashboard
+copying src/moro/dashboard/gateway.py -> build/lib/moro/dashboard
+copying src/moro/dashboard/mission_control.py -> build/lib/moro/dashboard
+copying src/moro/dashboard/__init__.py -> build/lib/moro/dashboard
+copying src/moro/dashboard/utils.py -> build/lib/moro/dashboard
+creating build/lib/moro/recipes
+copying src/moro/recipes/presets.py -> build/lib/moro/recipes
+copying src/moro/recipes/__init__.py -> build/lib/moro/recipes
+copying src/moro/recipes/rules.py -> build/lib/moro/recipes
+copying src/moro/recipes/engine.py -> build/lib/moro/recipes
+copying src/moro/recipes/mixing.py -> build/lib/moro/recipes
+creating build/lib/moro/flywheel
+copying src/moro/flywheel/models.py -> build/lib/moro/flywheel
+copying src/moro/flywheel/__init__.py -> build/lib/moro/flywheel
+copying src/moro/flywheel/orchestrator.py -> build/lib/moro/flywheel
+copying src/moro/flywheel/architecture.py -> build/lib/moro/flywheel
+creating build/lib/moro/registry
+copying src/moro/registry/__init__.py -> build/lib/moro/registry
+copying src/moro/registry/manager.py -> build/lib/moro/registry
+creating build/lib/moro/templates
+copying src/moro/templates/__init__.py -> build/lib/moro/templates
+copying src/moro/templates/project.py -> build/lib/moro/templates
+creating build/lib/moro/eval
+copying src/moro/eval/scorers.py -> build/lib/moro/eval
+copying src/moro/eval/runner.py -> build/lib/moro/eval
+copying src/moro/eval/harness.py -> build/lib/moro/eval
+copying src/moro/eval/models.py -> build/lib/moro/eval
+copying src/moro/eval/perturbations.py -> build/lib/moro/eval
+copying src/moro/eval/__init__.py -> build/lib/moro/eval
+copying src/moro/eval/robustness.py -> build/lib/moro/eval
+copying src/moro/eval/loader.py -> build/lib/moro/eval
+copying src/moro/eval/compare.py -> build/lib/moro/eval
+creating build/lib/moro/export
+copying src/moro/export/gguf.py -> build/lib/moro/export
+copying src/moro/export/merge.py -> build/lib/moro/export
+copying src/moro/export/paths.py -> build/lib/moro/export
+copying src/moro/export/manifest.py -> build/lib/moro/export
+copying src/moro/export/__init__.py -> build/lib/moro/export
+copying src/moro/export/gates.py -> build/lib/moro/export
+copying src/moro/export/ollama.py -> build/lib/moro/export
+copying src/moro/export/eligibility.py -> build/lib/moro/export
+creating build/lib/moro/data
+copying src/moro/data/ingest.py -> build/lib/moro/data
+copying src/moro/data/clean.py -> build/lib/moro/data
+copying src/moro/data/compiler.py -> build/lib/moro/data
+copying src/moro/data/models.py -> build/lib/moro/data
+copying src/moro/data/normalize.py -> build/lib/moro/data
+copying src/moro/data/splitter.py -> build/lib/moro/data
+copying src/moro/data/__init__.py -> build/lib/moro/data
+copying src/moro/data/versions.py -> build/lib/moro/data
+copying src/moro/data/quality.py -> build/lib/moro/data
+copying src/moro/data/report.py -> build/lib/moro/data
+copying src/moro/data/privacy.py -> build/lib/moro/data
+creating build/lib/moro/services
+copying src/moro/services/__init__.py -> build/lib/moro/services
+copying src/moro/services/orchestrator.py -> build/lib/moro/services
+creating build/lib/moro/validation
+copying src/moro/validation/__init__.py -> build/lib/moro/validation
+copying src/moro/validation/engine.py -> build/lib/moro/validation
+creating build/lib/moro/analytics
+copying src/moro/analytics/__init__.py -> build/lib/moro/analytics
+copying src/moro/analytics/visualizations.py -> build/lib/moro/analytics
+copying src/moro/analytics/tracker.py -> build/lib/moro/analytics
+copying src/moro/analytics/schema.py -> build/lib/moro/analytics
+creating build/lib/moro/dashboard/api
+copying src/moro/dashboard/api/system.py -> build/lib/moro/dashboard/api
+copying src/moro/dashboard/api/models.py -> build/lib/moro/dashboard/api
+copying src/moro/dashboard/api/deployment.py -> build/lib/moro/dashboard/api
+copying src/moro/dashboard/api/evaluation.py -> build/lib/moro/dashboard/api
+copying src/moro/dashboard/api/datasets.py -> build/lib/moro/dashboard/api
+copying src/moro/dashboard/api/__init__.py -> build/lib/moro/dashboard/api
+copying src/moro/dashboard/api/flywheel.py -> build/lib/moro/dashboard/api
+copying src/moro/dashboard/api/training.py -> build/lib/moro/dashboard/api
+creating build/lib/moro/flywheel/webhook
+copying src/moro/flywheel/webhook/receiver.py -> build/lib/moro/flywheel/webhook
+copying src/moro/flywheel/webhook/__init__.py -> build/lib/moro/flywheel/webhook
+creating build/lib/moro/flywheel/ingestors
+copying src/moro/flywheel/ingestors/__init__.py -> build/lib/moro/flywheel/ingestors
+copying src/moro/flywheel/ingestors/sqlite_ingestor.py -> build/lib/moro/flywheel/ingestors
+creating build/lib/moro/flywheel/storage
+copying src/moro/flywheel/storage/__init__.py -> build/lib/moro/flywheel/storage
+copying src/moro/flywheel/storage/schema.py -> build/lib/moro/flywheel/storage
+creating build/lib/moro/flywheel/generators
+copying src/moro/flywheel/generators/grounded_generator.py -> build/lib/moro/flywheel/generators
+copying src/moro/flywheel/generators/__init__.py -> build/lib/moro/flywheel/generators
+creating build/lib/moro/flywheel/extractors
+copying src/moro/flywheel/extractors/__init__.py -> build/lib/moro/flywheel/extractors
+copying src/moro/flywheel/extractors/deterministic_extractor.py -> build/lib/moro/flywheel/extractors
+running egg_info
+writing src/moroai.egg-info/PKG-INFO
+writing dependency_links to src/moroai.egg-info/dependency_links.txt
+writing entry points to src/moroai.egg-info/entry_points.txt
+writing requirements to src/moroai.egg-info/requires.txt
+writing top-level names to src/moroai.egg-info/top_level.txt
+reading manifest file 'src/moroai.egg-info/SOURCES.txt'
+reading manifest template 'MANIFEST.in'
+adding license file 'LICENSE'
+writing manifest file 'src/moroai.egg-info/SOURCES.txt'
+installing to build/bdist.macosx-10.15-x86_64/wheel
+running install
+running install_lib
+creating build/bdist.macosx-10.15-x86_64/wheel
+creating build/bdist.macosx-10.15-x86_64/wheel/moro
+creating build/bdist.macosx-10.15-x86_64/wheel/moro/ui
+copying build/lib/moro/ui/server.py -> build/bdist.macosx-10.15-x86_64/wheel/./moro/ui
+copying build/lib/moro/ui/__init__.py -> build/bdist.macosx-10.15-x86_64/wheel/./moro/ui
+creating build/bdist.macosx-10.15-x86_64/wheel/moro/hardware
+copying build/lib/moro/hardware/detector.py -> build/bdist.macosx-10.15-x86_64/wheel/./moro/hardware
+copying build/lib/moro/hardware/profile.py -> build/bdist.macosx-10.15-x86_64/wheel/./moro/hardware
+copying build/lib/moro/hardware/__init__.py -> build/bdist.macosx-10.15-x86_64/wheel/./moro/hardware
+creating build/bdist.macosx-10.15-x86_64/wheel/moro/core
+copying build/lib/moro/core/logging.py -> build/bdist.macosx-10.15-x86_64/wheel/./moro/core
+copying build/lib/moro/core/paths.py -> build/bdist.macosx-10.15-x86_64/wheel/./moro/core
+copying build/lib/moro/core/__init__.py -> build/bdist.macosx-10.15-x86_64/wheel/./moro/core
+copying build/lib/moro/core/errors.py -> build/bdist.macosx-10.15-x86_64/wheel/./moro/core
+copying build/lib/moro/core/ids.py -> build/bdist.macosx-10.15-x86_64/wheel/./moro/core
+copying build/lib/moro/core/hashing.py -> build/bdist.macosx-10.15-x86_64/wheel/./moro/core
+copying build/lib/moro/core/project.py -> build/bdist.macosx-10.15-x86_64/wheel/./moro/core
+creating build/bdist.macosx-10.15-x86_64/wheel/moro/config
+copying build/lib/moro/config/models.py -> build/bdist.macosx-10.15-x86_64/wheel/./moro/config
+copying build/lib/moro/config/__init__.py -> build/bdist.macosx-10.15-x86_64/wheel/./moro/config
+copying build/lib/moro/config/loader.py -> build/bdist.macosx-10.15-x86_64/wheel/./moro/config
+creating build/bdist.macosx-10.15-x86_64/wheel/moro/deploy
+copying build/lib/moro/deploy/__init__.py -> build/bdist.macosx-10.15-x86_64/wheel/./moro/deploy
+copying build/lib/moro/deploy/manager.py -> build/bdist.macosx-10.15-x86_64/wheel/./moro/deploy
+creating build/bdist.macosx-10.15-x86_64/wheel/moro/training
+copying build/lib/moro/training/runner.py -> build/bdist.macosx-10.15-x86_64/wheel/./moro/training
+copying build/lib/moro/training/backend.py -> build/bdist.macosx-10.15-x86_64/wheel/./moro/training
+copying build/lib/moro/training/recovery.py -> build/bdist.macosx-10.15-x86_64/wheel/./moro/training
+copying build/lib/moro/training/__init__.py -> build/bdist.macosx-10.15-x86_64/wheel/./moro/training
+copying build/lib/moro/training/hf_backend.py -> build/bdist.macosx-10.15-x86_64/wheel/./moro/training
+copying build/lib/moro/training/async_runner.py -> build/bdist.macosx-10.15-x86_64/wheel/./moro/training
+creating build/bdist.macosx-10.15-x86_64/wheel/moro/runtime
+copying build/lib/moro/runtime/__init__.py -> build/bdist.macosx-10.15-x86_64/wheel/./moro/runtime
+copying build/lib/moro/runtime/orchestrator.py -> build/bdist.macosx-10.15-x86_64/wheel/./moro/runtime
+copying build/lib/moro/__init__.py -> build/bdist.macosx-10.15-x86_64/wheel/./moro
+creating build/bdist.macosx-10.15-x86_64/wheel/moro/release
+copying build/lib/moro/release/__init__.py -> build/bdist.macosx-10.15-x86_64/wheel/./moro/release
+copying build/lib/moro/release/manager.py -> build/bdist.macosx-10.15-x86_64/wheel/./moro/release
+creating build/bdist.macosx-10.15-x86_64/wheel/moro/models
+copying build/lib/moro/models/loading.py -> build/bdist.macosx-10.15-x86_64/wheel/./moro/models
+copying build/lib/moro/models/__init__.py -> build/bdist.macosx-10.15-x86_64/wheel/./moro/models
+creating build/bdist.macosx-10.15-x86_64/wheel/moro/cli
+copying build/lib/moro/cli/hooks.py -> build/bdist.macosx-10.15-x86_64/wheel/./moro/cli
+copying build/lib/moro/cli/services.py -> build/bdist.macosx-10.15-x86_64/wheel/./moro/cli
+copying build/lib/moro/cli/deploy.py -> build/bdist.macosx-10.15-x86_64/wheel/./moro/cli
+copying build/lib/moro/cli/import_data.py -> build/bdist.macosx-10.15-x86_64/wheel/./moro/cli
+copying build/lib/moro/cli/registry.py -> build/bdist.macosx-10.15-x86_64/wheel/./moro/cli
+copying build/lib/moro/cli/ui.py -> build/bdist.macosx-10.15-x86_64/wheel/./moro/cli
+copying build/lib/moro/cli/__init__.py -> build/bdist.macosx-10.15-x86_64/wheel/./moro/cli
+copying build/lib/moro/cli/export.py -> build/bdist.macosx-10.15-x86_64/wheel/./moro/cli
+copying build/lib/moro/cli/dashboard.py -> build/bdist.macosx-10.15-x86_64/wheel/./moro/cli
+copying build/lib/moro/cli/diagnose.py -> build/bdist.macosx-10.15-x86_64/wheel/./moro/cli
+copying build/lib/moro/cli/validate.py -> build/bdist.macosx-10.15-x86_64/wheel/./moro/cli
+copying build/lib/moro/cli/flywheel.py -> build/bdist.macosx-10.15-x86_64/wheel/./moro/cli
+copying build/lib/moro/cli/train.py -> build/bdist.macosx-10.15-x86_64/wheel/./moro/cli
+copying build/lib/moro/cli/guard.py -> build/bdist.macosx-10.15-x86_64/wheel/./moro/cli
+copying build/lib/moro/cli/analytics.py -> build/bdist.macosx-10.15-x86_64/wheel/./moro/cli
+copying build/lib/moro/cli/eval.py -> build/bdist.macosx-10.15-x86_64/wheel/./moro/cli
+copying build/lib/moro/cli/recipe.py -> build/bdist.macosx-10.15-x86_64/wheel/./moro/cli
+copying build/lib/moro/cli/init.py -> build/bdist.macosx-10.15-x86_64/wheel/./moro/cli
+copying build/lib/moro/cli/runs.py -> build/bdist.macosx-10.15-x86_64/wheel/./moro/cli
+copying build/lib/moro/cli/doctor.py -> build/bdist.macosx-10.15-x86_64/wheel/./moro/cli
+copying build/lib/moro/cli/data.py -> build/bdist.macosx-10.15-x86_64/wheel/./moro/cli
+copying build/lib/moro/cli/status.py -> build/bdist.macosx-10.15-x86_64/wheel/./moro/cli
+creating build/bdist.macosx-10.15-x86_64/wheel/moro/state
+copying build/lib/moro/state/__init__.py -> build/bdist.macosx-10.15-x86_64/wheel/./moro/state
+copying build/lib/moro/state/manager.py -> build/bdist.macosx-10.15-x86_64/wheel/./moro/state
+copying build/lib/moro/state/schema.py -> build/bdist.macosx-10.15-x86_64/wheel/./moro/state
+creating build/bdist.macosx-10.15-x86_64/wheel/moro/diagnose
+copying build/lib/moro/diagnose/analyzer.py -> build/bdist.macosx-10.15-x86_64/wheel/./moro/diagnose
+copying build/lib/moro/diagnose/__init__.py -> build/bdist.macosx-10.15-x86_64/wheel/./moro/diagnose
+creating build/bdist.macosx-10.15-x86_64/wheel/moro/storage
+copying build/lib/moro/storage/db.py -> build/bdist.macosx-10.15-x86_64/wheel/./moro/storage
+copying build/lib/moro/storage/state_graph.py -> build/bdist.macosx-10.15-x86_64/wheel/./moro/storage
+copying build/lib/moro/storage/__init__.py -> build/bdist.macosx-10.15-x86_64/wheel/./moro/storage
+creating build/bdist.macosx-10.15-x86_64/wheel/moro/dashboard
+copying build/lib/moro/dashboard/gateway.py -> build/bdist.macosx-10.15-x86_64/wheel/./moro/dashboard
+copying build/lib/moro/dashboard/mission_control.py -> build/bdist.macosx-10.15-x86_64/wheel/./moro/dashboard
+copying build/lib/moro/dashboard/__init__.py -> build/bdist.macosx-10.15-x86_64/wheel/./moro/dashboard
+copying build/lib/moro/dashboard/utils.py -> build/bdist.macosx-10.15-x86_64/wheel/./moro/dashboard
+creating build/bdist.macosx-10.15-x86_64/wheel/moro/dashboard/api
+copying build/lib/moro/dashboard/api/system.py -> build/bdist.macosx-10.15-x86_64/wheel/./moro/dashboard/api
+copying build/lib/moro/dashboard/api/models.py -> build/bdist.macosx-10.15-x86_64/wheel/./moro/dashboard/api
+copying build/lib/moro/dashboard/api/deployment.py -> build/bdist.macosx-10.15-x86_64/wheel/./moro/dashboard/api
+copying build/lib/moro/dashboard/api/evaluation.py -> build/bdist.macosx-10.15-x86_64/wheel/./moro/dashboard/api
+copying build/lib/moro/dashboard/api/datasets.py -> build/bdist.macosx-10.15-x86_64/wheel/./moro/dashboard/api
+copying build/lib/moro/dashboard/api/__init__.py -> build/bdist.macosx-10.15-x86_64/wheel/./moro/dashboard/api
+copying build/lib/moro/dashboard/api/flywheel.py -> build/bdist.macosx-10.15-x86_64/wheel/./moro/dashboard/api
+copying build/lib/moro/dashboard/api/training.py -> build/bdist.macosx-10.15-x86_64/wheel/./moro/dashboard/api
+creating build/bdist.macosx-10.15-x86_64/wheel/moro/recipes
+copying build/lib/moro/recipes/presets.py -> build/bdist.macosx-10.15-x86_64/wheel/./moro/recipes
+copying build/lib/moro/recipes/__init__.py -> build/bdist.macosx-10.15-x86_64/wheel/./moro/recipes
+copying build/lib/moro/recipes/rules.py -> build/bdist.macosx-10.15-x86_64/wheel/./moro/recipes
+copying build/lib/moro/recipes/engine.py -> build/bdist.macosx-10.15-x86_64/wheel/./moro/recipes
+copying build/lib/moro/recipes/mixing.py -> build/bdist.macosx-10.15-x86_64/wheel/./moro/recipes
+creating build/bdist.macosx-10.15-x86_64/wheel/moro/flywheel
+creating build/bdist.macosx-10.15-x86_64/wheel/moro/flywheel/webhook
+copying build/lib/moro/flywheel/webhook/receiver.py -> build/bdist.macosx-10.15-x86_64/wheel/./moro/flywheel/webhook
+copying build/lib/moro/flywheel/webhook/__init__.py -> build/bdist.macosx-10.15-x86_64/wheel/./moro/flywheel/webhook
+creating build/bdist.macosx-10.15-x86_64/wheel/moro/flywheel/ingestors
+copying build/lib/moro/flywheel/ingestors/__init__.py -> build/bdist.macosx-10.15-x86_64/wheel/./moro/flywheel/ingestors
+copying build/lib/moro/flywheel/ingestors/sqlite_ingestor.py -> build/bdist.macosx-10.15-x86_64/wheel/./moro/flywheel/ingestors
+copying build/lib/moro/flywheel/models.py -> build/bdist.macosx-10.15-x86_64/wheel/./moro/flywheel
+copying build/lib/moro/flywheel/__init__.py -> build/bdist.macosx-10.15-x86_64/wheel/./moro/flywheel
+creating build/bdist.macosx-10.15-x86_64/wheel/moro/flywheel/storage
+copying build/lib/moro/flywheel/storage/__init__.py -> build/bdist.macosx-10.15-x86_64/wheel/./moro/flywheel/storage
+copying build/lib/moro/flywheel/storage/schema.py -> build/bdist.macosx-10.15-x86_64/wheel/./moro/flywheel/storage
+copying build/lib/moro/flywheel/orchestrator.py -> build/bdist.macosx-10.15-x86_64/wheel/./moro/flywheel
+copying build/lib/moro/flywheel/architecture.py -> build/bdist.macosx-10.15-x86_64/wheel/./moro/flywheel
+creating build/bdist.macosx-10.15-x86_64/wheel/moro/flywheel/generators
+copying build/lib/moro/flywheel/generators/grounded_generator.py -> build/bdist.macosx-10.15-x86_64/wheel/./moro/flywheel/generators
+copying build/lib/moro/flywheel/generators/__init__.py -> build/bdist.macosx-10.15-x86_64/wheel/./moro/flywheel/generators
+creating build/bdist.macosx-10.15-x86_64/wheel/moro/flywheel/extractors
+copying build/lib/moro/flywheel/extractors/__init__.py -> build/bdist.macosx-10.15-x86_64/wheel/./moro/flywheel/extractors
+copying build/lib/moro/flywheel/extractors/deterministic_extractor.py -> build/bdist.macosx-10.15-x86_64/wheel/./moro/flywheel/extractors
+creating build/bdist.macosx-10.15-x86_64/wheel/moro/registry
+copying build/lib/moro/registry/__init__.py -> build/bdist.macosx-10.15-x86_64/wheel/./moro/registry
+copying build/lib/moro/registry/manager.py -> build/bdist.macosx-10.15-x86_64/wheel/./moro/registry
+creating build/bdist.macosx-10.15-x86_64/wheel/moro/templates
+copying build/lib/moro/templates/__init__.py -> build/bdist.macosx-10.15-x86_64/wheel/./moro/templates
+copying build/lib/moro/templates/project.py -> build/bdist.macosx-10.15-x86_64/wheel/./moro/templates
+creating build/bdist.macosx-10.15-x86_64/wheel/moro/eval
+copying build/lib/moro/eval/scorers.py -> build/bdist.macosx-10.15-x86_64/wheel/./moro/eval
+copying build/lib/moro/eval/runner.py -> build/bdist.macosx-10.15-x86_64/wheel/./moro/eval
+copying build/lib/moro/eval/harness.py -> build/bdist.macosx-10.15-x86_64/wheel/./moro/eval
+copying build/lib/moro/eval/models.py -> build/bdist.macosx-10.15-x86_64/wheel/./moro/eval
+copying build/lib/moro/eval/perturbations.py -> build/bdist.macosx-10.15-x86_64/wheel/./moro/eval
+copying build/lib/moro/eval/__init__.py -> build/bdist.macosx-10.15-x86_64/wheel/./moro/eval
+copying build/lib/moro/eval/robustness.py -> build/bdist.macosx-10.15-x86_64/wheel/./moro/eval
+copying build/lib/moro/eval/loader.py -> build/bdist.macosx-10.15-x86_64/wheel/./moro/eval
+copying build/lib/moro/eval/compare.py -> build/bdist.macosx-10.15-x86_64/wheel/./moro/eval
+creating build/bdist.macosx-10.15-x86_64/wheel/moro/export
+copying build/lib/moro/export/gguf.py -> build/bdist.macosx-10.15-x86_64/wheel/./moro/export
+copying build/lib/moro/export/merge.py -> build/bdist.macosx-10.15-x86_64/wheel/./moro/export
+copying build/lib/moro/export/paths.py -> build/bdist.macosx-10.15-x86_64/wheel/./moro/export
+copying build/lib/moro/export/manifest.py -> build/bdist.macosx-10.15-x86_64/wheel/./moro/export
+copying build/lib/moro/export/__init__.py -> build/bdist.macosx-10.15-x86_64/wheel/./moro/export
+copying build/lib/moro/export/gates.py -> build/bdist.macosx-10.15-x86_64/wheel/./moro/export
+copying build/lib/moro/export/ollama.py -> build/bdist.macosx-10.15-x86_64/wheel/./moro/export
+copying build/lib/moro/export/eligibility.py -> build/bdist.macosx-10.15-x86_64/wheel/./moro/export
+copying build/lib/moro/main.py -> build/bdist.macosx-10.15-x86_64/wheel/./moro
+creating build/bdist.macosx-10.15-x86_64/wheel/moro/data
+copying build/lib/moro/data/ingest.py -> build/bdist.macosx-10.15-x86_64/wheel/./moro/data
+copying build/lib/moro/data/clean.py -> build/bdist.macosx-10.15-x86_64/wheel/./moro/data
+copying build/lib/moro/data/compiler.py -> build/bdist.macosx-10.15-x86_64/wheel/./moro/data
+copying build/lib/moro/data/models.py -> build/bdist.macosx-10.15-x86_64/wheel/./moro/data
+copying build/lib/moro/data/normalize.py -> build/bdist.macosx-10.15-x86_64/wheel/./moro/data
+copying build/lib/moro/data/splitter.py -> build/bdist.macosx-10.15-x86_64/wheel/./moro/data
+copying build/lib/moro/data/__init__.py -> build/bdist.macosx-10.15-x86_64/wheel/./moro/data
+copying build/lib/moro/data/versions.py -> build/bdist.macosx-10.15-x86_64/wheel/./moro/data
+copying build/lib/moro/data/quality.py -> build/bdist.macosx-10.15-x86_64/wheel/./moro/data
+copying build/lib/moro/data/report.py -> build/bdist.macosx-10.15-x86_64/wheel/./moro/data
+copying build/lib/moro/data/privacy.py -> build/bdist.macosx-10.15-x86_64/wheel/./moro/data
+creating build/bdist.macosx-10.15-x86_64/wheel/moro/services
+copying build/lib/moro/services/__init__.py -> build/bdist.macosx-10.15-x86_64/wheel/./moro/services
+copying build/lib/moro/services/orchestrator.py -> build/bdist.macosx-10.15-x86_64/wheel/./moro/services
+creating build/bdist.macosx-10.15-x86_64/wheel/moro/validation
+copying build/lib/moro/validation/__init__.py -> build/bdist.macosx-10.15-x86_64/wheel/./moro/validation
+copying build/lib/moro/validation/engine.py -> build/bdist.macosx-10.15-x86_64/wheel/./moro/validation
+creating build/bdist.macosx-10.15-x86_64/wheel/moro/analytics
+copying build/lib/moro/analytics/__init__.py -> build/bdist.macosx-10.15-x86_64/wheel/./moro/analytics
+copying build/lib/moro/analytics/visualizations.py -> build/bdist.macosx-10.15-x86_64/wheel/./moro/analytics
+copying build/lib/moro/analytics/tracker.py -> build/bdist.macosx-10.15-x86_64/wheel/./moro/analytics
+copying build/lib/moro/analytics/schema.py -> build/bdist.macosx-10.15-x86_64/wheel/./moro/analytics
+running install_egg_info
+Copying src/moroai.egg-info to build/bdist.macosx-10.15-x86_64/wheel/./moroai-0.1.0-py3.12.egg-info
+running install_scripts
+creating build/bdist.macosx-10.15-x86_64/wheel/moroai-0.1.0.dist-info/WHEEL
+creating '/tmp/moro-audit-20261002/dist/.tmp-_364mzst/moroai-0.1.0-py3-none-any.whl' and adding 'build/bdist.macosx-10.15-x86_64/wheel' to it
+adding 'moro/__init__.py'
+adding 'moro/main.py'
+adding 'moro/analytics/__init__.py'
+adding 'moro/analytics/schema.py'
+adding 'moro/analytics/tracker.py'
+adding 'moro/analytics/visualizations.py'
+adding 'moro/cli/__init__.py'
+adding 'moro/cli/analytics.py'
+adding 'moro/cli/dashboard.py'
+adding 'moro/cli/data.py'
+adding 'moro/cli/deploy.py'
+adding 'moro/cli/diagnose.py'
+adding 'moro/cli/doctor.py'
+adding 'moro/cli/eval.py'
+adding 'moro/cli/export.py'
+adding 'moro/cli/flywheel.py'
+adding 'moro/cli/guard.py'
+adding 'moro/cli/hooks.py'
+adding 'moro/cli/import_data.py'
+adding 'moro/cli/init.py'
+adding 'moro/cli/recipe.py'
+adding 'moro/cli/registry.py'
+adding 'moro/cli/runs.py'
+adding 'moro/cli/services.py'
+adding 'moro/cli/status.py'
+adding 'moro/cli/train.py'
+adding 'moro/cli/ui.py'
+adding 'moro/cli/validate.py'
+adding 'moro/config/__init__.py'
+adding 'moro/config/loader.py'
+adding 'moro/config/models.py'
+adding 'moro/core/__init__.py'
+adding 'moro/core/errors.py'
+adding 'moro/core/hashing.py'
+adding 'moro/core/ids.py'
+adding 'moro/core/logging.py'
+adding 'moro/core/paths.py'
+adding 'moro/core/project.py'
+adding 'moro/dashboard/__init__.py'
+adding 'moro/dashboard/gateway.py'
+adding 'moro/dashboard/mission_control.py'
+adding 'moro/dashboard/utils.py'
+adding 'moro/dashboard/api/__init__.py'
+adding 'moro/dashboard/api/datasets.py'
+adding 'moro/dashboard/api/deployment.py'
+adding 'moro/dashboard/api/evaluation.py'
+adding 'moro/dashboard/api/flywheel.py'
+adding 'moro/dashboard/api/models.py'
+adding 'moro/dashboard/api/system.py'
+adding 'moro/dashboard/api/training.py'
+adding 'moro/data/__init__.py'
+adding 'moro/data/clean.py'
+adding 'moro/data/compiler.py'
+adding 'moro/data/ingest.py'
+adding 'moro/data/models.py'
+adding 'moro/data/normalize.py'
+adding 'moro/data/privacy.py'
+adding 'moro/data/quality.py'
+adding 'moro/data/report.py'
+adding 'moro/data/splitter.py'
+adding 'moro/data/versions.py'
+adding 'moro/deploy/__init__.py'
+adding 'moro/deploy/manager.py'
+adding 'moro/diagnose/__init__.py'
+adding 'moro/diagnose/analyzer.py'
+adding 'moro/eval/__init__.py'
+adding 'moro/eval/compare.py'
+adding 'moro/eval/harness.py'
+adding 'moro/eval/loader.py'
+adding 'moro/eval/models.py'
+adding 'moro/eval/perturbations.py'
+adding 'moro/eval/robustness.py'
+adding 'moro/eval/runner.py'
+adding 'moro/eval/scorers.py'
+adding 'moro/export/__init__.py'
+adding 'moro/export/eligibility.py'
+adding 'moro/export/gates.py'
+adding 'moro/export/gguf.py'
+adding 'moro/export/manifest.py'
+adding 'moro/export/merge.py'
+adding 'moro/export/ollama.py'
+adding 'moro/export/paths.py'
+adding 'moro/flywheel/__init__.py'
+adding 'moro/flywheel/architecture.py'
+adding 'moro/flywheel/models.py'
+adding 'moro/flywheel/orchestrator.py'
+adding 'moro/flywheel/extractors/__init__.py'
+adding 'moro/flywheel/extractors/deterministic_extractor.py'
+adding 'moro/flywheel/generators/__init__.py'
+adding 'moro/flywheel/generators/grounded_generator.py'
+adding 'moro/flywheel/ingestors/__init__.py'
+adding 'moro/flywheel/ingestors/sqlite_ingestor.py'
+adding 'moro/flywheel/storage/__init__.py'
+adding 'moro/flywheel/storage/schema.py'
+adding 'moro/flywheel/webhook/__init__.py'
+adding 'moro/flywheel/webhook/receiver.py'
+adding 'moro/hardware/__init__.py'
+adding 'moro/hardware/detector.py'
+adding 'moro/hardware/profile.py'
+adding 'moro/models/__init__.py'
+adding 'moro/models/loading.py'
+adding 'moro/recipes/__init__.py'
+adding 'moro/recipes/engine.py'
+adding 'moro/recipes/mixing.py'
+adding 'moro/recipes/presets.py'
+adding 'moro/recipes/rules.py'
+adding 'moro/registry/__init__.py'
+adding 'moro/registry/manager.py'
+adding 'moro/release/__init__.py'
+adding 'moro/release/manager.py'
+adding 'moro/runtime/__init__.py'
+adding 'moro/runtime/orchestrator.py'
+adding 'moro/services/__init__.py'
+adding 'moro/services/orchestrator.py'
+adding 'moro/state/__init__.py'
+adding 'moro/state/manager.py'
+adding 'moro/state/schema.py'
+adding 'moro/storage/__init__.py'
+adding 'moro/storage/db.py'
+adding 'moro/storage/state_graph.py'
+adding 'moro/templates/__init__.py'
+adding 'moro/templates/project.py'
+adding 'moro/training/__init__.py'
+adding 'moro/training/async_runner.py'
+adding 'moro/training/backend.py'
+adding 'moro/training/hf_backend.py'
+adding 'moro/training/recovery.py'
+adding 'moro/training/runner.py'
+adding 'moro/ui/__init__.py'
+adding 'moro/ui/server.py'
+adding 'moro/validation/__init__.py'
+adding 'moro/validation/engine.py'
+adding 'moroai-0.1.0.dist-info/licenses/LICENSE'
+adding 'moroai-0.1.0.dist-info/METADATA'
+adding 'moroai-0.1.0.dist-info/WHEEL'
+adding 'moroai-0.1.0.dist-info/entry_points.txt'
+adding 'moroai-0.1.0.dist-info/top_level.txt'
+adding 'moroai-0.1.0.dist-info/RECORD'
+removing build/bdist.macosx-10.15-x86_64/wheel
+Successfully built moroai-0.1.0.tar.gz and moroai-0.1.0-py3-none-any.whl

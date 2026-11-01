@@ -1,0 +1,19 @@
+...                                                                      [100%]
+=============================== warnings summary ===============================
+tests/integration/test_training_cpu.py::test_offline_training_and_adapter_reload[backend]
+tests/integration/test_training_cpu.py::test_offline_training_and_adapter_reload[sdk]
+tests/integration/test_training_cpu.py::test_offline_training_and_adapter_reload[sdk_oom]
+  /opt/moro-candidate/lib/python3.11/site-packages/peft/tuners/lora/layer.py:2760: UserWarning: fan_in_fan_out is set to False but the target module is `Conv1D`. Setting fan_in_fan_out to True.
+    warnings.warn(
+
+tests/integration/test_training_cpu.py::test_offline_training_and_adapter_reload[backend]
+tests/integration/test_training_cpu.py::test_offline_training_and_adapter_reload[backend]
+tests/integration/test_training_cpu.py::test_offline_training_and_adapter_reload[sdk]
+tests/integration/test_training_cpu.py::test_offline_training_and_adapter_reload[sdk]
+tests/integration/test_training_cpu.py::test_offline_training_and_adapter_reload[sdk_oom]
+tests/integration/test_training_cpu.py::test_offline_training_and_adapter_reload[sdk_oom]
+  /opt/moro-candidate/lib/python3.11/site-packages/torch/utils/data/dataloader.py:759: UserWarning: 'pin_memory' argument is set as true but no accelerator is found, then device pinned memory won't be used.
+    super().__init__(loader)
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+3 passed, 9 warnings in 9.75s

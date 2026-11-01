@@ -12,7 +12,6 @@ import tempfile
 from pathlib import Path
 
 import pytest
-import yaml
 
 
 @pytest.fixture
@@ -85,194 +84,67 @@ training:
     return project_dir
 
 
-class TestCompletePipeline:
-    """Test the complete pipeline end-to-end."""
+class TestSDKContracts:
+    """Contract tests; inference is mocked explicitly, never presented as real training."""
 
-    def test_data_compilation(self, initialized_project):
-        """Test that data compilation works."""
+    def test_data_compilation_has_disjoint_versioned_splits(self, initialized_project):
         from moro.data.compiler import DataCompiler
 
-        compiler = DataCompiler(initialized_project)
+        source = initialized_project / "data/raw/sample_data.jsonl"
+        with source.open("a") as stream:
+            stream.write(
+                json.dumps(
+                    {
+                        "messages": [
+                            {"role": "user", "content": "Third distinct question"},
+                            {"role": "assistant", "content": "Another useful answer"},
+                        ]
+                    }
+                )
+                + "\n"
+            )
+        version = DataCompiler(initialized_project).compile_dataset(source)
+        destination = initialized_project / "data/versions" / version
+        splits = [
+            {
+                json.loads(line)["id"]
+                for line in (destination / f"{name}.jsonl").read_text().splitlines()
+            }
+            for name in ("train", "validation", "eval")
+        ]
+        assert all(splits)
+        assert not (splits[0] & splits[1] or splits[0] & splits[2] or splits[1] & splits[2])
 
-        dataset_id = compiler.compile_dataset(
-            source_path=initialized_project / "data" / "raw" / "sample_data.jsonl",
-            config={"format": "jsonl", "deduplicate": True},
-        )
-
-        assert dataset_id is not None
-        assert (initialized_project / "data" / "compiled" / "train.jsonl").exists()
-
-    def test_recipe_generation(self, initialized_project):
-        """Test that recipe generation works."""
-        from moro.recipes.engine import RecipeEngine
-
-        engine = RecipeEngine(initialized_project)
-
-        recipe = engine.generate_recipe(
-            model_name="test-model-1.5b",
-        )
-
-        assert recipe is not None
-        assert "model_name" in recipe
-        assert "lora_r" in recipe
-        assert "learning_rate" in recipe
-
-    def test_training_execution(self, initialized_project):
-        """Test that training execution works."""
-        from moro.data.compiler import DataCompiler
-        from moro.recipes.engine import RecipeEngine
+    def test_missing_dataset_cannot_train(self, initialized_project):
+        from moro.core.errors import DatasetError
         from moro.training.runner import TrainingRunner
 
-        # First compile data
-        compiler = DataCompiler(initialized_project)
-        compiler.compile_dataset(
-            source_path=initialized_project / "data" / "raw" / "sample_data.jsonl",
-            config={"format": "jsonl"},
-        )
+        with pytest.raises(DatasetError, match="No immutable dataset"):
+            TrainingRunner(initialized_project).run_training()
 
-        # Generate recipe
-        engine = RecipeEngine(initialized_project)
-        recipe = engine.generate_recipe(model_name="test-model")
-
-        # Run training
-        runner = TrainingRunner(initialized_project)
-        results = runner.run_training(
-            recipe=recipe,
-            dataset_id="test_dataset",
-        )
-
-        assert results is not None
-        assert results["status"] == "completed"
-        assert "run_id" in results
-
-    def test_evaluation_execution(self, initialized_project):
-        """Test that evaluation execution works."""
+    def test_missing_run_cannot_evaluate(self, initialized_project):
+        from moro.core.errors import ExportError
         from moro.eval.harness import EvalHarness
 
-        # Create a simple eval suite
-        eval_suite = {
-            "name": "test-suite",
-            "cases": [
-                {
-                    "id": "test_1",
-                    "messages": [{"role": "user", "content": "Hello"}],
-                    "expect": {"contains": ["Hi"]},
-                },
-            ],
-        }
+        with pytest.raises(ExportError):
+            EvalHarness(initialized_project).run_evaluation("missing", "eval/missing.yaml")
 
-        eval_path = initialized_project / "eval" / "test_suite.yaml"
-        with open(eval_path, "w", encoding="utf-8") as f:
-            yaml.dump(eval_suite, f)
-
-        # Run evaluation
-        harness = EvalHarness(initialized_project)
-        results = harness.run_evaluation(
-            run_id="test_run",
-            eval_suite_path=eval_path,
-        )
-
-        assert results is not None
-        assert results["status"] == "completed"
-        assert "pass_rate" in results
-
-    def test_release_creation(self, initialized_project):
-        """Test that release creation works."""
+    def test_placeholder_model_cannot_release(self, initialized_project):
+        from moro.core.errors import ExportError
         from moro.release.manager import ReleaseManager
 
-        # Create a fake run
-        run_dir = initialized_project / "runs" / "test_run"
-        run_dir.mkdir(parents=True)
-        (run_dir / "model").mkdir()
-        (run_dir / "model" / "config.json").write_text("{}")
+        model = initialized_project / "runs/fake/model"
+        model.mkdir(parents=True)
+        (model / "config.json").write_text("{}")
+        with pytest.raises(ExportError):
+            ReleaseManager(initialized_project).create_release("fake", "v1", {"pass_rate": 1.0})
+        assert not list((initialized_project / "releases").iterdir())
 
-        # Create release
-        manager = ReleaseManager(initialized_project)
-        results = manager.create_release(
-            run_id="test_run",
-            version="v0.1.0",
-        )
+    def test_missing_deployment_cannot_claim_active(self, initialized_project):
+        import asyncio
 
-        assert results is not None
-        assert results["status"] == "created"
-        assert (initialized_project / "releases" / "v0.1.0").exists()
+        from moro.core.errors import ExportError
+        from moro.deploy.manager import DeploymentManager
 
-    def test_flywheel_execution(self, initialized_project):
-        """Test that flywheel execution works."""
-        from moro.flywheel.orchestrator import FlywheelOrchestrator
-
-        orchestrator = FlywheelOrchestrator(initialized_project)
-        results = orchestrator.run_cycle()
-
-        assert results is not None
-        assert "status" in results
-
-    def test_complete_pipeline(self, initialized_project):
-        """Test the complete pipeline end-to-end."""
-        from moro.data.compiler import DataCompiler
-        from moro.eval.harness import EvalHarness
-        from moro.recipes.engine import RecipeEngine
-        from moro.release.manager import ReleaseManager
-        from moro.training.runner import TrainingRunner
-
-        # Step 1: Compile data
-        compiler = DataCompiler(initialized_project)
-        dataset_id = compiler.compile_dataset(
-            source_path=initialized_project / "data" / "raw" / "sample_data.jsonl",
-            config={"format": "jsonl"},
-        )
-
-        assert dataset_id is not None
-
-        # Step 2: Generate recipe
-        engine = RecipeEngine(initialized_project)
-        recipe = engine.generate_recipe(model_name="test-model")
-
-        assert recipe is not None
-
-        # Step 3: Run training
-        runner = TrainingRunner(initialized_project)
-        training_results = runner.run_training(
-            recipe=recipe,
-            dataset_id=dataset_id,
-        )
-
-        assert training_results["status"] == "completed"
-
-        # Step 4: Run evaluation
-        eval_suite = {
-            "name": "test-suite",
-            "cases": [
-                {
-                    "id": "test_1",
-                    "messages": [{"role": "user", "content": "Hello"}],
-                },
-            ],
-        }
-
-        eval_path = initialized_project / "eval" / "test_suite.yaml"
-        with open(eval_path, "w", encoding="utf-8") as f:
-            yaml.dump(eval_suite, f)
-
-        harness = EvalHarness(initialized_project)
-        eval_results = harness.run_evaluation(
-            run_id=training_results["run_id"],
-            eval_suite_path=eval_path,
-        )
-
-        assert eval_results["status"] == "completed"
-
-        # Step 5: Create release
-        manager = ReleaseManager(initialized_project)
-        release_results = manager.create_release(
-            run_id=training_results["run_id"],
-            version="v0.1.0",
-            eval_results=eval_results,
-        )
-
-        assert release_results["status"] == "created"
-
-        # Verify all outputs exist
-        assert (initialized_project / "data" / "compiled" / "train.jsonl").exists()
-        assert (initialized_project / "runs" / training_results["run_id"]).exists()
-        assert (initialized_project / "releases" / "v0.1.0").exists()
+        with pytest.raises(ExportError, match="No endpoint has been created"):
+            asyncio.run(DeploymentManager(initialized_project).deploy_async("missing", "ollama"))

@@ -1,0 +1,56 @@
+import json, uuid, subprocess
+from pathlib import Path
+from datetime import datetime, timezone
+import httpx
+root=Path('/tmp/moro-remediation-20261003')
+token=(root/'project/.moro/web.token').read_text().strip()
+results={'time':datetime.now(timezone.utc).isoformat(), 'checks':[]}
+def check(name, response, expected):
+    assert response.status_code == expected, (name,response.status_code,response.text[:250])
+    results['checks'].append({'name':name,'status':response.status_code})
+for label, port in [('native',8501),('alternate',8765),('compose',18501)]:
+    base=f'http://127.0.0.1:{port}'
+    with httpx.Client(base_url=base,timeout=20,trust_env=False) as c:
+        check(label+' anonymous overview',c.get('/api/system/overview'),401)
+        check(label+' login page',c.get('/login'),200)
+        r=c.post('/login',data={'token':token},headers={'Origin':base})
+        check(label+' login',r,303)
+        assert 'httponly' in r.headers['set-cookie'].lower() and 'samesite=strict' in r.headers['set-cookie'].lower()
+        check(label+' authenticated dashboard',c.get('/'),200)
+        check(label+' authenticated overview',c.get('/api/system/overview'),200)
+        check(label+' packaged asset',c.get('/static/vendor/alpine.min.js'),200)
+        check(label+' cross origin',c.post('/api/terminal/execute',json={'command':'pwd'},headers={'Origin':'http://untrusted.invalid'}),403)
+        check(label+' disabled terminal',c.post('/api/terminal/execute',json={'command':'pwd'},headers={'Origin':base}),410)
+        check(label+' untrusted host',c.get('/login',headers={'Host':'untrusted.invalid'}),403)
+for label, port in [('native',8000),('compose',18000)]:
+    with httpx.Client(base_url=f'http://127.0.0.1:{port}',timeout=70,trust_env=False) as c:
+        check(label+' gateway anonymous',c.get('/v1/models'),401)
+        c.headers['Authorization']='Bearer '+token
+        r=c.get('/v1/models'); check(label+' actual model inventory',r,200)
+        assert r.json()['data']==[],r.text
+        results['checks'][-1]['model_count']=0
+        r=c.post('/v1/chat/completions',json={'model':'moro-smoke-missing-model','messages':[{'role':'user','content':'hello'}]})
+        check(label+' missing backend model',r,502)
+        assert 'choices' not in r.json()
+for label, port in [('native',8001),('compose',18001)]:
+    with httpx.Client(base_url=f'http://127.0.0.1:{port}',timeout=20,trust_env=False) as c:
+        r=c.get('/health'); check(label+' webhook health',r,200)
+        assert set(r.json())=={'status','service'}
+        payload={'session_id':'verification-'+uuid.uuid4().hex,'prompt':'Synthetic verification prompt','completion':'Synthetic verification response','human_correction':'Synthetic reviewed response','user_rating':1}
+        check(label+' webhook unauthenticated',c.post('/webhook/ingest',json=payload),403)
+        c.headers.update({'X-API-Key':token,'Idempotency-Key':'verification-'+uuid.uuid4().hex})
+        r=c.post('/webhook/ingest',json=payload); check(label+' webhook valid batch',r,200)
+        first=r.json()
+        r=c.post('/webhook/ingest',json=payload); check(label+' webhook replay',r,200)
+        assert first==r.json() and first['count']==1
+        payload['completion']='Conflicting synthetic response'
+        check(label+' webhook conflicting replay',c.post('/webhook/ingest',json=payload),409)
+        payload['user_rating']=5
+        check(label+' webhook invalid rating',c.post('/webhook/ingest',json=payload),422)
+        check(label+' webhook browser origin',c.post('/webhook/ingest',json=payload,headers={'Origin':'http://127.0.0.1:8501'}),403)
+results['containers']=[]
+for name in ['moro-remediation-dashboard-1','moro-remediation-gateway-1','moro-remediation-webhook-1','moro-remediation-ollama-1']:
+    d=json.loads(subprocess.check_output(['docker','inspect',name]))[0]
+    results['containers'].append({'name':name,'image':d['Image'],'user':d['Config']['User'],'ports':d['NetworkSettings']['Ports'],'running':d['State']['Running'],'health':d['State'].get('Health',{}).get('Status')})
+(root/'services-smoke.json').write_text(json.dumps(results,indent=2)+'\n')
+print(f"Passed {len(results['checks'])} live HTTP checks; token and session cookies omitted from evidence.")

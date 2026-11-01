@@ -192,6 +192,11 @@ def clean_rows(
                 total_docs=total_docs,
                 is_duplicate=is_duplicate,
             )
+            metadata.group_id = row.metadata.group_id
+            metadata.source_file = row.metadata.source_file
+            metadata.line_number = row.metadata.line_number
+            metadata.format = row.metadata.format
+            metadata.extra = dict(row.metadata.extra)
             row.metadata = metadata
             row.quality_score = metadata.quality_score
             row.privacy_flags = metadata.privacy_flags
