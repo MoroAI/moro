@@ -64,9 +64,7 @@ def test_missing_run_is_404_not_409(client, action):
 
 
 def test_operations_resume_job_mirrors_training_api(client, recorded_run):
-    missing = client.post(
-        "/api/operations/resume_job", json={"job_id": "missing"}, headers=_auth()
-    )
+    missing = client.post("/api/operations/resume_job", json={"job_id": "missing"}, headers=_auth())
     assert missing.status_code == 404
     response = client.post(
         "/api/operations/resume_job", json={"job_id": recorded_run}, headers=_auth()
@@ -76,9 +74,7 @@ def test_operations_resume_job_mirrors_training_api(client, recorded_run):
 
 
 def test_operations_resume_job_rejects_strict_input(client):
-    response = client.post(
-        "/api/operations/resume_job", json={"job_id": "run;id"}, headers=_auth()
-    )
+    response = client.post("/api/operations/resume_job", json={"job_id": "run;id"}, headers=_auth())
     assert response.status_code == 422
 
 

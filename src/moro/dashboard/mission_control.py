@@ -372,8 +372,7 @@ class TrainingMonitor:
             conn = db.get_connection(self.project_root)
             try:
                 row = conn.execute(
-                    "SELECT * FROM runs WHERE status = 'running'"
-                    " ORDER BY created_at DESC LIMIT 1"
+                    "SELECT * FROM runs WHERE status = 'running' ORDER BY created_at DESC LIMIT 1"
                 ).fetchone()
                 if row is not None:
                     active = {

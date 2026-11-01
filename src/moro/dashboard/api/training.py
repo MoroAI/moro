@@ -89,9 +89,7 @@ async def stop_training(run_id: str):
 @router.post("/runs/{run_id}/resume")
 async def resume_training(run_id: str):
     await get_training_run(run_id)
-    raise HTTPException(
-        409, "Checkpoint resume is not implemented; no training was started"
-    )
+    raise HTTPException(409, "Checkpoint resume is not implemented; no training was started")
 
 
 @router.get("/runs/{run_id}/metrics")

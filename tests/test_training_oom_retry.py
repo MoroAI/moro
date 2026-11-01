@@ -152,9 +152,7 @@ def test_oom_triggers_single_restart_with_preserved_effective_batch(tmp_path, mo
     assert len(attempts) == 2
     assert result["oom_recovered"] is True
     assert result["recovery_kind"] == "restart"
-    assert result["recovery_actions"] == [
-        "Reduced microbatch to 1; preserved effective batch size"
-    ]
+    assert result["recovery_actions"] == ["Reduced microbatch to 1; preserved effective batch size"]
     retry_args = attempts[1]["args"]
     assert retry_args["per_device_train_batch_size"] == 1
     assert retry_args["gradient_accumulation_steps"] == 8
