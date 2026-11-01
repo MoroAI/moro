@@ -1,0 +1,100 @@
+[
+  {
+    "args": [
+      "import",
+      "/tmp/moro-audit-20261002/dev/data/raw/audit.jsonl"
+    ],
+    "exit_code": 0
+  },
+  {
+    "args": [
+      "data",
+      "build"
+    ],
+    "exit_code": 0
+  },
+  {
+    "args": [
+      "data",
+      "report",
+      "--format",
+      "json"
+    ],
+    "exit_code": 0
+  },
+  {
+    "args": [
+      "train",
+      "--dry-run"
+    ],
+    "exit_code": 0
+  },
+  {
+    "args": [
+      "recipe",
+      "suggest"
+    ],
+    "exit_code": 0
+  },
+  {
+    "args": [
+      "validate"
+    ],
+    "exit_code": 0
+  },
+  {
+    "args": [
+      "flywheel",
+      "run",
+      "--json"
+    ],
+    "exit_code": 0
+  },
+  {
+    "args": [
+      "services",
+      "status",
+      "--json"
+    ],
+    "exit_code": 0
+  },
+  {
+    "args": [
+      "doctor",
+      "--privacy"
+    ],
+    "exit_code": 2
+  },
+  {
+    "args": [
+      "recipe",
+      "generate"
+    ],
+    "exit_code": 2
+  },
+  {
+    "args": [
+      "release",
+      "verify"
+    ],
+    "exit_code": 2
+  },
+  {
+    "args": [
+      "data",
+      "build",
+      "--mi-guard-threshold",
+      "0.85"
+    ],
+    "exit_code": 2
+  },
+  {
+    "args": [
+      "train",
+      "--auto-heal"
+    ],
+    "exit_code": 2
+  }
+]
+PII survives CLI pii_scan: True
+Plain SQLite headers: [('.moro/state.db', 'SQLite format 3\x00')]

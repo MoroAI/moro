@@ -1,0 +1,22 @@
+{
+  "htmx.org": {
+    "version": "1.9.12",
+    "license": "0BSD"
+  },
+  "alpinejs": {
+    "version": "3.14.9",
+    "license": "MIT"
+  },
+  "chart.js": {
+    "version": "4.4.8",
+    "license": "MIT"
+  },
+  "dropzone": {
+    "version": "5.9.3",
+    "license": "MIT"
+  },
+  "tailwindcss": {
+    "version": "3.4.17",
+    "license": "MIT"
+  }
+}

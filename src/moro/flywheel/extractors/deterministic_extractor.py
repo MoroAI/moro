@@ -23,7 +23,9 @@ class DeterministicPreferenceExtractor(AbstractPreferenceExtractor):
         self,
         synthetic_generator: AbstractSyntheticGenerator | None = None,
         min_confidence_delta: float = 0.05,
+        allow_synthetic: bool = False,
     ):
+        self.allow_synthetic = allow_synthetic
         self.synthetic_generator = synthetic_generator or DeterministicGroundedGenerator()
         self.min_confidence_delta = min_confidence_delta
 
@@ -33,6 +35,11 @@ class DeterministicPreferenceExtractor(AbstractPreferenceExtractor):
         for log in logs:
             extracted = self._extract_single(log)
             if extracted:
+                for pair in extracted:
+                    pair.metadata["synthetic"] = (
+                        pair.feedback_type != FeedbackType.EXPLICIT_HUMAN_CORRECTION
+                    )
+                    pair.metadata["review_status"] = "unreviewed"
                 pairs.extend(extracted)
         return pairs
 
@@ -46,6 +53,10 @@ class DeterministicPreferenceExtractor(AbstractPreferenceExtractor):
                 pairs.append(pair)
             return pairs
 
+        if not self.allow_synthetic:
+            return []
+
+        # Experimental rules require explicit opt-in; ratings alone do not supply a correct answer.
         # Rule 2: Implicit Negative Rating
         if log.user_rating is not None and log.user_rating < 0:
             pair = self._extract_negative_rating(log)

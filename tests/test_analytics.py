@@ -315,33 +315,13 @@ def test_visual_analytics_engine(tracker: ExperimentTracker):
 # ===================================================================
 
 
-def test_training_runner_tracks_experiments(tmp_path: Path):
-    """Test TrainingRunner automatic lifecycle orchestration."""
-    runner = TrainingRunner(tmp_path)
-    exp_id = runner.run_training(
-        {
-            "name": "auto_tracked_run",
-            "model_name": "Qwen/Qwen2.5-1.5B",
-            "learning_rate": 2e-4,
-            "batch_size": 2,
-            "epochs": 1.0,
-            "steps_data": [
-                {"step": 10, "train_loss": 2.2, "eval_loss": 2.3},
-                {"step": 20, "train_loss": 1.8, "eval_loss": 1.9},
-            ],
-            "final_train_loss": 1.8,
-            "eval_pass_rate": 0.85,
-            "eval_delta": 0.05,
-        }
-    )
+def test_training_runner_rejects_supplied_success_metrics(tmp_project):
+    from moro.core.errors import ConfigError
 
-    assert exp_id.startswith("exp_")
-    exp = runner.tracker.get_experiment(exp_id)
-    assert exp["status"] == "completed"
-    assert exp["final_train_loss"] == 1.8
-
-    metrics = runner.tracker.get_metrics(exp_id)
-    assert len(metrics) == 2
+    runner = TrainingRunner(tmp_project)
+    with pytest.raises(ConfigError, match="Unsupported training recipe field"):
+        runner.run_training({"steps_data": [{"train_loss": 1.8}], "final_train_loss": 1.8})
+    assert not list((tmp_project / "runs").glob("*/model/config.json"))
 
 
 # ===================================================================
@@ -404,7 +384,12 @@ def test_mission_control_analytics_endpoints(tmp_path: Path, monkeypatch):
     tracker.log_metrics(exp1, step=10, train_loss=2.1, eval_loss=2.2)
     tracker.complete_experiment(exp1, final_train_loss=1.2, eval_delta=0.07, eval_pass_rate=0.86)
 
-    client = TestClient(dashboard_app)
+    monkeypatch.setenv("MORO_API_TOKEN", "test-analytics-" + "a" * 32)
+    client = TestClient(
+        dashboard_app,
+        base_url="http://127.0.0.1",
+        headers={"Authorization": "Bearer test-analytics-" + "a" * 32},
+    )
 
     # List experiments
     r = client.get("/api/analytics/experiments")

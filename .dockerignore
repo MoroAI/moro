@@ -1,0 +1,16 @@
+.git
+.venv
+.moro
+.env
+.env.*
+data
+runs
+releases
+__pycache__
+*.pyc
+.pytest_cache
+.ruff_cache
+build
+dist
+*.egg-info
+docs/audits

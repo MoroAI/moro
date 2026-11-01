@@ -141,10 +141,10 @@ class ServiceOrchestrator:
                     "--host",
                     "127.0.0.1",
                     "--port",
-                    "8765",
+                    "8501",
                 ],
-                port=8765,
-                health_check_url="http://127.0.0.1:8765/api/health",
+                port=8501,
+                health_check_url="http://127.0.0.1:8501/api/health",
                 auto_restart=True,
                 description="Mission Control Web Operations Center",
             ),
@@ -171,7 +171,7 @@ class ServiceOrchestrator:
                     "8001",
                 ],
                 port=8001,
-                health_check_url="http://127.0.0.1:8001/webhook/stats",
+                health_check_url="http://127.0.0.1:8001/health",
                 auto_restart=True,
                 description="Production Telemetry & Log Receiver",
             ),
@@ -411,7 +411,7 @@ class ServiceOrchestrator:
     def start_all(self) -> dict[str, bool]:
         """Start all configured services."""
         results: dict[str, bool] = {}
-        for service_name in ["dashboard", "ollama", "webhook"]:
+        for service_name in ["dashboard", "ollama", "webhook", "gateway"]:
             results[service_name] = self.start_service(service_name)
         return results
 

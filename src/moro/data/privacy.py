@@ -22,7 +22,13 @@ _PATTERNS: list[tuple[str, re.Pattern]] = [
     ("phone", re.compile(r"\b(\+?1[\s.-])?(\(?\d{3}\)?[\s.-])?\d{3}[\s.-]\d{4}\b")),
     ("api_key", re.compile(r"\b(sk-|pk-|api[-_]?key[-_]?)[a-zA-Z0-9_\-]{16,}\b", re.IGNORECASE)),
     ("bearer_token", re.compile(r"\bBearer\s+[a-zA-Z0-9_\-\.]+\b")),
-    ("private_key", re.compile(r"-----BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY-----")),
+    (
+        "private_key",
+        re.compile(
+            r"-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----.*?(?:-----END (?:RSA |EC |OPENSSH )?PRIVATE KEY-----|\Z)",
+            re.DOTALL,
+        ),
+    ),
     ("aws_key", re.compile(r"\bAKIA[0-9A-Z]{16}\b")),
     (
         "secret_env",
@@ -63,6 +69,8 @@ def scan_rows(rows: list[DatasetRow]) -> list[DatasetRow]:
     """
     for row in rows:
         row.privacy_flags = scan_row(row)
+        row.metadata.privacy_flags = list(row.privacy_flags)
+        row.metadata.pii_detected = bool(row.privacy_flags)
     return rows
 
 
@@ -107,6 +115,9 @@ def redact_row(row: DatasetRow) -> tuple[DatasetRow, list[str]]:
             if f not in detected_flags:
                 detected_flags.append(f)
     row.privacy_flags = detected_flags
+    row.metadata.privacy_flags = list(detected_flags)
+    row.metadata.pii_detected = bool(detected_flags)
+    row.metadata.extra["privacy_redacted"] = bool(detected_flags)
     return row, detected_flags
 
 

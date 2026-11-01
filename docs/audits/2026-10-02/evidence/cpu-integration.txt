@@ -1,0 +1,421 @@
+============================= test session starts ==============================
+platform linux -- Python 3.11.17, pytest-9.1.1, pluggy-1.6.0 -- /usr/local/bin/python
+cachedir: /tmp/pytest-cache
+rootdir: /workspace
+configfile: pyproject.toml
+plugins: anyio-4.15.1
+collecting ... collected 18 items
+
+../workspace/tests/integration/test_complete_pipeline.py::TestStateManagement::test_state_db_initialization PASSED [  5%]
+../workspace/tests/integration/test_complete_pipeline.py::TestStateManagement::test_node_creation_and_query PASSED [ 11%]
+../workspace/tests/integration/test_complete_pipeline.py::TestStateManagement::test_edge_creation_and_lineage PASSED [ 16%]
+../workspace/tests/integration/test_complete_pipeline.py::TestStateManagement::test_model_registry PASSED [ 22%]
+../workspace/tests/integration/test_complete_pipeline.py::TestExperimentTracking::test_experiment_db_initialization PASSED [ 27%]
+../workspace/tests/integration/test_complete_pipeline.py::TestExperimentTracking::test_experiment_lifecycle PASSED [ 33%]
+../workspace/tests/integration/test_complete_pipeline.py::TestExperimentTracking::test_experiment_comparison PASSED [ 38%]
+../workspace/tests/integration/test_complete_pipeline.py::TestRuntimeOrchestrator::test_orchestrator_initialization PASSED [ 44%]
+../workspace/tests/integration/test_complete_pipeline.py::TestRuntimeOrchestrator::test_execution_context_creation PASSED [ 50%]
+../workspace/tests/integration/test_complete_pipeline.py::TestRuntimeOrchestrator::test_execution_lifecycle PASSED [ 55%]
+../workspace/tests/integration/test_complete_pipeline.py::TestRuntimeOrchestrator::test_error_recovery PASSED [ 61%]
+../workspace/tests/integration/test_complete_pipeline.py::TestServiceOrchestrator::test_service_definitions PASSED [ 66%]
+../workspace/tests/integration/test_complete_pipeline.py::TestServiceOrchestrator::test_service_status PASSED [ 72%]
+../workspace/tests/integration/test_complete_pipeline.py::TestCompletePipeline::test_complete_pipeline_execution PASSED [ 77%]
+../workspace/tests/integration/test_complete_pipeline.py::TestPerformanceBenchmarks::test_state_manager_performance PASSED [ 83%]
+../workspace/tests/integration/test_complete_pipeline.py::TestPerformanceBenchmarks::test_experiment_tracker_performance PASSED [ 88%]
+../workspace/tests/integration/test_moro_full_lifecycle_e2e.py::test_moro_full_lifecycle_master_e2e FAILED [ 94%]
+../workspace/tests/integration/test_training_cpu.py::test_offline_training_and_adapter_reload PASSED [100%]
+
+=================================== FAILURES ===================================
+_____________________ test_moro_full_lifecycle_master_e2e ______________________
+
+tmp_path = PosixPath('/tmp/pytest-of-root/pytest-0/test_moro_full_lifecycle_maste0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7fc51533d250>
+
+    def test_moro_full_lifecycle_master_e2e(tmp_path: Path, monkeypatch):
+        project_dir = tmp_path / "quantum_foundry"
+    
+        # ---------------------------------------------------------
+        # 1. moro doctor
+        # ---------------------------------------------------------
+        res_doc = runner.invoke(app, ["doctor"])
+        assert res_doc.exit_code in (0, 1, 2, 3)
+        assert "MoroAI Environment Check" in res_doc.stdout
+    
+        # ---------------------------------------------------------
+        # 2. moro init
+        # ---------------------------------------------------------
+        res_init = runner.invoke(app, ["init", str(project_dir)])
+        assert res_init.exit_code == 0
+        assert (project_dir / "moro.yaml").exists()
+        assert (project_dir / "data" / "raw").exists()
+        assert (project_dir / "eval" / "support-golden-v1.yaml").exists()
+    
+        # Change working directory into the project directory
+        monkeypatch.chdir(project_dir)
+    
+        # ---------------------------------------------------------
+        # 3. moro status (initial)
+        # ---------------------------------------------------------
+        res_status = runner.invoke(app, ["status"])
+        assert res_status.exit_code == 0
+        assert "MoroAI Project Status" in res_status.stdout
+    
+        # ---------------------------------------------------------
+        # 4. moro guard (scan, redact, check)
+        # ---------------------------------------------------------
+        dirty_file = project_dir / "dirty_data.jsonl"
+        dirty_file.write_text(
+            json.dumps(
+                {
+                    "prompt": "Contact john.doe@example.com or use key sk-1234567890abcdef1234567890abcdef",
+                    "completion": "Call +1-555-019-2834 for support.",
+                }
+            )
+            + "\n"
+            + json.dumps(
+                {
+                    "prompt": "Explain quantum entanglement.",
+                    "completion": "Quantum entanglement occurs when particles remain connected.",
+                }
+            )
+            + "\n"
+            + json.dumps(
+                {
+                    "prompt": "What is quantum superposition?",
+                    "completion": "Superposition allows a quantum state to exist across linear combinations of basis states.",
+                }
+            )
+            + "\n"
+            + json.dumps(
+                {
+                    "prompt": "Define quantum decoherence.",
+                    "completion": "Decoherence is the loss of quantum coherence due to environmental interaction.",
+                }
+            )
+            + "\n"
+            + json.dumps(
+                {
+                    "prompt": "How does Shor's algorithm work?",
+                    "completion": "Shor's algorithm factors integers in polynomial time using quantum Fourier transforms.",
+                }
+            )
+            + "\n"
+        )
+    
+        # 4a. guard scan detects PII
+        res_scan = runner.invoke(app, ["guard", "scan", str(dirty_file)])
+        assert res_scan.exit_code == 0
+        assert "Privacy Guard Alert" in res_scan.stdout
+        assert "email" in res_scan.stdout
+    
+        # 4b. guard check fails because PII is present
+        res_chk_fail = runner.invoke(app, ["guard", "check", str(dirty_file)])
+        assert res_chk_fail.exit_code == 1
+    
+        # 4c. guard redact sanitizes the file
+        clean_file = project_dir / "clean_data.jsonl"
+        res_redact = runner.invoke(
+            app, ["guard", "redact", str(dirty_file), "--output", str(clean_file)]
+        )
+        assert res_redact.exit_code == 0
+        assert "Redacted" in res_redact.stdout
+    
+        # Verify clean_file passes guard check
+        res_chk_pass = runner.invoke(app, ["guard", "check", str(clean_file)])
+        assert res_chk_pass.exit_code == 0
+    
+        clean_content = clean_file.read_text()
+        assert "[REDACTED_EMAIL]" in clean_content
+    
+        # ---------------------------------------------------------
+        # 5. moro import
+        # ---------------------------------------------------------
+        res_import = runner.invoke(app, ["import", str(clean_file)])
+        assert res_import.exit_code == 0
+        assert "Registered dataset source" in res_import.stdout
+    
+        # ---------------------------------------------------------
+        # 6. moro data build with Epistemic Quality, PPMI & MI Guard
+        # ---------------------------------------------------------
+        # Create a domain glossary
+        glossary_file = project_dir / "domain_glossary.txt"
+        glossary_file.write_text(
+            "quantum\nentanglement\nsupremacy\nqubit\nhamiltonian\nsuperposition\n"
+        )
+    
+        # Add an edge case row with high jargon density
+        edge_file = project_dir / "edge_case.jsonl"
+        edge_file.write_text(
+            json.dumps(
+                {
+                    "prompt": "Qubit Hamiltonian state.",
+                    "completion": "Superposition of qubit Hamiltonian yields quantum supremacy.",
+                }
+            )
+            + "\n"
+        )
+        runner.invoke(app, ["import", str(edge_file)])
+    
+        # Update moro.yaml to point to the imported data and glossary file
+        moro_yaml = project_dir / "moro.yaml"
+        with open(moro_yaml) as f:
+            cfg = yaml.safe_load(f)
+        cfg.setdefault("dataset", {})["source"] = "data/raw/clean_data.jsonl"
+        cfg["dataset"]["domain_glossary"] = "domain_glossary.txt"
+        cfg.setdefault("release", {}).setdefault("require", {})["safety_pass"] = False
+        with open(moro_yaml, "w") as f:
+            yaml.safe_dump(cfg, f)
+    
+        res_build = runner.invoke(app, ["data", "build"])
+        if res_build.exit_code != 0:
+            print("DATA BUILD ERROR:", res_build.stdout)
+        assert res_build.exit_code == 0
+        assert "Dataset built successfully!" in res_build.stdout
+    
+        # Verify build artifacts
+        versions_dir = project_dir / "data" / "versions"
+        version_dirs = [d for d in versions_dir.iterdir() if d.is_dir()]
+        assert len(version_dirs) >= 1
+        latest_version = version_dirs[0]
+        assert (latest_version / "train.jsonl").exists()
+        assert (latest_version / "report.json").exists()
+    
+        with open(latest_version / "report.json") as f:
+            stats = json.load(f)
+            assert "classification_counts" in stats
+            assert "avg_zlib_entropy" in stats
+            assert "avg_ppmi" in stats
+    
+        # ---------------------------------------------------------
+        # 7. moro data report
+        # ---------------------------------------------------------
+        res_report = runner.invoke(app, ["data", "report"])
+        assert res_report.exit_code == 0
+        assert "Dataset Quality Report" in res_report.stdout
+    
+        # ---------------------------------------------------------
+        # 8. moro data inspect
+        # ---------------------------------------------------------
+        res_inspect = runner.invoke(app, ["data", "inspect", "--n", "2"])
+        assert res_inspect.exit_code == 0
+        assert "Row 1" in res_inspect.stdout or "Dataset:" in res_inspect.stdout
+    
+        # ---------------------------------------------------------
+        # 9. moro recipe suggest & apply
+        # ---------------------------------------------------------
+        res_recipe = runner.invoke(app, ["recipe", "suggest", "--target-vram", "16.0"])
+        assert res_recipe.exit_code == 0
+        assert "Suggested Training Recipe" in res_recipe.stdout
+        assert "domain_ratio" in res_recipe.stdout or "replay_ratio" in res_recipe.stdout
+    
+        # Apply recipe with -y
+        res_apply = runner.invoke(app, ["recipe", "apply", "-y", "--target-vram", "16.0"])
+        assert res_apply.exit_code == 0
+        assert "updated" in res_apply.stdout
+    
+        # ---------------------------------------------------------
+        # 10. moro hooks (install, check, uninstall)
+        # ---------------------------------------------------------
+        import subprocess
+    
+>       subprocess.run(["git", "init"], cwd=str(project_dir), capture_output=True)
+
+/workspace/tests/integration/test_moro_full_lifecycle_e2e.py:221: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/usr/local/lib/python3.11/subprocess.py:548: in run
+    with Popen(*popenargs, **kwargs) as process:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/usr/local/lib/python3.11/subprocess.py:1026: in __init__
+    self._execute_child(args, executable, preexec_fn, close_fds,
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <Popen: returncode: 255 args: ['git', 'init']>, args = ['git', 'init']
+executable = b'git', preexec_fn = None, close_fds = True, pass_fds = ()
+cwd = '/tmp/pytest-of-root/pytest-0/test_moro_full_lifecycle_maste0/quantum_foundry'
+env = None, startupinfo = None, creationflags = 0, shell = False, p2cread = -1
+p2cwrite = -1, c2pread = 11, c2pwrite = 12, errread = 13, errwrite = 14
+restore_signals = True, gid = None, gids = None, uid = None, umask = -1
+start_new_session = False, process_group = -1
+
+    def _execute_child(self, args, executable, preexec_fn, close_fds,
+                       pass_fds, cwd, env,
+                       startupinfo, creationflags, shell,
+                       p2cread, p2cwrite,
+                       c2pread, c2pwrite,
+                       errread, errwrite,
+                       restore_signals,
+                       gid, gids, uid, umask,
+                       start_new_session, process_group):
+        """Execute program (POSIX version)"""
+    
+        if isinstance(args, (str, bytes)):
+            args = [args]
+        elif isinstance(args, os.PathLike):
+            if shell:
+                raise TypeError('path-like args is not allowed when '
+                                'shell is true')
+            args = [args]
+        else:
+            args = list(args)
+    
+        if shell:
+            # On Android the default shell is at '/system/bin/sh'.
+            unix_shell = ('/system/bin/sh' if
+                      hasattr(sys, 'getandroidapilevel') else '/bin/sh')
+            args = [unix_shell, "-c"] + args
+            if executable:
+                args[0] = executable
+    
+        if executable is None:
+            executable = args[0]
+    
+        sys.audit("subprocess.Popen", executable, args, cwd, env)
+    
+        if (_USE_POSIX_SPAWN
+                and os.path.dirname(executable)
+                and preexec_fn is None
+                and not close_fds
+                and not pass_fds
+                and cwd is None
+                and (p2cread == -1 or p2cread > 2)
+                and (c2pwrite == -1 or c2pwrite > 2)
+                and (errwrite == -1 or errwrite > 2)
+                and not start_new_session
+                and process_group == -1
+                and gid is None
+                and gids is None
+                and uid is None
+                and umask < 0):
+            self._posix_spawn(args, executable, env, restore_signals,
+                              p2cread, p2cwrite,
+                              c2pread, c2pwrite,
+                              errread, errwrite)
+            return
+    
+        orig_executable = executable
+    
+        # For transferring possible exec failure from child to parent.
+        # Data format: "exception name:hex errno:description"
+        # Pickle is not used; it is complex and involves memory allocation.
+        errpipe_read, errpipe_write = os.pipe()
+        # errpipe_write must not be in the standard io 0, 1, or 2 fd range.
+        low_fds_to_close = []
+        while errpipe_write < 3:
+            low_fds_to_close.append(errpipe_write)
+            errpipe_write = os.dup(errpipe_write)
+        for low_fd in low_fds_to_close:
+            os.close(low_fd)
+        try:
+            try:
+                # We must avoid complex work that could involve
+                # malloc or free in the child process to avoid
+                # potential deadlocks, thus we do all this here.
+                # and pass it to fork_exec()
+    
+                if env is not None:
+                    env_list = []
+                    for k, v in env.items():
+                        k = os.fsencode(k)
+                        if b'=' in k:
+                            raise ValueError("illegal environment variable name")
+                        env_list.append(k + b'=' + os.fsencode(v))
+                else:
+                    env_list = None  # Use execv instead of execve.
+                executable = os.fsencode(executable)
+                if os.path.dirname(executable):
+                    executable_list = (executable,)
+                else:
+                    # This matches the behavior of os._execvpe().
+                    executable_list = tuple(
+                        os.path.join(os.fsencode(dir), executable)
+                        for dir in os.get_exec_path(env))
+                fds_to_keep = set(pass_fds)
+                fds_to_keep.add(errpipe_write)
+                self.pid = _fork_exec(
+                        args, executable_list,
+                        close_fds, tuple(sorted(map(int, fds_to_keep))),
+                        cwd, env_list,
+                        p2cread, p2cwrite, c2pread, c2pwrite,
+                        errread, errwrite,
+                        errpipe_read, errpipe_write,
+                        restore_signals, start_new_session,
+                        process_group, gid, gids, uid, umask,
+                        preexec_fn, _USE_VFORK)
+                self._child_created = True
+            finally:
+                # be sure the FD is closed no matter what
+                os.close(errpipe_write)
+    
+            self._close_pipe_fds(p2cread, p2cwrite,
+                                 c2pread, c2pwrite,
+                                 errread, errwrite)
+    
+            # Wait for exec to fail or succeed; possibly raising an
+            # exception (limited in size)
+            errpipe_data = bytearray()
+            while True:
+                part = os.read(errpipe_read, 50000)
+                errpipe_data += part
+                if not part or len(errpipe_data) > 50000:
+                    break
+        finally:
+            # be sure the FD is closed no matter what
+            os.close(errpipe_read)
+    
+        if errpipe_data:
+            try:
+                pid, sts = os.waitpid(self.pid, 0)
+                if pid == self.pid:
+                    self._handle_exitstatus(sts)
+                else:
+                    self.returncode = sys.maxsize
+            except ChildProcessError:
+                pass
+    
+            try:
+                exception_name, hex_errno, err_msg = (
+                        errpipe_data.split(b':', 2))
+                # The encoding here should match the encoding
+                # written in by the subprocess implementations
+                # like _posixsubprocess
+                err_msg = err_msg.decode()
+            except ValueError:
+                exception_name = b'SubprocessError'
+                hex_errno = b'0'
+                err_msg = 'Bad exception data from child: {!r}'.format(
+                              bytes(errpipe_data))
+            child_exception_type = getattr(
+                    builtins, exception_name.decode('ascii'),
+                    SubprocessError)
+            if issubclass(child_exception_type, OSError) and hex_errno:
+                errno_num = int(hex_errno, 16)
+                if err_msg == "noexec:chdir":
+                    err_msg = ""
+                    # The error must be from chdir(cwd).
+                    err_filename = cwd
+                elif err_msg == "noexec":
+                    err_msg = ""
+                    err_filename = None
+                else:
+                    err_filename = orig_executable
+                if errno_num != 0:
+                    err_msg = os.strerror(errno_num)
+                if err_filename is not None:
+>                   raise child_exception_type(errno_num, err_msg, err_filename)
+E                   FileNotFoundError: [Errno 2] No such file or directory: 'git'
+
+/usr/local/lib/python3.11/subprocess.py:1955: FileNotFoundError
+=============================== warnings summary ===============================
+tests/integration/test_training_cpu.py::test_offline_training_and_adapter_reload
+  /usr/local/lib/python3.11/site-packages/peft/tuners/lora/layer.py:2174: UserWarning: fan_in_fan_out is set to False but the target module is `Conv1D`. Setting fan_in_fan_out to True.
+    warnings.warn(
+
+tests/integration/test_training_cpu.py::test_offline_training_and_adapter_reload
+tests/integration/test_training_cpu.py::test_offline_training_and_adapter_reload
+  /usr/local/lib/python3.11/site-packages/torch/utils/data/dataloader.py:666: UserWarning: 'pin_memory' argument is set as true but no accelerator is found, then device pinned memory won't be used.
+    warnings.warn(warn_msg)
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED ../workspace/tests/integration/test_moro_full_lifecycle_e2e.py::test_moro_full_lifecycle_master_e2e
+=================== 1 failed, 17 passed, 3 warnings in 8.73s ===================

@@ -63,3 +63,24 @@ def estimate_memory(
     )
     components["headroom"] = max(1.0, sum(components.values()) * 0.2)
     return {name: round(value, 3) for name, value in components.items()}
+
+
+def estimate_config_memory(config) -> float | None:
+    """Shared planning estimate; unknown model size remains unknown."""
+    billions, _ = infer_parameter_billions(config.model.name)
+    if billions is None:
+        return None
+    parts = estimate_memory(
+        billions,
+        quantization=config.model.quantization,
+        precision=config.training.precision,
+        sequence_length=config.dataset.max_seq_length,
+        batch_size=config.training.batch_size,
+        rank=config.adapter.r,
+        module_count=len(config.adapter.target_modules)
+        if isinstance(config.adapter.target_modules, list)
+        else 7,
+        checkpointing=config.training.gradient_checkpointing,
+        optimizer=config.training.optimizer,
+    )
+    return round(sum(parts.values()), 3)

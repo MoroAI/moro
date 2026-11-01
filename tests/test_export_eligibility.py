@@ -527,3 +527,42 @@ def test_invalid_checks_fail_before_model_loading(recorded_run, monkeypatch, exp
     conn = db.get_connection(root)
     assert conn.execute("SELECT COUNT(*) FROM eval_runs").fetchone()[0] == 0
     conn.close()
+
+
+@pytest.mark.parametrize(
+    "command,module_name",
+    [(["deploy"], "moro.cli.deploy"), (["export", "--format", "ollama"], "moro.cli.export")],
+)
+def test_ollama_package_rejects_change_after_gate(evaluated_run, monkeypatch, command, module_name):
+    import importlib
+
+    module = importlib.import_module(module_name)
+    root, directory, run, _ = evaluated_run
+    check = module.check_release_requirements
+
+    def change_after_approval(*args, **kwargs):
+        result = check(*args, **kwargs)
+        assert result["status"] == "passed"
+        (directory / "adapter/adapter_model.safetensors").write_bytes(b"changed after approval")
+        return result
+
+    monkeypatch.setattr(module, "check_release_requirements", change_after_approval)
+    result = runner.invoke(app, [*command, "--run-id", run])
+    assert result.exit_code == 1
+    assert "changed after release approval" in result.output
+    assert not list((root / "releases").rglob("package_manifest.json"))
+
+
+def test_promotion_requires_real_gate_and_preserves_previous_on_failure(evaluated_run):
+    from moro.state.manager import StateManager
+
+    root, _, run, _ = evaluated_run
+    manager = StateManager(root / ".moro/state.db")
+    model = manager.register_model("candidate", "1", "fixture-base", training_run_id=run)
+    assert manager.promote_model_to_production(model)
+    assert manager.promote_model_to_production("missing") is False
+    assert manager.list_models(production_only=True)[0]["model_id"] == model
+    invalid = manager.register_model("candidate", "2", "fixture-base")
+    with pytest.raises(ValueError):
+        manager.promote_model_to_production(invalid)
+    assert manager.list_models(production_only=True)[0]["model_id"] == model

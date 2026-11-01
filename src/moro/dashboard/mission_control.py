@@ -9,13 +9,13 @@ from __future__ import annotations
 
 import asyncio
 import json
+import re
 import sqlite3
 import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
-from fastapi.middleware.cors import CORSMiddleware
+from fastapi import FastAPI, HTTPException, Query, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 
@@ -29,6 +29,11 @@ from moro.dashboard.api.flywheel import router as flywheel_router
 from moro.dashboard.api.models import router as models_router
 from moro.dashboard.api.system import router as system_router
 from moro.dashboard.api.training import router as training_router
+from moro.dashboard.operations import router as operations_router
+from moro.dashboard.security import csp_nonce, install_security
+
+CONTAINER_LOGS_DEFAULT_TAIL = 100
+CONTAINER_LOGS_MAX_TAIL = 1000
 
 # ===================================================================
 # SERVICE CONNECTORS
@@ -67,7 +72,15 @@ class DockerConnector:
             return []
         try:
             result = subprocess.run(
-                ["docker", "ps", "-a", "--format", "{{json .}}"],
+                [
+                    "docker",
+                    "ps",
+                    "-a",
+                    "--filter",
+                    "label=moro.managed=true",
+                    "--format",
+                    "{{json .}}",
+                ],
                 capture_output=True,
                 text=True,
                 timeout=6,
@@ -83,8 +96,32 @@ class DockerConnector:
         except Exception:
             return []
 
+    def _is_managed(self, container_id: str) -> bool:
+        import re
+
+        if not re.fullmatch(r"[a-f0-9]{12,64}", container_id):
+            return False
+        try:
+            result = subprocess.run(
+                [
+                    "docker",
+                    "inspect",
+                    "--format",
+                    '{{index .Config.Labels "moro.managed"}}',
+                    container_id,
+                ],
+                capture_output=True,
+                text=True,
+                timeout=5,
+            )
+            return result.returncode == 0 and result.stdout.strip() == "true"
+        except (OSError, subprocess.TimeoutExpired):
+            return False
+
     def start_container(self, container_id: str) -> bool:
-        """Start a Docker container."""
+        """Start an explicitly Moro-managed Docker container."""
+        if not self._is_managed(container_id):
+            return False
         try:
             result = subprocess.run(
                 ["docker", "start", container_id],
@@ -96,7 +133,9 @@ class DockerConnector:
             return False
 
     def stop_container(self, container_id: str) -> bool:
-        """Stop a Docker container."""
+        """Stop an explicitly Moro-managed Docker container."""
+        if not self._is_managed(container_id):
+            return False
         try:
             result = subprocess.run(
                 ["docker", "stop", container_id],
@@ -107,8 +146,15 @@ class DockerConnector:
         except Exception:
             return False
 
-    def get_container_logs(self, container_id: str, tail: int = 100) -> str:
-        """Get container logs."""
+    def get_container_logs(self, container_id: str, tail: int = CONTAINER_LOGS_DEFAULT_TAIL) -> str:
+        """Get container logs, clamped to the supported tail window."""
+        try:
+            tail = int(tail)
+        except (TypeError, ValueError):
+            tail = CONTAINER_LOGS_DEFAULT_TAIL
+        tail = max(1, min(tail, CONTAINER_LOGS_MAX_TAIL))
+        if not self._is_managed(container_id):
+            return "Container is not managed by Moro"
         try:
             result = subprocess.run(
                 ["docker", "logs", "--tail", str(tail), container_id],
@@ -125,7 +171,9 @@ class OllamaConnector:
     """Connects to Ollama daemon for model management."""
 
     def __init__(self, base_url: str = "http://127.0.0.1:11434") -> None:
-        self.base_url = base_url
+        import os
+
+        self.base_url = os.environ.get("OLLAMA_BASE_URL", base_url)
         self._available: bool | None = None
         self._last_checked: float = 0.0
 
@@ -154,7 +202,7 @@ class OllamaConnector:
             response = httpx.get(f"{self.base_url}/api/tags", timeout=5.0)
             return response.json().get("models", [])
         except Exception:
-            return [{"name": "qwen2.5:1.5b", "size": 986000000}]
+            return []
 
     def get_model_info(self, model_name: str) -> dict:
         """Get detailed information about a model."""
@@ -196,7 +244,7 @@ class DatabaseConnector:
     def get_production_stats(self) -> dict:
         """Get production log statistics."""
         if not self.production_db.exists():
-            return {"total_logs": 24, "pending_logs": 0, "processed_logs": 24}
+            return {"total_logs": 0, "pending_logs": 0, "processed_logs": 0}
 
         conn = sqlite3.connect(self.production_db)
         try:
@@ -210,39 +258,20 @@ class DatabaseConnector:
                 "processed_logs": total - pending,
             }
         except Exception:
-            return {"total_logs": 24, "pending_logs": 0, "processed_logs": 24}
+            return {"total_logs": 0, "pending_logs": 0, "processed_logs": 0}
         finally:
             conn.close()
 
     def get_recent_logs(self, limit: int = 20) -> list[dict]:
         """Get recent production logs."""
         if not self.production_db.exists():
-            return [
-                {
-                    "session_id": "sess-alpha-001",
-                    "prompt": "What is quantum superposition?",
-                    "completion": "Superposition is a principle of quantum mechanics where a system exists in a linear combination of states.",
-                    "human_correction": None,
-                    "user_rating": 1.0,
-                    "is_processed": 1,
-                    "timestamp": "2026-09-27T21:40:00Z",
-                },
-                {
-                    "session_id": "sess-beta-002",
-                    "prompt": "Explain quantum entanglement simply.",
-                    "completion": "Entanglement links particle states across distance.",
-                    "human_correction": "Entanglement describes interacting particles whose quantum states cannot be described independently.",
-                    "user_rating": -1.0,
-                    "is_processed": 1,
-                    "timestamp": "2026-09-27T21:42:00Z",
-                },
-            ]
+            return []
 
         conn = sqlite3.connect(self.production_db)
         conn.row_factory = sqlite3.Row
         try:
             rows = conn.execute(
-                "SELECT * FROM inference_logs ORDER BY timestamp DESC LIMIT ?",
+                "SELECT * FROM inference_logs ORDER BY created_at DESC LIMIT ?",
                 (limit,),
             ).fetchall()
             return [dict(row) for row in rows]
@@ -253,60 +282,31 @@ class DatabaseConnector:
 
     def get_training_runs(self) -> list[dict]:
         """Get training run history."""
-        runs_dir = self.project_root / "runs"
-        if not runs_dir.exists():
+        from moro.storage import db
+
+        conn = db.get_connection(self.project_root)
+        try:
             return [
                 {
-                    "run_id": "run_20260927_beta",
-                    "name": "qwen-quantum-lora-v2-dpo",
-                    "status": "completed",
-                    "train_loss": 1.08,
-                    "val_loss": 0.99,
-                    "peak_vram_gb": 4.6,
-                    "tokens_per_sec": 134.1,
-                },
-                {
-                    "run_id": "run_20260927_alpha",
-                    "name": "qwen-quantum-lora-v1",
-                    "status": "completed",
-                    "train_loss": 1.84,
-                    "val_loss": 1.71,
-                    "peak_vram_gb": 4.2,
-                    "tokens_per_sec": 128.4,
-                },
+                    **dict(row),
+                    "run_id": row["id"],
+                    "name": row["run_name"] or row["model_name"],
+                    "val_loss": row["validation_loss"],
+                }
+                for row in conn.execute("SELECT * FROM runs ORDER BY created_at DESC LIMIT 20")
             ]
-
-        runs = []
-        for run_dir in sorted(runs_dir.iterdir(), reverse=True)[:20]:
-            if run_dir.is_dir():
-                metadata_file = run_dir / "run_metadata.json"
-                if metadata_file.exists():
-                    try:
-                        with open(metadata_file) as f:
-                            runs.append(json.load(f))
-                    except Exception:
-                        runs.append({"run_id": run_dir.name, "status": "completed"})
-        return runs or [
-            {
-                "run_id": "run_20260927_beta",
-                "name": "qwen-quantum-lora-v2-dpo",
-                "status": "completed",
-                "train_loss": 1.08,
-                "val_loss": 0.99,
-            }
-        ]
+        finally:
+            conn.close()
 
     def get_registered_models(self) -> list[dict]:
         """Get models from the model registry."""
-        registry_db = self.project_root / ".moro" / "registry.db"
+        registry_db = self.project_root / ".moro" / "state.db"
         if not registry_db.exists():
             return []
         conn = sqlite3.connect(registry_db)
         conn.row_factory = sqlite3.Row
         try:
-            rows = conn.execute(
-                "SELECT * FROM registered_models ORDER BY updated_at DESC"
-            ).fetchall()
+            rows = conn.execute("SELECT * FROM model_registry ORDER BY trained_at DESC").fetchall()
             return [dict(r) for r in rows]
         except Exception:
             return []
@@ -315,18 +315,41 @@ class DatabaseConnector:
 
     def get_state_lineage(self) -> list[dict]:
         """Get nodes from the state graph lineage database."""
-        sg_db = self.project_root / ".moro" / "state_graph.db"
+        sg_db = self.project_root / ".moro" / "state.db"
         if not sg_db.exists():
             return []
         conn = sqlite3.connect(sg_db)
         conn.row_factory = sqlite3.Row
         try:
-            rows = conn.execute("SELECT * FROM lineage_nodes ORDER BY created_at ASC").fetchall()
+            rows = conn.execute("SELECT * FROM nodes ORDER BY created_at ASC").fetchall()
             return [dict(r) for r in rows]
         except Exception:
             return []
         finally:
             conn.close()
+
+
+def _training_lock_held(project_root: Path) -> bool:
+    """Check whether a training process currently holds the fcntl execution lock."""
+    import fcntl
+    import os
+
+    lock_path = Path(project_root) / ".moro" / "training.execution.lock"
+    if not lock_path.exists():
+        return False
+    try:
+        fd = os.open(lock_path, os.O_RDWR | os.O_NOFOLLOW)
+    except OSError:
+        return False
+    try:
+        try:
+            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            return True
+        fcntl.flock(fd, fcntl.LOCK_UN)
+        return False
+    finally:
+        os.close(fd)
 
 
 class TrainingMonitor:
@@ -336,15 +359,43 @@ class TrainingMonitor:
         self.project_root = project_root
 
     def get_active_training(self) -> dict | None:
-        """Check if there's an active training run."""
-        lock_file = self.project_root / ".moro" / "training.lock"
-        if lock_file.exists():
+        """Return the latest run still marked running, with live lock state.
+
+        The runs table identifies which run is active; the fcntl execution
+        lock proves a training process holds the project. Either may briefly
+        lag the other, so both are reported and neither is fabricated.
+        """
+        from moro.storage import db
+
+        active: dict | None = None
+        try:
+            conn = db.get_connection(self.project_root)
             try:
-                with open(lock_file) as f:
-                    return json.load(f)
-            except Exception:
-                return {"status": "running", "run_id": "live_run"}
-        return None
+                row = conn.execute(
+                    "SELECT * FROM runs WHERE status = 'running' ORDER BY created_at DESC LIMIT 1"
+                ).fetchone()
+                if row is not None:
+                    active = {
+                        **dict(row),
+                        "run_id": row["id"],
+                        "name": row["run_name"] or row["model_name"],
+                    }
+            finally:
+                conn.close()
+        except Exception:
+            active = None
+        lock_held = _training_lock_held(self.project_root)
+        if active is None:
+            if not lock_held:
+                return None
+            return {
+                "status": "running",
+                "run_id": None,
+                "lock_held": True,
+                "detail": "Training lock is held but no run is marked running.",
+            }
+        active["lock_held"] = lock_held
+        return active
 
     def get_telemetry(self, run_id: str) -> list[dict]:
         """Get telemetry data for a training run."""
@@ -356,11 +407,7 @@ class TrainingMonitor:
                     return data.get("tracker", {}).get("history", [])
             except Exception:
                 pass
-        return [
-            {"step": 0, "loss": 2.4, "val_loss": 2.35},
-            {"step": 100, "loss": 1.8, "val_loss": 1.74},
-            {"step": 200, "loss": 1.2, "val_loss": 1.05},
-        ]
+        return []
 
 
 class FlywheelMonitor:
@@ -371,30 +418,23 @@ class FlywheelMonitor:
 
     def get_status(self) -> dict:
         """Get flywheel status."""
-        dpo_dir = self.project_root / "data" / "dpo"
-        if not dpo_dir.exists():
+        from moro.flywheel.storage.schema import get_production_db
+
+        conn = get_production_db(self.project_root / "data" / "production_logs.db")
+        try:
+            count = conn.execute("SELECT COUNT(*) FROM dpo_epochs").fetchone()[0]
+            pairs = conn.execute("SELECT COUNT(*) FROM preference_pairs").fetchone()[0]
+            last = conn.execute(
+                "SELECT epoch_id FROM dpo_epochs ORDER BY started_at DESC LIMIT 1"
+            ).fetchone()
             return {
-                "active": True,
-                "epochs": 3,
-                "pairs_generated": 19,
-                "last_epoch": "epoch_20260927_214131",
+                "active": False,
+                "epochs": count,
+                "pairs_generated": pairs,
+                "last_epoch": last[0] if last else None,
             }
-
-        epochs = list(dpo_dir.glob("dpo_epoch_*.jsonl"))
-        total_pairs = 0
-        for epoch_file in epochs:
-            try:
-                with open(epoch_file) as f:
-                    total_pairs += sum(1 for line in f if line.strip())
-            except Exception:
-                pass
-
-        return {
-            "active": len(epochs) > 0,
-            "epochs": max(len(epochs), 3),
-            "pairs_generated": max(total_pairs, 19),
-            "last_epoch": epochs[0].name if epochs else "epoch_latest",
-        }
+        finally:
+            conn.close()
 
 
 # ===================================================================
@@ -407,13 +447,7 @@ app = FastAPI(
     version="1.0.0",
 )
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+install_security(app, browser_login=True)
 
 app.include_router(datasets_router)
 app.include_router(training_router)
@@ -422,6 +456,7 @@ app.include_router(deployment_router)
 app.include_router(system_router)
 app.include_router(evaluation_router)
 app.include_router(flywheel_router)
+app.include_router(operations_router)
 
 static_dir = Path(__file__).resolve().parent / "static"
 if static_dir.exists():
@@ -454,11 +489,15 @@ async def startup() -> None:
 
 @app.get("/", response_class=HTMLResponse)
 @app.get("/dashboard", response_class=HTMLResponse)
-async def serve_dashboard() -> str:
+async def serve_dashboard(request: Request) -> str:
     template_path = Path(__file__).resolve().parent / "templates" / "mission_control.html"
-    if template_path.exists():
-        return template_path.read_text(encoding="utf-8")
-    return "<h1>MoroAI Mission Control Dashboard Template Not Found</h1>"
+    if not template_path.exists():
+        return "<h1>MoroAI Mission Control Dashboard Template Not Found</h1>"
+    html = template_path.read_text(encoding="utf-8")
+    nonce = csp_nonce(request)
+    if nonce:
+        html = re.sub(r"<script(?=[ >])", f'<script nonce="{nonce}"', html)
+    return html
 
 
 # ===================================================================
@@ -468,16 +507,12 @@ async def serve_dashboard() -> str:
 
 @app.get("/api/health")
 async def health_check() -> dict:
-    docker: DockerConnector = _connectors.get("docker", DockerConnector())  # type: ignore
-    ollama: OllamaConnector = _connectors.get("ollama", OllamaConnector())  # type: ignore
+    # Liveness must not wait for external daemons or invent their readiness.
     return {
         "status": "healthy",
+        "kind": "liveness",
         "timestamp": datetime.now(timezone.utc).isoformat(),
-        "services": {
-            "docker": docker.available,
-            "ollama": ollama.available,
-            "database": True,
-        },
+        "services": {},
     }
 
 
@@ -620,7 +655,10 @@ async def docker_stop_container(container_id: str) -> dict:
 
 
 @app.get("/api/docker/containers/{container_id}/logs")
-async def docker_container_logs(container_id: str, tail: int = 100) -> dict:
+async def docker_container_logs(
+    container_id: str,
+    tail: int = Query(default=CONTAINER_LOGS_DEFAULT_TAIL, ge=1, le=CONTAINER_LOGS_MAX_TAIL),
+) -> dict:
     docker: DockerConnector = _connectors.get("docker", DockerConnector())  # type: ignore
     if not docker.available:
         raise HTTPException(status_code=503, detail="Docker is not available")
@@ -684,45 +722,6 @@ async def training_active() -> dict:
 async def flywheel_status() -> dict:
     flywheel: FlywheelMonitor = _connectors.get("flywheel", FlywheelMonitor(get_project_root()))  # type: ignore
     return flywheel.get_status()
-
-
-class CommandPayload(BaseModel):
-    command: str
-
-
-@app.post("/api/terminal/execute")
-async def terminal_execute(payload: CommandPayload) -> dict:
-    """Execute a CLI command safely from the browser terminal."""
-    cmd = payload.command.strip()
-    # Security filter: restrict to moro and docker inspection commands
-    allowed_prefixes = ("moro", "docker ps", "docker logs", "curl")
-    if not any(cmd.startswith(p) for p in allowed_prefixes):
-        return {"output": f"Command '{cmd}' not allowed in web terminal sandbox."}
-
-    # Execute inside project root
-    root = get_project_root()
-    # Map 'moro' to active venv if available
-    venv_moro = root / ".venv" / "bin" / "moro"
-    if cmd.startswith("moro") and venv_moro.exists():
-        exec_cmd = str(venv_moro) + cmd[4:]
-    else:
-        exec_cmd = cmd
-
-    try:
-        proc = subprocess.run(
-            exec_cmd,
-            shell=True,
-            cwd=str(root),
-            capture_output=True,
-            text=True,
-            timeout=15,
-        )
-        output = proc.stdout + proc.stderr
-        return {"output": output or "Command completed with exit code 0."}
-    except subprocess.TimeoutExpired:
-        return {"output": "Command timed out after 15 seconds."}
-    except Exception as exc:
-        return {"output": f"Execution error: {exc}"}
 
 
 # ===================================================================
@@ -805,8 +804,17 @@ async def analytics_heatmap(
     metric: str = "eval_delta",
 ) -> dict:
     """Generate hyperparameter heatmap data."""
-    viz_engine = _get_analytics_viz_engine()
-    return viz_engine.generate_hyperparameter_heatmap(x_param, y_param, metric)
+    from moro.analytics.columns import AnalyticsColumnError, resolve_hyperparam, resolve_metric
+
+    try:
+        # Validate before initializing or querying the analytics database.
+        resolve_hyperparam(x_param)
+        resolve_hyperparam(y_param)
+        resolve_metric(metric)
+        viz_engine = _get_analytics_viz_engine()
+        return viz_engine.generate_hyperparameter_heatmap(x_param, y_param, metric)
+    except AnalyticsColumnError as exc:
+        raise HTTPException(400, str(exc)) from exc
 
 
 @app.get("/api/analytics/viz/resource-utilization/{experiment_id}")

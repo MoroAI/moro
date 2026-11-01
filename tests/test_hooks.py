@@ -37,13 +37,13 @@ def test_check_pii_in_data(tmp_path):
     assert len(violations) > 0
 
 
-def test_check_pii_ignores_test_paths(tmp_path):
+def test_check_pii_does_not_exempt_test_paths(tmp_path):
     test_dir = tmp_path / "tests" / "fixtures"
     test_dir.mkdir(parents=True)
     f = test_dir / "sample.jsonl"
     f.write_text('{"text": "email@example.com"}\n')
     violations = check_pii_in_data(str(f))
-    assert len(violations) == 0  # safe path ignored
+    assert len(violations) > 0  # Directory names cannot exempt sensitive content
 
 
 def test_cli_hooks_help():

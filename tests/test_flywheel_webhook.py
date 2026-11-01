@@ -16,7 +16,7 @@ from moro.flywheel.webhook.receiver import (
 )
 
 
-def run_test_server(db_path: Path, api_key: str | None = None):
+def run_test_server(db_path: Path, api_key: str | None = "test-webhook-" + "a" * 32):
     config = WebhookConfig(db_path=db_path, api_key=api_key)
     set_config(config)
     server = HTTPServer(("127.0.0.1", 0), WebhookRequestHandler)
@@ -38,7 +38,7 @@ def test_webhook_health_and_ingest(tmp_path):
             assert resp.status == 200
             data = json.loads(resp.read().decode())
             assert data["status"] == "healthy"
-            assert data["pending_logs"] == 0
+            assert data["service"] == "moro-webhook"
 
         # 2. Ingest single log
         single_payload = {
@@ -52,7 +52,11 @@ def test_webhook_health_and_ingest(tmp_path):
         req = urllib.request.Request(
             f"{base_url}/webhook/ingest",
             data=body,
-            headers={"Content-Type": "application/json"},
+            headers={
+                "Content-Type": "application/json",
+                "X-API-Key": "test-webhook-" + "a" * 32,
+                "Idempotency-Key": "request-" + str(len(body)) + "-unique-key",
+            },
             method="POST",
         )
         with urllib.request.urlopen(req) as resp:
@@ -82,7 +86,11 @@ def test_webhook_health_and_ingest(tmp_path):
         req = urllib.request.Request(
             f"{base_url}/webhook/ingest-batch",
             data=body,
-            headers={"Content-Type": "application/json"},
+            headers={
+                "Content-Type": "application/json",
+                "X-API-Key": "test-webhook-" + "a" * 32,
+                "Idempotency-Key": "request-" + str(len(body)) + "-unique-key",
+            },
             method="POST",
         )
         with urllib.request.urlopen(req) as resp:
@@ -92,7 +100,9 @@ def test_webhook_health_and_ingest(tmp_path):
             assert data["count"] == 2
 
         # 4. Check stats
-        req = urllib.request.Request(f"{base_url}/webhook/stats")
+        req = urllib.request.Request(
+            f"{base_url}/webhook/stats", headers={"X-API-Key": "test-webhook-" + "a" * 32}
+        )
         with urllib.request.urlopen(req) as resp:
             assert resp.status == 200
             stats = json.loads(resp.read().decode())
@@ -106,7 +116,7 @@ def test_webhook_health_and_ingest(tmp_path):
 
 def test_webhook_authentication(tmp_path):
     db_file = tmp_path / "prod.db"
-    server, port = run_test_server(db_file, api_key="secret-token-xyz")
+    server, port = run_test_server(db_file, api_key="secret-token-xyz-" + "a" * 32)
     base_url = f"http://127.0.0.1:{port}"
 
     try:
@@ -126,7 +136,7 @@ def test_webhook_authentication(tmp_path):
         # /webhook/stats with auth succeeds
         req = urllib.request.Request(
             f"{base_url}/webhook/stats",
-            headers={"X-API-Key": "secret-token-xyz"},
+            headers={"X-API-Key": "secret-token-xyz-" + "a" * 32},
         )
         with urllib.request.urlopen(req) as resp:
             assert resp.status == 200

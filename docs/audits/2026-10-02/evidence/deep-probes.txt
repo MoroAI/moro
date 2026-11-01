@@ -1,0 +1,98 @@
+/tmp/moro-audit-20261002/tooling/lib/python3.12/site-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+  from starlette.testclient import TestClient as TestClient  # noqa
+{
+  "release_race_deploy": {
+    "gate_status": "passed",
+    "checked_hash": "353866c7e09c7027222fa77a5e872ab5c99c08d9ec0b884150f66e9cfe11e06f",
+    "exit_code": 0,
+    "package_published": true,
+    "controlled_interleaving": true,
+    "model_inference_mocked": true,
+    "published_hash": "b30fe2db160643bf8cf744b43118124cd3aa8d0fbc6b083d4041c7a39c48b018",
+    "gate_hash_matches_package": false
+  },
+  "release_race_export_ollama": {
+    "gate_status": "passed",
+    "checked_hash": "353866c7e09c7027222fa77a5e872ab5c99c08d9ec0b884150f66e9cfe11e06f",
+    "exit_code": 0,
+    "package_published": true,
+    "controlled_interleaving": true,
+    "model_inference_mocked": true,
+    "published_hash": "b30fe2db160643bf8cf744b43118124cd3aa8d0fbc6b083d4041c7a39c48b018",
+    "gate_hash_matches_package": false
+  },
+  "release_race_export_adapter": {
+    "gate_status": "passed",
+    "checked_hash": "353866c7e09c7027222fa77a5e872ab5c99c08d9ec0b884150f66e9cfe11e06f",
+    "exit_code": 1,
+    "package_published": false,
+    "controlled_interleaving": true,
+    "model_inference_mocked": true
+  },
+  "feedback_below_minimum": {
+    "logs_ingested": 1,
+    "pairs_generated": 1,
+    "pending_after": 0,
+    "dataset_written": false,
+    "pairs_by_type": {
+      "EXPLICIT_HUMAN_CORRECTION": 1
+    }
+  },
+  "feedback_above_cap": {
+    "logs_ingested": 3,
+    "pairs_generated": 1,
+    "pending_after": 0,
+    "dataset_written": true,
+    "pairs_by_type": {
+      "EXPLICIT_HUMAN_CORRECTION": 3
+    }
+  },
+  "failed_training_still_calls_deployment": {
+    "trainer_raises": true,
+    "auto_deploy": false,
+    "require_eval_gate": true,
+    "deployment_hook_called": true,
+    "summary_deployed": true,
+    "db_epoch_status": "completed",
+    "initial_loss": null,
+    "final_loss": null,
+    "hooks_are_test_doubles": true
+  },
+  "feedback_crash_retry": {
+    "pending_after_crash": 1,
+    "counts_per_source": [
+      {
+        "source_log_id": "8a62436a-77ca-4a57-9823-d0bc6bd15e77",
+        "n": 2
+      }
+    ],
+    "datasets_written": 2
+  },
+  "feedback_reused_epoch": {
+    "exception": "IntegrityError",
+    "existing_dataset_overwritten": true,
+    "file_has_new_answer": true,
+    "db_still_has_old_answer": true,
+    "new_log_pending": 1
+  },
+  "symlink_dataset_read": {
+    "status": 200,
+    "outside_marker_returned": true,
+    "preexisting_symlink_required": true
+  },
+  "symlink_upload_write": {
+    "status": 200,
+    "outside_target_overwritten": true,
+    "preexisting_symlink_required": true
+  },
+  "invalid_config_http_write": {
+    "status": 200,
+    "replaced_original": true,
+    "subsequent_strict_load_rejected": true
+  },
+  "zero_score_displayed_as_success": {
+    "status": 200,
+    "actual_metadata_pass_rate": 0.0,
+    "api_pass_rate": 0.88
+  }
+}

@@ -15,6 +15,7 @@ def generate_ollama_package(
     project_name: str,
     out_dir: Path,
     system_prompt: str | None = None,
+    expected_adapter_sha256: str | None = None,
 ) -> Path:
     adapter_path, out_dir = Path(adapter_path), Path(out_dir)
     if any(c in base_model + project_name for c in "\n\r"):
@@ -28,6 +29,8 @@ def generate_ollama_package(
         raise ExportError("Deployment output overlaps the source adapter.")
     try:
         before = sha256_directory(adapter_path)
+        if expected_adapter_sha256 is not None and before != expected_adapter_sha256:
+            raise ExportError("Adapter changed after release approval; rerun evaluation.")
         out_dir.mkdir(parents=True, exist_ok=True)
         with tempfile.TemporaryDirectory(prefix=".ollama-", dir=out_dir) as temporary:
             package = Path(temporary) / "package"

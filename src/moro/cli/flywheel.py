@@ -215,13 +215,13 @@ def flywheel_serve(
     host: str = typer.Option("127.0.0.1", "--host", help="Host address."),
     port: int = typer.Option(8001, "--port", help="Port number."),
     api_key: str | None = typer.Option(
-        None, "--api-key", help="Optional API key for webhook auth."
+        None, "--api-key", help="API key override; defaults to the project installation token."
     ),
     db_path: Path | None = typer.Option(
         None, "--db", help="Path to production logs SQLite database."
     ),
 ) -> None:
-    """Start the FastAPI webhook receiver for production chat UIs."""
+    """Start the authenticated HTTP webhook receiver for production chat UIs."""
     try:
         resolved_db = _get_db_path(db_path)
         initialize_production_db(resolved_db)
@@ -232,7 +232,7 @@ def flywheel_serve(
                 f"Endpoint: http://{host}:{port}/webhook/ingest\n"
                 f"Stats:    http://{host}:{port}/webhook/stats\n"
                 f"Database: {resolved_db}\n"
-                f"Auth:     {'API Key required' if api_key else 'Public (no auth)'}\n\n"
+                "Auth:     API key required (configured key or project installation token)\n\n"
                 "Press Ctrl+C to terminate.",
                 border_style="cyan",
             )

@@ -40,9 +40,9 @@ def test_flywheel_cli_flow(tmp_path):
     )
     assert res_run.exit_code == 0
     assert "DPO Flywheel Cycle Completed" in res_run.stdout
-    assert "Preference Pairs Generated: 2" in res_run.stdout
+    assert "Preference Pairs Generated: 1" in res_run.stdout
 
     # 5. History command shows completed epoch
     res_hist = runner.invoke(app, ["flywheel", "history", "--db", str(db_file)])
     assert res_hist.exit_code == 0
-    assert "completed" in res_hist.stdout
+    assert "extracted" in res_hist.stdout

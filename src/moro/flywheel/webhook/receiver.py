@@ -1,26 +1,26 @@
-"""
-MoroAI Production Webhook Receiver.
-
-An HTTP service that accepts inference logs from production chat UIs
-and writes them directly into the SQLite production log database.
-
-Works out of the box with Python standard library http.server (zero dependencies).
-"""
+"""Authenticated, bounded and idempotent production feedback ingestion."""
 
 from __future__ import annotations
 
+import hashlib
+import hmac
 import json
-import urllib.parse
 import uuid
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
+from urllib.parse import urlsplit
 
+from fastapi import FastAPI, HTTPException, Request
+from pydantic import ValidationError
+
+from moro.dashboard.security import access_token
+from moro.flywheel.models import InferenceLogPayload
 from moro.flywheel.storage.schema import get_db_stats, get_production_db
+
+MAX_BODY_BYTES = 1024 * 1024
 
 
 class WebhookConfig:
-    """Configuration for the webhook receiver."""
-
     def __init__(
         self,
         db_path: Path = Path("data/production_logs.db"),
@@ -28,7 +28,11 @@ class WebhookConfig:
         batch_size: int = 50,
     ):
         self.db_path = Path(db_path)
-        self.api_key = api_key
+        self.api_key = api_key or access_token()
+        if len(self.api_key) < 32:
+            raise ValueError("Webhook API key must contain at least 32 characters")
+        if not 1 <= batch_size <= 1000:
+            raise ValueError("Webhook batch size must be between 1 and 1000")
         self.batch_size = batch_size
 
 
@@ -47,168 +51,170 @@ def set_config(config: WebhookConfig) -> None:
     _config = config
 
 
+def authenticated(key: str) -> bool:
+    return hmac.compare_digest(key.encode(), get_config().api_key.encode())
+
+
+def ingest(payload: object, *, batch: bool, idempotency_key: str) -> dict:
+    config = get_config()
+    if not 16 <= len(idempotency_key) <= 128 or not idempotency_key.isascii():
+        raise HTTPException(400, "A stable Idempotency-Key of 16–128 ASCII characters is required")
+    if not isinstance(payload, dict):
+        raise HTTPException(422, "Expected a JSON object")
+    items = payload.get("logs") if batch else [payload]
+    if not isinstance(items, list) or not 1 <= len(items) <= config.batch_size:
+        raise HTTPException(422, "Invalid or excessive batch size")
+    try:
+        logs = [InferenceLogPayload.model_validate(item) for item in items]
+    except ValidationError as exc:
+        raise HTTPException(422, "Invalid feedback fields or rating") from exc
+    digest = hashlib.sha256(
+        json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
+    ).hexdigest()
+    sender = hashlib.sha256(config.api_key.encode()).hexdigest()
+    request_id = hashlib.sha256((sender + ":" + idempotency_key).encode()).hexdigest()
+    conn = get_production_db(config.db_path)
+    try:
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS webhook_requests (request_id TEXT PRIMARY KEY, digest TEXT NOT NULL, result_json TEXT NOT NULL)"
+        )
+        conn.execute("BEGIN IMMEDIATE")
+        previous = conn.execute(
+            "SELECT digest, result_json FROM webhook_requests WHERE request_id=?", (request_id,)
+        ).fetchone()
+        if previous:
+            if previous["digest"] != digest:
+                raise HTTPException(409, "Idempotency-Key was already used for different feedback")
+            return json.loads(previous["result_json"])
+        ids = []
+        for log in logs:
+            log_id = str(uuid.uuid4())
+            ids.append(log_id)
+            metadata = {**log.metadata, "sender_id": sender, "ingestion_request": request_id}
+            metadata.pop("log_id", None)
+            conn.execute(
+                """INSERT INTO inference_logs
+                (log_id,session_id,model_name,prompt,completion,context,user_rating,human_correction,latency_ms,metadata_json)
+                VALUES (?,?,?,?,?,?,?,?,?,?)""",
+                (
+                    log_id,
+                    log.session_id,
+                    str(metadata.get("model_name", "production")),
+                    log.prompt,
+                    log.completion,
+                    log.context,
+                    log.user_rating,
+                    log.human_correction,
+                    log.latency_ms,
+                    json.dumps(metadata),
+                ),
+            )
+        result = {"status": "success", "log_ids": ids, "count": len(ids)}
+        conn.execute(
+            "INSERT INTO webhook_requests VALUES (?,?,?)", (request_id, digest, json.dumps(result))
+        )
+        conn.commit()
+        return result
+    finally:
+        conn.close()
+
+
 class WebhookRequestHandler(BaseHTTPRequestHandler):
-    """HTTP request handler for receiving production inference logs."""
+    def setup(self):
+        super().setup()
+        self.connection.settimeout(5)
 
     def _send_json(self, status_code: int, data: dict):
-        body = json.dumps(data).encode("utf-8")
+        body = json.dumps(data).encode()
         self.send_response(status_code)
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", str(len(body)))
+        self.send_header("Cache-Control", "no-store")
         self.end_headers()
         self.wfile.write(body)
 
     def _verify_auth(self) -> bool:
-        config = get_config()
-        if not config.api_key:
-            return True
-        key = self.headers.get("X-API-Key")
-        return key == config.api_key
+        # No browser-origin access to this machine-to-machine receiver.
+        return not self.headers.get("Origin") and authenticated(self.headers.get("X-API-Key", ""))
 
     def do_GET(self):
-        parsed = urllib.parse.urlparse(self.path)
-        config = get_config()
-
-        if parsed.path == "/health":
-            db_exists = config.db_path.exists()
-            pending = 0
-            total = 0
-            if db_exists:
-                try:
-                    stats = get_db_stats(config.db_path)
-                    pending = stats["pending_logs"]
-                    total = stats["total_logs"]
-                except Exception:
-                    pass
-            self._send_json(
-                200,
-                {
-                    "status": "healthy",
-                    "database_path": str(config.db_path),
-                    "database_exists": db_exists,
-                    "pending_logs": pending,
-                    "total_logs": total,
-                },
-            )
-            return
-
-        if not self._verify_auth():
+        path = urlsplit(self.path).path
+        if path == "/health":
+            self._send_json(200, {"status": "healthy", "service": "moro-webhook"})
+        elif not self._verify_auth():
             self._send_json(403, {"error": "Invalid or missing X-API-Key"})
-            return
-
-        if parsed.path == "/webhook/stats":
-            stats = get_db_stats(config.db_path)
-            self._send_json(
-                200, {"status": "success", "database_path": str(config.db_path), **stats}
-            )
-            return
-
-        self._send_json(404, {"error": "Not found"})
+        elif path == "/webhook/stats":
+            self._send_json(200, {"status": "success", **get_db_stats(get_config().db_path)})
+        else:
+            self._send_json(404, {"error": "Not found"})
 
     def do_POST(self):
-        parsed = urllib.parse.urlparse(self.path)
         if not self._verify_auth():
             self._send_json(403, {"error": "Invalid or missing X-API-Key"})
             return
-
-        content_length = int(self.headers.get("Content-Length", 0))
-        raw_body = self.rfile.read(content_length)
-
+        path = urlsplit(self.path).path
+        if path not in ("/webhook/ingest", "/webhook/ingest-batch"):
+            self._send_json(404, {"error": "Not found"})
+            return
         try:
-            payload = json.loads(raw_body.decode("utf-8"))
-        except Exception as exc:
-            self._send_json(400, {"error": f"Invalid JSON payload: {exc}"})
-            return
+            size = int(self.headers.get("Content-Length", "0"))
+            if not 0 < size <= MAX_BODY_BYTES or self.headers.get("Transfer-Encoding"):
+                raise HTTPException(413, "Invalid or excessive body length")
+            body = self.rfile.read(size)
+            if len(body) != size:
+                raise HTTPException(400, "Incomplete request body")
+            payload = json.loads(body)
+            result = ingest(
+                payload,
+                batch=path.endswith("-batch"),
+                idempotency_key=self.headers.get("Idempotency-Key", ""),
+            )
+            self._send_json(200, result)
+        except HTTPException as exc:
+            self._send_json(exc.status_code, {"error": exc.detail})
+        except (TimeoutError, ValueError, UnicodeError):
+            self._send_json(400, {"error": "Invalid or incomplete JSON body"})
+        except Exception:
+            self._send_json(500, {"error": "Feedback could not be persisted"})
 
-        config = get_config()
-        conn = get_production_db(config.db_path)
 
-        if parsed.path == "/webhook/ingest":
-            try:
-                log_id = str(uuid.uuid4())
-                conn.execute(
-                    """
-                    INSERT INTO inference_logs (
-                        log_id, session_id, model_name, prompt, completion,
-                        context, user_rating, human_correction, latency_ms,
-                        metadata_json
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    """,
-                    (
-                        log_id,
-                        payload.get("session_id", "default"),
-                        payload.get("metadata", {}).get("model_name", "production"),
-                        payload.get("prompt", ""),
-                        payload.get("completion", ""),
-                        payload.get("context"),
-                        payload.get("user_rating"),
-                        payload.get("human_correction"),
-                        payload.get("latency_ms"),
-                        json.dumps(payload.get("metadata", {})),
-                    ),
-                )
-                conn.commit()
-                self._send_json(
-                    200,
-                    {
-                        "status": "success",
-                        "log_ids": [log_id],
-                        "count": 1,
-                        "message": "Log ingested successfully",
-                    },
-                )
-            except Exception as exc:
-                self._send_json(500, {"error": f"Failed to write log: {exc}"})
-            finally:
-                conn.close()
-            return
+webhook_app = FastAPI(title="MoroAI feedback receiver")
 
-        elif parsed.path == "/webhook/ingest-batch":
-            logs = payload.get("logs", [])
-            log_ids: list[str] = []
-            try:
-                cursor = conn.cursor()
-                for item in logs:
-                    lid = str(uuid.uuid4())
-                    log_ids.append(lid)
-                    cursor.execute(
-                        """
-                        INSERT INTO inference_logs (
-                            log_id, session_id, model_name, prompt, completion,
-                            context, user_rating, human_correction, latency_ms,
-                            metadata_json
-                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                        """,
-                        (
-                            lid,
-                            item.get("session_id", "default"),
-                            item.get("metadata", {}).get("model_name", "production"),
-                            item.get("prompt", ""),
-                            item.get("completion", ""),
-                            item.get("context"),
-                            item.get("user_rating"),
-                            item.get("human_correction"),
-                            item.get("latency_ms"),
-                            json.dumps(item.get("metadata", {})),
-                        ),
-                    )
-                conn.commit()
-                self._send_json(
-                    200,
-                    {
-                        "status": "success",
-                        "log_ids": log_ids,
-                        "count": len(log_ids),
-                        "message": f"Successfully ingested {len(log_ids)} logs",
-                    },
-                )
-            except Exception as exc:
-                self._send_json(500, {"error": f"Failed to batch write logs: {exc}"})
-            finally:
-                conn.close()
-            return
 
-        self._send_json(404, {"error": "Endpoint not found"})
+@webhook_app.get("/health")
+def health():
+    return {"status": "healthy", "service": "moro-webhook"}
+
+
+@webhook_app.post("/webhook/ingest")
+@webhook_app.post("/webhook/ingest-batch")
+async def receive_feedback(request: Request):
+    if request.headers.get("origin") or not authenticated(request.headers.get("x-api-key", "")):
+        raise HTTPException(403, "Invalid or missing X-API-Key")
+    data = bytearray()
+    async for chunk in request.stream():
+        data.extend(chunk)
+        if len(data) > MAX_BODY_BYTES:
+            raise HTTPException(413, "Request too large")
+    try:
+        payload = json.loads(data)
+    except (ValueError, UnicodeError) as exc:
+        raise HTTPException(400, "Invalid JSON") from exc
+    from starlette.concurrency import run_in_threadpool
+
+    return await run_in_threadpool(
+        ingest,
+        payload,
+        batch=request.url.path.endswith("-batch"),
+        idempotency_key=request.headers.get("idempotency-key", ""),
+    )
+
+
+@webhook_app.get("/webhook/stats")
+def stats(request: Request):
+    if request.headers.get("origin") or not authenticated(request.headers.get("x-api-key", "")):
+        raise HTTPException(403, "Invalid or missing X-API-Key")
+    return get_db_stats(get_config().db_path)
 
 
 def start_webhook_receiver(
@@ -217,15 +223,9 @@ def start_webhook_receiver(
     api_key: str | None = None,
     db_path: Path | None = None,
 ):
-    """Start the webhook receiver HTTP server."""
-    config = WebhookConfig(
-        db_path=db_path or Path("data/production_logs.db"),
-        api_key=api_key,
-    )
-    set_config(config)
-    server_address = (host, port)
-    httpd = HTTPServer(server_address, WebhookRequestHandler)
+    set_config(WebhookConfig(db_path=db_path or Path("data/production_logs.db"), api_key=api_key))
+    server = HTTPServer((host, port), WebhookRequestHandler)
     try:
-        httpd.serve_forever()
+        server.serve_forever()
     finally:
-        httpd.server_close()
+        server.server_close()

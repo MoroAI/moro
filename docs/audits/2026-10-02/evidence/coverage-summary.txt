@@ -1,0 +1,1 @@
+Wrote JSON report to /tmp/moro-audit-20261002/coverage.json

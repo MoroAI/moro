@@ -1,0 +1,9 @@
+Using Python 3.12.11 environment at: /tmp/moro-audit-20261002/tooling
+  × No solution found when resolving dependencies:
+  ╰─▶ Because torch==2.8.0 has no wheels with a matching platform tag (e.g.,
+      `macosx_15_0_x86_64`) and you require torch==2.8.0, we can conclude that
+      your requirements are unsatisfiable.
+
+      hint: Wheels are available for `torch` (v2.8.0) on the following
+      platforms: `manylinux_2_28_aarch64`, `manylinux_2_28_x86_64`,
+      `macosx_11_0_arm64`, `win_amd64`

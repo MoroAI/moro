@@ -8,6 +8,9 @@ into an automated continuous learning cycle.
 from __future__ import annotations
 
 import json
+import math
+import os
+import re
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
@@ -40,6 +43,8 @@ class FlywheelConfig:
         auto_deploy: bool = False,
         require_eval_gate: bool = True,
     ):
+        if not 1 <= min_pairs_per_epoch <= max_pairs_per_epoch:
+            raise ValueError("Pair limits must satisfy 1 <= minimum <= maximum")
         self.min_pairs_per_epoch = min_pairs_per_epoch
         self.max_pairs_per_epoch = max_pairs_per_epoch
         self.output_dir = Path(output_dir)
@@ -110,6 +115,9 @@ class MoroAIFlywheelOrchestrator:
             timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
             epoch_id = f"epoch_{timestamp}_{uuid.uuid4().hex[:6]}"
 
+        if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]{0,127}", epoch_id):
+            raise ValueError("Invalid epoch ID")
+
         # 1. Ingest logs
         logs = self.ingestor.ingest_logs()
         if not logs:
@@ -129,45 +137,59 @@ class MoroAIFlywheelOrchestrator:
             pairs_by_type[t] = pairs_by_type.get(t, 0) + 1
 
         if len(pairs) < self.config.min_pairs_per_epoch:
-            # Mark logs processed to avoid endless retry
-            session_ids = list(set(log.session_id for log in logs))
-            self.ingestor.mark_processed(session_ids, epoch_id)
             return DPOExecutionSummary(
                 epoch_id=epoch_id,
                 logs_ingested=len(logs),
-                pairs_generated=len(pairs),
-                pairs_by_type=pairs_by_type,
+                pairs_generated=0,
+                pairs_by_type={},
             )
 
         # Cap pairs if needed
         if len(pairs) > self.config.max_pairs_per_epoch:
             pairs = pairs[: self.config.max_pairs_per_epoch]
 
-        # 3. Write DPO dataset
-        dataset_path = self._write_dataset(pairs, epoch_id)
+        pairs_by_type = {}
+        for pair in pairs:
+            kind = pair.feedback_type.value
+            pairs_by_type[kind] = pairs_by_type.get(kind, 0) + 1
+            if not pair.source_log_id:
+                raise ValueError("Preference pair must identify its source log")
+            # Stable content identity prevents retry-dependent UUIDs.
+            pair.pair_id = str(
+                uuid.uuid5(
+                    uuid.NAMESPACE_URL,
+                    json.dumps([pair.source_log_id, pair.prompt, pair.chosen, pair.rejected, kind]),
+                )
+            )
 
-        # 4. Record pairs in SQLite
         if isinstance(self.ingestor, SQLiteLogIngestor):
-            self._record_epoch_in_db(epoch_id, pairs, dataset_path)
+            dataset_path = self._record_epoch_in_db(epoch_id, pairs)
+        else:
+            dataset_path = self._write_dataset(pairs, epoch_id)
+            self.ingestor.mark_processed(
+                [], epoch_id, log_ids=sorted({p.source_log_id for p in pairs})
+            )
 
-        # 5. Mark logs as processed
-        session_ids = list(set(log.session_id for log in logs))
-        self.ingestor.mark_processed(session_ids, epoch_id)
-
-        # 6. Execute optional training bridge
         initial_loss, final_loss = None, None
-        if self.trainer_bridge:
-            try:
-                initial_loss, final_loss = self.trainer_bridge.train_epoch(dataset_path, epoch_id)
-            except Exception:
-                pass
-
         deployed = False
-        if self.deployment_gate and (self.config.auto_deploy or self.config.require_eval_gate):
-            try:
-                deployed = self.deployment_gate.evaluate_and_deploy(epoch_id)
-            except Exception:
-                pass
+        try:
+            if self.trainer_bridge:
+                initial_loss, final_loss = self.trainer_bridge.train_epoch(dataset_path, epoch_id)
+                if not all(
+                    isinstance(v, (int, float)) and math.isfinite(v)
+                    for v in (initial_loss, final_loss)
+                ):
+                    raise ValueError("Trainer returned invalid loss metrics")
+                if self.config.auto_deploy:
+                    if self.deployment_gate is None:
+                        raise ValueError("Automatic deployment requires an evaluation gate")
+                    deployed = self.deployment_gate.evaluate_and_deploy(epoch_id)
+                self._update_epoch(epoch_id, "trained", initial_loss, final_loss, deployed)
+            elif self.config.auto_deploy:
+                raise ValueError("Cannot deploy an epoch without a successful trainer")
+        except Exception:
+            self._update_epoch(epoch_id, "failed", initial_loss, final_loss, False)
+            raise
 
         return DPOExecutionSummary(
             epoch_id=epoch_id,
@@ -183,7 +205,7 @@ class MoroAIFlywheelOrchestrator:
     def _write_dataset(self, pairs: list[PreferencePair], epoch_id: str) -> Path:
         self.config.output_dir.mkdir(parents=True, exist_ok=True)
         path = self.config.output_dir / f"dpo_{epoch_id}.jsonl"
-        with path.open("w", encoding="utf-8") as f:
+        with path.open("x", encoding="utf-8") as f:
             for p in pairs:
                 payload = {
                     "prompt": p.prompt,
@@ -195,47 +217,78 @@ class MoroAIFlywheelOrchestrator:
                     "metadata": p.metadata,
                 }
                 f.write(json.dumps(payload) + "\n")
+            f.flush()
+            os.fsync(f.fileno())
         return path
 
-    def _record_epoch_in_db(
-        self, epoch_id: str, pairs: list[PreferencePair], dataset_path: Path
-    ) -> None:
-        db_path = getattr(self.ingestor, "db_path", None)
-        if not db_path:
-            return
-        conn = get_production_db(db_path)
+    def _record_epoch_in_db(self, epoch_id, pairs) -> Path:
+        """Serialize publication and acknowledge only persisted source rows.
+
+        An interrupted file write may leave an orphan requiring inspection, but
+        cannot acknowledge pending logs or replace an existing epoch's dataset.
+        """
+        conn = get_production_db(self.ingestor.db_path)
+        dataset_path = None
         try:
+            conn.execute("BEGIN IMMEDIATE")
+            if conn.execute("SELECT 1 FROM dpo_epochs WHERE epoch_id=?", (epoch_id,)).fetchone():
+                raise ValueError("Epoch ID already exists; use a new ID")
+            ids = sorted({p.source_log_id for p in pairs})
+            for source_id in ids:
+                row = conn.execute(
+                    "SELECT is_processed FROM inference_logs WHERE log_id=?", (source_id,)
+                ).fetchone()
+                if row is None or row["is_processed"]:
+                    raise ValueError(
+                        "Source log unavailable or already processed; retry extraction"
+                    )
             now = datetime.now(timezone.utc).isoformat()
+            dataset_path = self._write_dataset(pairs, epoch_id)
             conn.execute(
-                """
-                INSERT INTO dpo_epochs (
-                    epoch_id, status, pair_count, dataset_path, started_at, completed_at
-                ) VALUES (?, 'completed', ?, ?, ?, ?)
-                """,
+                "INSERT INTO dpo_epochs (epoch_id, status, pair_count, dataset_path, started_at, completed_at) VALUES (?, 'extracted', ?, ?, ?, ?)",
                 (epoch_id, len(pairs), str(dataset_path), now, now),
             )
-            for p in pairs:
+            for pair in pairs:
                 conn.execute(
-                    """
-                    INSERT OR REPLACE INTO preference_pairs (
-                        pair_id, source_log_id, prompt, chosen, rejected,
-                        feedback_type, confidence_delta, metadata_json, created_at, epoch_id
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    """,
+                    "INSERT INTO preference_pairs (pair_id, source_log_id, prompt, chosen, rejected, feedback_type, confidence_delta, metadata_json, created_at, epoch_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                     (
-                        p.pair_id,
-                        p.source_log_id,
-                        p.prompt,
-                        p.chosen,
-                        p.rejected,
-                        p.feedback_type.value,
-                        p.confidence_delta,
-                        json.dumps(p.metadata),
-                        p.created_at.isoformat(),
+                        pair.pair_id,
+                        pair.source_log_id,
+                        pair.prompt,
+                        pair.chosen,
+                        pair.rejected,
+                        pair.feedback_type.value,
+                        pair.confidence_delta,
+                        json.dumps(pair.metadata),
+                        pair.created_at.isoformat(),
                         epoch_id,
                     ),
                 )
+            conn.executemany(
+                "UPDATE inference_logs SET is_processed=1, processed_at=?, epoch_id=? WHERE log_id=?",
+                [(now, epoch_id, item) for item in ids],
+            )
             conn.commit()
+            return dataset_path
+        except Exception:
+            conn.rollback()
+            # Only remove a file this transaction successfully created itself.
+            if dataset_path is not None:
+                dataset_path.unlink(missing_ok=True)
+            raise
+        finally:
+            conn.close()
+
+    def _update_epoch(self, epoch_id, status, initial_loss, final_loss, deployed):
+        if not isinstance(self.ingestor, SQLiteLogIngestor):
+            return
+        conn = get_production_db(self.ingestor.db_path)
+        try:
+            with conn:
+                conn.execute(
+                    "UPDATE dpo_epochs SET status=?, initial_loss=?, final_loss=?, deployed=? WHERE epoch_id=?",
+                    (status, initial_loss, final_loss, int(deployed), epoch_id),
+                )
         finally:
             conn.close()
 
@@ -250,7 +303,7 @@ class FlywheelOrchestrator:
     ) -> None:
         self.project_root = Path(project_root or Path.cwd())
         self.config = config or FlywheelConfig(output_dir=self.project_root / "data" / "dpo")
-        db_path = self.project_root / ".moro" / "production.db"
+        db_path = self.project_root / "data" / "production_logs.db"
         self.ingestor = SQLiteLogIngestor(db_path=db_path)
         self.extractor = DeterministicPreferenceExtractor()
         self._inner = MoroAIFlywheelOrchestrator(
@@ -261,21 +314,7 @@ class FlywheelOrchestrator:
 
     def run_cycle(self, epoch_id: str | None = None) -> dict[str, Any]:
         """Run a flywheel continuous learning cycle."""
-        import time
-
-        # Check feedback directory
-        feedback_dir = self.project_root / "data" / "raw" / "feedback"
-        if feedback_dir.exists():
-            feedback_files = list(feedback_dir.glob("*.jsonl"))
-            if feedback_files:
-                pairs = len(feedback_files) * 5
-                return {
-                    "epoch_id": epoch_id or f"epoch_{int(time.time())}",
-                    "pairs_generated": pairs,
-                    "status": "completed",
-                }
-
         summary = self._inner.run_cycle(epoch_id)
         res = summary.to_dict()
-        res["status"] = "completed" if summary.pairs_generated > 0 else "skipped"
+        res["status"] = "extracted" if summary.dataset_path else "skipped"
         return res

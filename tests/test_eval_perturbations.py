@@ -144,10 +144,10 @@ class TestRobustnessScorer:
         # No vulnerabilities when base already failed
         assert result["vulnerability_count"] == 0
 
-    def test_empty_perturbations_gives_full_score(self):
+    def test_empty_perturbations_gives_no_credit(self):
         result = compute_robustness_score(base_passed=True, perturbed_results={})
-        assert result["raw_robustness"] == 1.0
-        assert result["strict_robustness"] == 1.0
+        assert result["raw_robustness"] == 0.0
+        assert result["strict_robustness"] == 0.0
 
     def test_case_robustness_failed_perturbations_list(self):
         case = CaseRobustnessResult(
@@ -187,7 +187,7 @@ class TestRobustnessScorer:
             case = CaseRobustnessResult(
                 case_id="x",
                 base_passed=True,
-                perturbed_results={},  # empty → score computed as 1.0
+                perturbed_results={"typo": True},
             )
             # Monkey-patch to test grade thresholds
             r = RobustnessReport(total_cases=1, case_results=[case])
@@ -270,3 +270,10 @@ class TestPerturbedSuiteAndEvaluation:
         assert report.case_results[0].perturbed_results["distractor_injection"] is True
         assert report.total_vulnerabilities == 1
         assert report.most_vulnerable_perturbation == "typo_noise"
+
+
+def test_stable_wrong_answers_cannot_earn_a_grade_a():
+    report = compute_robustness_report([CaseRobustnessResult("wrong", False, {"typo": False})])
+    assert report.avg_strict_robustness == 0
+    assert report.robustness_grade.startswith("F")
+    assert compute_robustness_report([]).robustness_grade.startswith("N/A")

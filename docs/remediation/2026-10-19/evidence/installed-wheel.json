@@ -1,0 +1,11 @@
+{
+  "operations_module": "/opt/moro-candidate/lib/python3.11/site-packages/moro/dashboard/operations.py",
+  "training_module": "/opt/moro-candidate/lib/python3.11/site-packages/moro/training/hf_backend.py",
+  "html_packaged": true,
+  "alpine_packaged": true,
+  "aiohttp": "3.14.4",
+  "torch": "2.14.1+cpu",
+  "aiohttp_requirement": [
+    "aiohttp==3.14.4; extra == \"train\""
+  ]
+}

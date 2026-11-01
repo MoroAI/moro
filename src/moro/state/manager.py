@@ -449,12 +449,32 @@ class StateManager:
         """Promote a model to production (demotes current production model)."""
         conn = self._get_conn()
         try:
+            conn.execute("BEGIN IMMEDIATE")
+            target = conn.execute(
+                "SELECT * FROM model_registry WHERE model_id = ?", (model_id,)
+            ).fetchone()
+            if target is None:
+                conn.rollback()
+                return False
+            from moro.config.loader import load_config
+            from moro.export.eligibility import resolve_export_run
+            from moro.export.gates import check_release_requirements
+
+            root = self.db_path.parent.parent
+            if not target["training_run_id"]:
+                raise ValueError("Promotion requires a recorded completed training run")
+            config = load_config(root / "moro.yaml")
+            selected = resolve_export_run(root, config.project.name, target["training_run_id"])
+            gate = check_release_requirements(root, selected, config)
+            if gate["status"] != "passed":
+                raise ValueError("Promotion requires passed artifact-bound evaluation evidence")
+
             # Demote current production model
             conn.execute("UPDATE model_registry SET is_production = 0 WHERE is_production = 1")
 
             # Promote new model
             conn.execute(
-                "UPDATE model_registry SET is_production = 1, status = 'deployed' WHERE model_id = ?",
+                "UPDATE model_registry SET is_production = 1, status = 'released' WHERE model_id = ?",
                 [model_id],
             )
             conn.commit()

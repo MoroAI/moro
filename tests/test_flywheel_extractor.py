@@ -7,7 +7,7 @@ from moro.flywheel.models import FeedbackType, InferenceLogPayload
 
 
 def test_extract_human_correction():
-    extractor = DeterministicPreferenceExtractor()
+    extractor = DeterministicPreferenceExtractor(allow_synthetic=True)
     log = InferenceLogPayload(
         session_id="s1",
         prompt="What is the dosage of Drug X?",
@@ -25,7 +25,7 @@ def test_extract_human_correction():
 
 
 def test_extract_negative_rating_with_context():
-    extractor = DeterministicPreferenceExtractor()
+    extractor = DeterministicPreferenceExtractor(allow_synthetic=True)
     log = InferenceLogPayload(
         session_id="s2",
         prompt="What protocol applies to PCI?",
@@ -42,7 +42,7 @@ def test_extract_negative_rating_with_context():
 
 
 def test_extract_positive_reinforcement():
-    extractor = DeterministicPreferenceExtractor()
+    extractor = DeterministicPreferenceExtractor(allow_synthetic=True)
     log = InferenceLogPayload(
         session_id="s3",
         prompt="Explain hypertension pathophysiology.",
@@ -58,7 +58,7 @@ def test_extract_positive_reinforcement():
 
 
 def test_extract_automated_rule_violation():
-    extractor = DeterministicPreferenceExtractor()
+    extractor = DeterministicPreferenceExtractor(allow_synthetic=True)
     log = InferenceLogPayload(
         session_id="s4",
         prompt="Summarize Section 4.",
@@ -69,3 +69,14 @@ def test_extract_automated_rule_violation():
     pairs = extractor.extract_pairs([log])
     assert len(pairs) == 1
     assert pairs[0].feedback_type == FeedbackType.AUTOMATED_RULE_VIOLATION
+
+
+def test_ratings_alone_never_create_gold_preferences_by_default():
+    extractor = DeterministicPreferenceExtractor()
+    logs = [
+        InferenceLogPayload(
+            session_id="test", prompt="Question", completion="Answer", user_rating=rating
+        )
+        for rating in (-1, 1)
+    ]
+    assert extractor.extract_pairs(logs) == []

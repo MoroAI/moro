@@ -27,8 +27,8 @@ class SQLiteLogIngestor(AbstractLogIngestor):
         self,
         db_path: Path,
         batch_size: int = 100,
-        include_positive: bool = True,
-        include_negative: bool = True,
+        include_positive: bool = False,
+        include_negative: bool = False,
         include_corrections: bool = True,
     ):
         self.db_path = Path(db_path)

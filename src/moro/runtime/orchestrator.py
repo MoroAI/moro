@@ -332,6 +332,10 @@ class MoroRuntimeOrchestrator:
 
         Returns True if recovery was successful and execution should retry.
         """
+        attempts = getattr(context, "_recovery_attempts", 0)
+        if attempts >= 2:
+            return False
+        context._recovery_attempts = attempts + 1
         error_type = type(error).__name__
         error_message = str(error).lower()
 
@@ -343,6 +347,8 @@ class MoroRuntimeOrchestrator:
 
             if "batch_size" in context.config:
                 current_batch = context.config.get("batch_size", 1)
+                if current_batch <= 1:
+                    return False
                 context.config["batch_size"] = max(1, current_batch // 2)
                 return True
 
@@ -546,7 +552,7 @@ class MoroRuntimeOrchestrator:
         # Compile the dataset
         dataset_id = compiler.compile_dataset(
             source_path=data_source,
-            config=context.config,
+            config=context.config.get("dataset", {}),
         )
 
         context.report_progress("Dataset compiled successfully", 100)
@@ -602,8 +608,6 @@ class MoroRuntimeOrchestrator:
         recipe_input = context.config.get("recipe", {})
         recipe = recipe_input.get("recipe", recipe_input) if isinstance(recipe_input, dict) else {}
 
-        target_model = context.config.get("target_model") or recipe.get("model_name") or "unknown"
-
         context.report_progress("Initializing training...")
 
         # Import the training runner
@@ -614,19 +618,12 @@ class MoroRuntimeOrchestrator:
             experiment_tracker=self.experiment_tracker,
         )
 
-        # Create experiment
-        experiment_id = self.experiment_tracker.create_experiment(
-            name=f"run_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
-            base_model=target_model,
-            dataset_id=dataset_id,
-        )
-
         context.report_progress("Starting training...", 10)
 
         try:
             # Run training
             result = await runner.run_training_async(
-                experiment_id=experiment_id,
+                experiment_id=None,
                 dataset_id=dataset_id,
                 recipe=recipe,
                 progress_callback=lambda msg, pct: context.report_progress(msg, pct),
@@ -637,15 +634,15 @@ class MoroRuntimeOrchestrator:
             duration = time.time() - start_time
 
             return {
-                "experiment_id": experiment_id,
+                "experiment_id": result["run_id"],
+                "analytics_experiment_id": result.get("experiment_id"),
                 "final_loss": result.get("final_loss"),
                 "peak_vram": result.get("peak_vram"),
                 "duration": duration,
                 "status": "completed",
             }
 
-        except Exception as e:
-            self.experiment_tracker.fail_experiment(experiment_id, str(e))
+        except Exception:
             raise
 
     async def _phase_evaluation(self, context: ExecutionContext) -> dict[str, Any]:

@@ -1,0 +1,68 @@
+{
+  "pipeline_id": "pipeline_7aebd36f",
+  "phases": {
+    "data_compilation": {
+      "dataset_id": "data_b76668d8d7ee",
+      "duration": 0.003607034683227539,
+      "status": "completed"
+    },
+    "recipe_generation": {
+      "recipe": {
+        "model_name": "missing-model",
+        "target_model": "missing-model",
+        "dataset_id": "data_b76668d8d7ee",
+        "quantization": "nf4",
+        "adapter_type": "lora",
+        "lora_r": 8,
+        "lora_alpha": 16,
+        "target_modules": [
+          "q_proj",
+          "v_proj"
+        ],
+        "batch_size": 1,
+        "gradient_accumulation_steps": 4,
+        "learning_rate": 0.0002,
+        "epochs": 1,
+        "max_seq_length": 512,
+        "optimizer": "paged_adamw_8bit",
+        "gradient_checkpointing": true,
+        "precision": "bf16",
+        "estimated_vram_gb": 9.75,
+        "total_steps": 10
+      },
+      "duration": 0.13263201713562012,
+      "status": "completed"
+    },
+    "training": {
+      "experiment_id": "exp_f7f39252b6c4",
+      "final_loss": 1.0,
+      "peak_vram": 9.75,
+      "duration": 0.12607383728027344,
+      "status": "completed"
+    },
+    "evaluation": {
+      "eval_id": "eval_f740f1a9",
+      "pass_rate": 1.0,
+      "delta": 0.15,
+      "duration": 0.04001212120056152,
+      "status": "completed"
+    },
+    "release": {
+      "release_id": "rel_cae08e09",
+      "version": "v1.0.0",
+      "duration": 0.024042844772338867,
+      "status": "completed"
+    },
+    "deployment": {
+      "deployment_id": "dep_5467032d",
+      "endpoint": "http://localhost:11434/api/generate",
+      "duration": 0.02451014518737793,
+      "status": "completed"
+    }
+  },
+  "success": true,
+  "invalid_promotion": {
+    "return": true,
+    "remaining_production": 0
+  }
+}

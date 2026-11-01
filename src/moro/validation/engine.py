@@ -21,7 +21,7 @@ from pydantic import BaseModel
 from moro.config.models import MoroConfig
 from moro.hardware.detector import detect_hardware
 from moro.hardware.profile import HardwareProfile
-from moro.recipes.rules import estimate_memory, infer_parameter_billions
+from moro.recipes.rules import estimate_config_memory
 
 
 class ValidationCheck(BaseModel):
@@ -79,30 +79,29 @@ def validate_project(config: MoroConfig, root: Path) -> ValidationReport:
     # 2. Hardware & Memory Pre-Flight Check
     raw_hw = detect_hardware()
     hw = HardwareProfile.model_validate(raw_hw)
-    param_b, _ = infer_parameter_billions(model_name)
-    param_billions = param_b if param_b is not None else 1.5
+    est_mem = estimate_config_memory(config)
 
-    quant = (
-        config.model.quantization if config.model.quantization in ("nf4", "int8", "none") else "nf4"
-    )
-    module_count = (
-        len(config.adapter.target_modules) if isinstance(config.adapter.target_modules, list) else 7
-    )
-
-    mem_dict = estimate_memory(
-        param_billions,
-        quantization=quant,
-        precision=config.training.precision,
-        sequence_length=config.dataset.max_seq_length,
-        batch_size=config.training.batch_size,
-        rank=config.adapter.r,
-        module_count=module_count,
-        checkpointing=config.training.gradient_checkpointing,
-        optimizer=config.training.optimizer,
-    )
-    est_mem = sum(mem_dict.values())
-
-    if hw.cuda_available and hw.vram_gb is not None:
+    if not hw.cuda_available and (
+        config.model.quantization != "none" or "8bit" in config.training.optimizer
+    ):
+        checks.append(
+            ValidationCheck(
+                name="Hardware Compatibility",
+                status="fail",
+                message="Quantization and 8-bit optimizers require a supported CUDA environment.",
+            )
+        )
+        errors.append("Unsupported non-CUDA training configuration")
+    if est_mem is None:
+        checks.append(
+            ValidationCheck(
+                name="Hardware Memory Fit",
+                status="warn",
+                message="Model size is unknown; no memory fit claim can be made.",
+            )
+        )
+        warnings.append("Unknown model size")
+    elif hw.cuda_available and hw.vram_gb is not None:
         if est_mem and est_mem > hw.vram_gb:
             checks.append(
                 ValidationCheck(
@@ -210,12 +209,12 @@ def validate_project(config: MoroConfig, root: Path) -> ValidationReport:
                 errors.append(f"Eval suite '{suite_path.name}' corrupt: {e}")
 
     # 5. Release Governance Check
-    if config.release.require.safety_pass:
+    if config.release.require is not None and config.release.require.safety_pass:
         checks.append(
             ValidationCheck(
                 name="Safety Governance",
                 status="pass",
-                message="Release safety gate enabled (requires PII clean & eval pass).",
+                message="Release safety gate enabled (requires recorded safety-tagged assertions).",
             )
         )
     else:

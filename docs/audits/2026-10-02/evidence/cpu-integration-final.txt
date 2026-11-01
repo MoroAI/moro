@@ -1,0 +1,39 @@
+============================= test session starts ==============================
+platform linux -- Python 3.11.17, pytest-9.1.1, pluggy-1.6.0 -- /usr/local/bin/python
+cachedir: /tmp/pytest-cache
+rootdir: /workspace
+configfile: pyproject.toml
+plugins: anyio-4.15.1
+collecting ... collected 18 items
+
+tests/integration/test_complete_pipeline.py::TestStateManagement::test_state_db_initialization PASSED [  5%]
+tests/integration/test_complete_pipeline.py::TestStateManagement::test_node_creation_and_query PASSED [ 11%]
+tests/integration/test_complete_pipeline.py::TestStateManagement::test_edge_creation_and_lineage PASSED [ 16%]
+tests/integration/test_complete_pipeline.py::TestStateManagement::test_model_registry PASSED [ 22%]
+tests/integration/test_complete_pipeline.py::TestExperimentTracking::test_experiment_db_initialization PASSED [ 27%]
+tests/integration/test_complete_pipeline.py::TestExperimentTracking::test_experiment_lifecycle PASSED [ 33%]
+tests/integration/test_complete_pipeline.py::TestExperimentTracking::test_experiment_comparison PASSED [ 38%]
+tests/integration/test_complete_pipeline.py::TestRuntimeOrchestrator::test_orchestrator_initialization PASSED [ 44%]
+tests/integration/test_complete_pipeline.py::TestRuntimeOrchestrator::test_execution_context_creation PASSED [ 50%]
+tests/integration/test_complete_pipeline.py::TestRuntimeOrchestrator::test_execution_lifecycle PASSED [ 55%]
+tests/integration/test_complete_pipeline.py::TestRuntimeOrchestrator::test_error_recovery PASSED [ 61%]
+tests/integration/test_complete_pipeline.py::TestServiceOrchestrator::test_service_definitions PASSED [ 66%]
+tests/integration/test_complete_pipeline.py::TestServiceOrchestrator::test_service_status PASSED [ 72%]
+tests/integration/test_complete_pipeline.py::TestCompletePipeline::test_complete_pipeline_execution PASSED [ 77%]
+tests/integration/test_complete_pipeline.py::TestPerformanceBenchmarks::test_state_manager_performance PASSED [ 83%]
+tests/integration/test_complete_pipeline.py::TestPerformanceBenchmarks::test_experiment_tracker_performance PASSED [ 88%]
+tests/integration/test_moro_full_lifecycle_e2e.py::test_moro_full_lifecycle_master_e2e PASSED [ 94%]
+tests/integration/test_training_cpu.py::test_offline_training_and_adapter_reload PASSED [100%]
+
+=============================== warnings summary ===============================
+tests/integration/test_training_cpu.py::test_offline_training_and_adapter_reload
+  /usr/local/lib/python3.11/site-packages/peft/tuners/lora/layer.py:2174: UserWarning: fan_in_fan_out is set to False but the target module is `Conv1D`. Setting fan_in_fan_out to True.
+    warnings.warn(
+
+tests/integration/test_training_cpu.py::test_offline_training_and_adapter_reload
+tests/integration/test_training_cpu.py::test_offline_training_and_adapter_reload
+  /usr/local/lib/python3.11/site-packages/torch/utils/data/dataloader.py:666: UserWarning: 'pin_memory' argument is set as true but no accelerator is found, then device pinned memory won't be used.
+    warnings.warn(warn_msg)
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+======================= 18 passed, 3 warnings in 11.57s ========================

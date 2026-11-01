@@ -28,12 +28,14 @@ class DatasetConfig(StrictConfig):
     format: Literal["auto", "jsonl", "csv", "txt", "markdown"] = "auto"
     deduplicate: bool = True
     pii_scan: bool = False
+    privacy_action: Literal["flag", "redact", "reject", "quarantine"] = "flag"
     max_seq_length: int = Field(default=1024, ge=16, le=32768)
     min_quality_score: float = Field(default=0.0, ge=0.0, le=1.0)
     validation_ratio: float = Field(default=0.1, ge=0.0, le=0.5)
     eval_ratio: float = Field(default=0.1, ge=0.0, le=0.5)
     replay_ratio: float = Field(default=0.0, ge=0.0, le=0.5)
     domain_glossary: Path | None = None
+    split_group_by: Literal["content", "group_id"] = "content"
 
     @model_validator(mode="after")
     def validate_split_ratios(self):

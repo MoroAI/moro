@@ -1,0 +1,83 @@
+src/moro/training/async_runner.py:65:                simulated_loss = round(max(0.1, 2.0 - (1.0 * (step + 1) / total_steps)), 4)
+src/moro/training/async_runner.py:70:                        train_loss=simulated_loss,
+src/moro/training/async_runner.py:76:                    pass
+src/moro/training/async_runner.py:91:                pass
+src/moro/cli/status.py:56:                pass
+src/moro/analytics/visualizations.py:186:                placeholders = ",".join(["?" for _ in experiment_ids])
+src/moro/analytics/visualizations.py:191:                    WHERE experiment_id IN ({placeholders})
+src/moro/training/runner.py:70:            pass
+src/moro/training/runner.py:80:            pass
+src/moro/training/runner.py:90:            pass
+src/moro/services/orchestrator.py:125:            pass
+src/moro/services/orchestrator.py:271:            pass
+src/moro/services/orchestrator.py:329:                pass
+src/moro/services/orchestrator.py:375:                pass
+src/moro/services/orchestrator.py:387:                    pass
+src/moro/services/orchestrator.py:398:                pass
+src/moro/runtime/orchestrator.py:116:                pass
+src/moro/runtime/orchestrator.py:124:                pass
+src/moro/cli/diagnose.py:33:            pass
+src/moro/cli/diagnose.py:53:            pass
+src/moro/cli/hooks.py:5:Ensures every commit is scanned for hardcoded secrets and PII leaks
+src/moro/cli/hooks.py:98:        pass
+src/moro/cli/hooks.py:239:        pass
+src/moro/flywheel/orchestrator.py:163:                pass
+src/moro/flywheel/orchestrator.py:170:                pass
+src/moro/cli/guard.py:6:  moro guard redact  — Redact detected PII/secrets with safe placeholders
+src/moro/cli/guard.py:175:    """Redact PII and secrets with safe semantic placeholders."""
+src/moro/cli/train.py:156:            pass
+src/moro/cli/train.py:194:                    pass
+src/moro/cli/train.py:213:                    pass
+src/moro/cli/train.py:237:                pass
+src/moro/data/privacy.py:84:    Scan and replace detected PII and secret patterns with redaction placeholders.
+src/moro/flywheel/ingestors/sqlite_ingestor.py:129:                placeholders = ",".join(["?" for _ in log_ids])
+src/moro/flywheel/ingestors/sqlite_ingestor.py:136:                    WHERE log_id IN ({placeholders})
+src/moro/flywheel/ingestors/sqlite_ingestor.py:142:                placeholders = ",".join(["?" for _ in session_ids])
+src/moro/flywheel/ingestors/sqlite_ingestor.py:149:                    WHERE session_id IN ({placeholders})
+src/moro/flywheel/webhook/receiver.py:82:                    pass
+src/moro/eval/harness.py:95:                pass
+src/moro/recipes/engine.py:308:                pass
+src/moro/eval/perturbations.py:80:        Error rate of 4% simulates realistic keyboard typos in professional settings.
+src/moro/eval/perturbations.py:122:                      for common placeholder patterns (System A/B, Drug A/B, etc.).
+src/moro/eval/perturbations.py:125:            # Generic placeholder swaps for common patterns
+src/moro/eval/perturbations.py:140:        # Swap first two provided entities using a temp placeholder
+src/moro/data/quality.py:308:        local_vector_density=0.5,  # MinHash placeholder — future enhancement
+src/moro/hardware/detector.py:41:        pass
+src/moro/hardware/detector.py:43:        pass
+src/moro/hardware/detector.py:63:        pass
+src/moro/data/compiler.py:78:            # If source is an in-memory or mock path
+src/moro/main.py:57:    pass
+src/moro/ui/server.py:105:    """Retrieve metadata about the active project or mock a comprehensive state."""
+src/moro/ui/server.py:113:            pass
+src/moro/ui/server.py:212:        pass
+src/moro/ui/server.py:1068:          <input type="text" id="chat-input" class="input-field" style="margin-bottom: 0;" placeholder="Ask anything to the local model (e.g., 'What is quantum entanglement?')" value="What is quantum superposition?">
+src/moro/recipes/rules.py:26:            pass
+src/moro/dashboard/api/models.py:73:                    pass
+src/moro/dashboard/api/models.py:119:            pass
+src/moro/dashboard/api/models.py:175:            pass
+src/moro/dashboard/api/models.py:204:            pass
+src/moro/dashboard/api/models.py:228:            pass
+src/moro/dashboard/api/training.py:99:                    pass
+src/moro/dashboard/api/training.py:108:                    pass
+src/moro/dashboard/api/training.py:137:async def _simulate_training_worker(run_id: str, config: TrainingConfig) -> None:
+src/moro/dashboard/api/training.py:250:    task = asyncio.create_task(_simulate_training_worker(run_id, config))
+src/moro/dashboard/api/system.py:112:            pass
+src/moro/dashboard/api/system.py:114:        pass
+src/moro/dashboard/api/system.py:129:        pass
+src/moro/dashboard/api/system.py:290:        pass
+src/moro/dashboard/api/system.py:308:        pass
+src/moro/dashboard/api/datasets.py:139:                    pass
+src/moro/dashboard/api/datasets.py:164:                    pass
+src/moro/dashboard/mission_control.py:81:                        pass
+src/moro/dashboard/mission_control.py:358:                pass
+src/moro/dashboard/mission_control.py:390:                pass
+src/moro/dashboard/mission_control.py:860:        pass
+src/moro/dashboard/mission_control.py:885:        pass
+src/moro/dashboard/mission_control.py:907:        pass
+src/moro/dashboard/api/flywheel.py:46:            pass
+src/moro/dashboard/api/flywheel.py:90:                pass
+src/moro/dashboard/api/deployment.py:67:        pass
+src/moro/dashboard/api/deployment.py:142:        pass
+src/moro/dashboard/api/deployment.py:143:    return {"status": "simulated", "model": model_name, "message": "Ollama pull registered"}
+src/moro/dashboard/api/deployment.py:159:        pass
+src/moro/dashboard/api/deployment.py:189:        pass

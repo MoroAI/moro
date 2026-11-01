@@ -21,6 +21,9 @@ def temp_project():
     temp_dir = tempfile.mkdtemp(prefix="moro_bench_")
     project_root = Path(temp_dir)
     (project_root / ".moro").mkdir(parents=True)
+    from moro.templates.project import default_moro_yaml
+
+    (project_root / "moro.yaml").write_text(default_moro_yaml("benchmark"))
     yield project_root
     shutil.rmtree(temp_dir, ignore_errors=True)
 
@@ -43,7 +46,13 @@ def large_dataset(temp_project):
     )
 
     with open(dataset_path, "w", encoding="utf-8") as f:
-        f.write(sample * 10000)
+        for index in range(10000):
+            f.write(
+                sample.replace(
+                    "What is the capital of France?",
+                    f"Question {index}: what is the capital of France?",
+                )
+            )
 
     return dataset_path
 
@@ -83,76 +92,31 @@ class TestDataCompilationPerformance:
 class TestVRAMPredictionPerformance:
     """Benchmark VRAM prediction accuracy."""
 
-    def test_prediction_accuracy(self):
-        """Test that VRAM predictions are within 5% of actual."""
+    def test_prediction_accounts_for_memory_drivers(self):
+        """Planner invariants, not a claim of measured GPU accuracy."""
         from moro.recipes.engine import predict_peak_vram_gb
 
-        # Test cases with known actual VRAM usage
-        test_cases = [
-            {
-                "model_class": "1.5b",
-                "quantization": "nf4",
-                "max_seq_length": 1024,
-                "batch_size": 1,
-                "lora_r": 16,
-                "actual_vram": 3.2,  # GB
-            },
-            {
-                "model_class": "3b",
-                "quantization": "nf4",
-                "max_seq_length": 2048,
-                "batch_size": 1,
-                "lora_r": 32,
-                "actual_vram": 5.8,  # GB
-            },
-            {
-                "model_class": "7b",
-                "quantization": "nf4",
-                "max_seq_length": 2048,
-                "batch_size": 1,
-                "lora_r": 16,
-                "actual_vram": 9.5,  # GB
-            },
-        ]
-
-        errors = []
-
-        for case in test_cases:
-            predicted = predict_peak_vram_gb(
-                model_class=case["model_class"],
-                quantization=case["quantization"],
-                max_seq_length=case["max_seq_length"],
-                batch_size=case["batch_size"],
-                lora_r=case["lora_r"],
-            )
-
-            actual = case["actual_vram"]
-            error = abs(predicted - actual) / actual
-
-            errors.append(error)
-
-            print(
-                f"\n{case['model_class']}: Predicted {predicted:.2f}GB, Actual {actual:.2f}GB, Error {error:.1%}"
-            )
-
-        # Target: > 95% accuracy (error < 5%)
-        avg_error = sum(errors) / len(errors)
-
-        assert avg_error < 0.05, f"Average prediction error too high: {avg_error:.1%}"
-
-        print(f"\nAverage VRAM Prediction Error: {avg_error:.1%}")
+        base = predict_peak_vram_gb("7b", batch_size=1)
+        assert predict_peak_vram_gb("7b", batch_size=4) > base
+        assert predict_peak_vram_gb("7b", quantization="none") > base
+        assert predict_peak_vram_gb("unknown-model") is None
 
 
 class TestDashboardPerformance:
     """Benchmark dashboard response times."""
 
-    def test_health_endpoint_response_time(self, temp_project):
+    def test_health_endpoint_response_time(self, temp_project, monkeypatch):
         """Test that the health endpoint responds quickly."""
         from fastapi.testclient import TestClient
 
         from moro.dashboard.mission_control import mission_app
 
-        client = TestClient(mission_app)
+        monkeypatch.setenv("MORO_API_TOKEN", "test-benchmark-" + "a" * 32)
+        client = TestClient(
+            mission_app,
+            base_url="http://127.0.0.1",
+            headers={"Authorization": "Bearer test-benchmark-" + "a" * 32},
+        )
 
         # Warm up
         client.get("/api/health")

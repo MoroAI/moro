@@ -55,7 +55,7 @@ No cloud dependencies. No surprise token bills. No PhD in distributed systems re
 
 ## Architecture & Pipeline
 
-Moro treats model adaptation like a compiler pipeline. Raw, messy real-world data enters one end; a verified, quantized, production-ready local model emerges from the other.
+Moro treats model adaptation like a compiler pipeline. Supported conversation data is compiled into versioned splits, trained into adapters, evaluated with explicit assertions, and packaged under configured release requirements. Serving readiness and model quality require separate validation.
 
 <p align="center">
   <img src="assets/pipeline-diagram.svg" alt="MoroAI Pipeline Architecture" width="100%" />

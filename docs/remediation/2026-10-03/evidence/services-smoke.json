@@ -1,0 +1,257 @@
+{
+  "time": "2026-10-05T09:01:34.291300+00:00",
+  "checks": [
+    {
+      "name": "native anonymous overview",
+      "status": 401
+    },
+    {
+      "name": "native login page",
+      "status": 200
+    },
+    {
+      "name": "native login",
+      "status": 303
+    },
+    {
+      "name": "native authenticated dashboard",
+      "status": 200
+    },
+    {
+      "name": "native authenticated overview",
+      "status": 200
+    },
+    {
+      "name": "native packaged asset",
+      "status": 200
+    },
+    {
+      "name": "native cross origin",
+      "status": 403
+    },
+    {
+      "name": "native disabled terminal",
+      "status": 410
+    },
+    {
+      "name": "native untrusted host",
+      "status": 403
+    },
+    {
+      "name": "alternate anonymous overview",
+      "status": 401
+    },
+    {
+      "name": "alternate login page",
+      "status": 200
+    },
+    {
+      "name": "alternate login",
+      "status": 303
+    },
+    {
+      "name": "alternate authenticated dashboard",
+      "status": 200
+    },
+    {
+      "name": "alternate authenticated overview",
+      "status": 200
+    },
+    {
+      "name": "alternate packaged asset",
+      "status": 200
+    },
+    {
+      "name": "alternate cross origin",
+      "status": 403
+    },
+    {
+      "name": "alternate disabled terminal",
+      "status": 410
+    },
+    {
+      "name": "alternate untrusted host",
+      "status": 403
+    },
+    {
+      "name": "compose anonymous overview",
+      "status": 401
+    },
+    {
+      "name": "compose login page",
+      "status": 200
+    },
+    {
+      "name": "compose login",
+      "status": 303
+    },
+    {
+      "name": "compose authenticated dashboard",
+      "status": 200
+    },
+    {
+      "name": "compose authenticated overview",
+      "status": 200
+    },
+    {
+      "name": "compose packaged asset",
+      "status": 200
+    },
+    {
+      "name": "compose cross origin",
+      "status": 403
+    },
+    {
+      "name": "compose disabled terminal",
+      "status": 410
+    },
+    {
+      "name": "compose untrusted host",
+      "status": 403
+    },
+    {
+      "name": "native gateway anonymous",
+      "status": 401
+    },
+    {
+      "name": "native actual model inventory",
+      "status": 200,
+      "model_count": 0
+    },
+    {
+      "name": "native missing backend model",
+      "status": 502
+    },
+    {
+      "name": "compose gateway anonymous",
+      "status": 401
+    },
+    {
+      "name": "compose actual model inventory",
+      "status": 200,
+      "model_count": 0
+    },
+    {
+      "name": "compose missing backend model",
+      "status": 502
+    },
+    {
+      "name": "native webhook health",
+      "status": 200
+    },
+    {
+      "name": "native webhook unauthenticated",
+      "status": 403
+    },
+    {
+      "name": "native webhook valid batch",
+      "status": 200
+    },
+    {
+      "name": "native webhook replay",
+      "status": 200
+    },
+    {
+      "name": "native webhook conflicting replay",
+      "status": 409
+    },
+    {
+      "name": "native webhook invalid rating",
+      "status": 422
+    },
+    {
+      "name": "native webhook browser origin",
+      "status": 403
+    },
+    {
+      "name": "compose webhook health",
+      "status": 200
+    },
+    {
+      "name": "compose webhook unauthenticated",
+      "status": 403
+    },
+    {
+      "name": "compose webhook valid batch",
+      "status": 200
+    },
+    {
+      "name": "compose webhook replay",
+      "status": 200
+    },
+    {
+      "name": "compose webhook conflicting replay",
+      "status": 409
+    },
+    {
+      "name": "compose webhook invalid rating",
+      "status": 422
+    },
+    {
+      "name": "compose webhook browser origin",
+      "status": 403
+    }
+  ],
+  "containers": [
+    {
+      "name": "moro-remediation-dashboard-1",
+      "image": "sha256:d3eef168035d3f6f1ee2abde88c17a6cbc085c2b0c16c9bd3cec731eb3dfd88b",
+      "user": "501:20",
+      "ports": {
+        "8501/tcp": [
+          {
+            "HostIp": "127.0.0.1",
+            "HostPort": "18501"
+          }
+        ]
+      },
+      "running": true,
+      "health": null
+    },
+    {
+      "name": "moro-remediation-gateway-1",
+      "image": "sha256:d3eef168035d3f6f1ee2abde88c17a6cbc085c2b0c16c9bd3cec731eb3dfd88b",
+      "user": "501:20",
+      "ports": {
+        "8000/tcp": [
+          {
+            "HostIp": "127.0.0.1",
+            "HostPort": "18000"
+          }
+        ]
+      },
+      "running": true,
+      "health": null
+    },
+    {
+      "name": "moro-remediation-webhook-1",
+      "image": "sha256:d3eef168035d3f6f1ee2abde88c17a6cbc085c2b0c16c9bd3cec731eb3dfd88b",
+      "user": "501:20",
+      "ports": {
+        "8001/tcp": [
+          {
+            "HostIp": "127.0.0.1",
+            "HostPort": "18001"
+          }
+        ]
+      },
+      "running": true,
+      "health": "healthy"
+    },
+    {
+      "name": "moro-remediation-ollama-1",
+      "image": "sha256:8262851b2846b87c649eddf3e76beb270c52f4d1bc94559f47efde16b0841551",
+      "user": "",
+      "ports": {
+        "11434/tcp": [
+          {
+            "HostIp": "127.0.0.1",
+            "HostPort": "11435"
+          }
+        ]
+      },
+      "running": true,
+      "health": "healthy"
+    }
+  ]
+}

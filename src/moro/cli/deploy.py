@@ -42,6 +42,7 @@ def deploy_command(
                 base_model=selected.config.model.name,
                 project_name=cfg.project.name,
                 out_dir=out_dir,
+                expected_adapter_sha256=gate["adapter_sha256"],
             )
             write_gate_report(gate, pkg_dir)
             console.print(

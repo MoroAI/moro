@@ -52,14 +52,14 @@ def test_sqlite_ingestor_and_orchestrator_cycle(tmp_path):
     orchestrator = MoroAIFlywheelOrchestrator(config=config, ingestor=ingestor)
 
     summary = orchestrator.run_cycle(epoch_id="epoch_test_1")
-    assert summary.pairs_generated == 2
-    assert summary.logs_ingested == 2  # filtered to logs with signals
+    assert summary.pairs_generated == 1
+    assert summary.logs_ingested == 1  # filtered to logs with signals
     assert summary.dataset_path is not None
     assert summary.dataset_path.exists()
 
     # 3. Check database updates: preference pairs recorded, epoch recorded
     stats_after = get_db_stats(db_path)
-    assert stats_after["total_pairs"] == 2
+    assert stats_after["total_pairs"] == 1
     assert stats_after["total_epochs"] == 1
 
     # 4. Verify IDEMPOTENCY: second run finds 0 eligible unprocessed logs
@@ -82,3 +82,91 @@ def test_ingest_from_jsonl(tmp_path):
 
     pending = ingestor.get_pending_count()
     assert pending == 2
+
+
+def correction(ingestor, session="shared"):
+    return ingestor.insert_log(
+        InferenceLogPayload(
+            session_id=session, prompt="Question", completion="Wrong", human_correction="Correct"
+        )
+    )
+
+
+def test_pair_cap_only_acknowledges_persisted_log_ids(tmp_path):
+    ingestor = SQLiteLogIngestor(tmp_path / "prod.db", batch_size=2)
+    for _ in range(3):
+        correction(ingestor)
+    config = FlywheelConfig(output_dir=tmp_path / "pairs", max_pairs_per_epoch=1)
+    worker = MoroAIFlywheelOrchestrator(config, ingestor)
+    for index in range(3):
+        result = worker.run_cycle(f"cap_{index}")
+        assert result.pairs_generated == 1
+        assert sum(result.pairs_by_type.values()) == 1
+        assert ingestor.get_pending_count() == 2 - index
+
+
+def test_below_minimum_keeps_pending_logs(tmp_path):
+    ingestor = SQLiteLogIngestor(tmp_path / "prod.db")
+    correction(ingestor)
+    worker = MoroAIFlywheelOrchestrator(
+        FlywheelConfig(output_dir=tmp_path / "pairs", min_pairs_per_epoch=2), ingestor
+    )
+    result = worker.run_cycle("too_small")
+    assert result.pairs_generated == 0
+    assert result.dataset_path is None
+    assert ingestor.get_pending_count() == 1
+    correction(ingestor)
+    assert worker.run_cycle("enough").pairs_generated == 2
+
+
+def test_reused_epoch_preserves_original_bytes_and_pending_logs(tmp_path):
+    import pytest
+
+    ingestor = SQLiteLogIngestor(tmp_path / "prod.db")
+    correction(ingestor)
+    worker = MoroAIFlywheelOrchestrator(FlywheelConfig(output_dir=tmp_path / "pairs"), ingestor)
+    path = worker.run_cycle("same").dataset_path
+    before = path.read_bytes()
+    correction(ingestor)
+    with pytest.raises(ValueError, match="already exists"):
+        worker.run_cycle("same")
+    assert path.read_bytes() == before
+    assert ingestor.get_pending_count() == 1
+
+
+def test_trainer_failure_never_calls_deployment(tmp_path):
+    from unittest.mock import Mock
+
+    import pytest
+
+    ingestor = SQLiteLogIngestor(tmp_path / "prod.db")
+    correction(ingestor)
+    trainer, gate = Mock(), Mock()
+    trainer.train_epoch.side_effect = RuntimeError("training failed")
+    worker = MoroAIFlywheelOrchestrator(
+        FlywheelConfig(output_dir=tmp_path / "pairs", auto_deploy=True),
+        ingestor,
+        trainer_bridge=trainer,
+        deployment_gate=gate,
+    )
+    with pytest.raises(RuntimeError, match="training failed"):
+        worker.run_cycle("failed")
+    gate.evaluate_and_deploy.assert_not_called()
+    assert ingestor.get_epoch_history("failed")["status"] == "failed"
+
+
+def test_required_gate_does_not_imply_auto_deployment(tmp_path):
+    from unittest.mock import Mock
+
+    ingestor = SQLiteLogIngestor(tmp_path / "prod.db")
+    correction(ingestor)
+    trainer, gate = Mock(), Mock()
+    trainer.train_epoch.return_value = (2.0, 1.0)
+    worker = MoroAIFlywheelOrchestrator(
+        FlywheelConfig(output_dir=tmp_path / "pairs", auto_deploy=False, require_eval_gate=True),
+        ingestor,
+        trainer_bridge=trainer,
+        deployment_gate=gate,
+    )
+    assert worker.run_cycle("train_only").deployed is False
+    gate.evaluate_and_deploy.assert_not_called()

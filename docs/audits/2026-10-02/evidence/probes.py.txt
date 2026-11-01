@@ -1,0 +1,63 @@
+import asyncio, json, tempfile
+from pathlib import Path
+import httpx
+from moro.data.compiler import DataCompiler
+from moro.eval.harness import EvalHarness
+from moro.release.manager import ReleaseManager
+from moro.training.runner import TrainingRunner
+from moro.deploy.manager import DeploymentManager
+from moro.flywheel.ingestors.sqlite_ingestor import SQLiteLogIngestor
+from moro.flywheel.models import InferenceLogPayload
+from moro.flywheel.orchestrator import FlywheelConfig, MoroAIFlywheelOrchestrator
+from moro.data.privacy import redact_text
+
+out={}
+c=httpx.Client(base_url='http://127.0.0.1:8501',timeout=20)
+for path in ['/api/health','/api/evaluation/results/does-not-exist','/api/flywheel/status']:
+    r=c.get(path); out[path]={'status':r.status_code,'body':r.json()}
+r=c.post('/api/terminal/execute',json={'command':'moro --help; printf MORO_AUDIT_SHELL_MARKER'})
+out['shell_prefix_bypass']={'status':r.status_code,'marker_seen':'MORO_AUDIT_SHELL_MARKER' in r.text}
+r=c.post('/api/system/terminal/execute',json={'command':'python3 -c print(673829)'})
+out['unauthenticated_python']={'status':r.status_code,'body':r.json()}
+r=c.post('/api/datasets/upload',files={'file':('allowed.txt',b'MORO_AUDIT_FILE_MARKER','text/plain')},data={'name':'../../audit-marker.unsupported'})
+out['upload_traversal_extension_bypass']={'status':r.status_code,'body':r.json(),'outside_raw_exists':Path('/tmp/moro-audit-20261002/dev/audit-marker.unsupported').exists()}
+r=c.options('/api/terminal/execute',headers={'Origin':'https://untrusted.invalid','Access-Control-Request-Method':'POST','Access-Control-Request-Headers':'content-type'})
+out['cors_untrusted_origin']={'status':r.status_code,'allow_origin':r.headers.get('access-control-allow-origin'),'allow_credentials':r.headers.get('access-control-allow-credentials')}
+r=c.get('/api/health',headers={'Host':'untrusted.invalid'})
+out['host_validation']={'status':r.status_code}
+r=c.post('/api/deployment/deploy',json={'model_id':'nonexistent-model','target':'nonexistent-runtime'})
+out['fake_deployment']={'status':r.status_code,'body':r.json()}
+r=c.post('/api/training/start',json={'model_name':'nonexistent-model','dataset_id':'nonexistent-data','epochs':-1})
+out['fake_training_start']={'status':r.status_code,'body':r.json()}
+run_id=r.json()['run_id']
+import time
+time.sleep(5)
+r=c.get('/api/training/runs/'+run_id)
+out['fake_training_complete']={'status':r.status_code,'body':r.json()}
+r=httpx.post('http://127.0.0.1:8000/v1/chat/completions',json={'model':'nonexistent-model','messages':[{'role':'user','content':'Harmless test'}],'stream':True},timeout=20)
+out['gateway_missing_model']={'status':r.status_code,'body':r.json(),'content_type':r.headers.get('content-type')}
+r=httpx.post('http://127.0.0.1:8001/webhook/ingest',json={'session_id':'audit-only','prompt':'Test question','completion':'Test answer','human_correction':'Test corrected answer'},timeout=5)
+out['webhook_no_auth']={'status':r.status_code,'body':r.json()}
+with tempfile.TemporaryDirectory(prefix='moro-unit-probes-') as td:
+    root=Path(td)
+    source=root/'source.jsonl'; source.write_text('{"messages":[{"role":"user","content":"My email is audit@example.com"},{"role":"assistant","content":"Understood"}]}\n')
+    DataCompiler(root).compile_dataset(source,{'pii_scan':True,'deduplicate':True})
+    split_bytes=[(root/'data/compiled'/f'{s}.jsonl').read_bytes() for s in ['train','validation','eval']]
+    out['sdk_compiler']={'three_splits_identical':len(set(split_bytes))==1,'email_survives':b'audit@example.com' in split_bytes[0]}
+    harness=EvalHarness(root)
+    out['eval_missing_suite_sync']=harness.run_evaluation('missing-run',root/'missing.yaml')
+    out['eval_missing_suite_async']=asyncio.run(harness.run_evaluation_async('missing-experiment',root/'missing.yaml'))
+    release=asyncio.run(ReleaseManager(root).create_release_async('missing-run',{'pass_rate':0},version='zero-score'))
+    out['release_zero_score_missing_artifact']=release
+    out['sdk_training_without_model']=dict(TrainingRunner(root).run_training(config={'model_name':'missing-model'}).items())
+    out['sdk_deploy_missing_release']=asyncio.run(DeploymentManager(root).deploy_async('missing-release','ollama'))
+    ing=SQLiteLogIngestor(root/'production.db',batch_size=1)
+    for n in range(3):
+        ing.insert_log(InferenceLogPayload(session_id='same-session',prompt=f'Question {n}',completion='Wrong response',human_correction='Correct response'))
+    summary=MoroAIFlywheelOrchestrator(FlywheelConfig(output_dir=root/'dpo'),ing).run_cycle()
+    out['flywheel_unfetched_logs_lost']={'logs_ingested':summary.logs_ingested,'pairs_generated':summary.pairs_generated,'pending_after':ing.get_pending_count()}
+text='-----BEGIN PRIVATE KEY-----\nAUDIT_ONLY_FAKE_KEY_BODY\n-----END PRIVATE KEY-----'
+redacted,flags=redact_text(text)
+out['private_key_redaction']={'flags':flags,'key_body_survives':'AUDIT_ONLY_FAKE_KEY_BODY' in redacted}
+Path('/tmp/moro-audit-20261002/probes.json').write_text(json.dumps(out,indent=2,default=str))
+print(json.dumps(out,indent=2,default=str))

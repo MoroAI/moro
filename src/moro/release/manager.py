@@ -1,132 +1,84 @@
-"""
-MoroAI Release Manager.
-
-Orchestrates release gating, provenance verification, version tagging,
-and artifact packaging.
-"""
+"""Create governed release bundles from recorded runs and evaluation evidence."""
 
 from __future__ import annotations
 
 import asyncio
-import json
-import logging
-import uuid
-from collections.abc import Callable
-from datetime import datetime, timezone
+import fcntl
+import os
+import tempfile
 from pathlib import Path
-from typing import Any
 
-logger = logging.getLogger("moro.release.manager")
+from moro.config.loader import load_config
+from moro.core.errors import ExportError
+from moro.core.hashing import sha256_directory
+from moro.export.eligibility import resolve_export_run
+from moro.export.gates import check_release_requirements
+from moro.export.manifest import export_adapter, generate_manifest, write_manifest
+from moro.export.paths import deployment_directory
 
 
 class ReleaseManager:
-    """Manages the creation and governance of model releases."""
-
-    def __init__(self, project_root: Path, state_manager: Any = None) -> None:
-        self.project_root = Path(project_root)
+    def __init__(self, project_root: Path, state_manager=None):
+        self.project_root = Path(project_root).resolve()
         self.state_manager = state_manager
-        self.releases_dir = self.project_root / "releases"
-        self.releases_dir.mkdir(parents=True, exist_ok=True)
 
-    async def create_release_async(
-        self,
-        training_run_id: str,
-        eval_results: dict[str, Any] | None = None,
-        version: str | None = None,
-        progress_callback: Callable[[str, float | None], None] | None = None,
-    ) -> dict[str, Any]:
-        """Create a new model release after verifying governance gates."""
-
-        def report(msg: str, pct: float | None = None) -> None:
-            if progress_callback:
-                progress_callback(msg, pct)
-
-        report("Checking release gates and quality thresholds...", 20.0)
-        await asyncio.sleep(0.01)
-
-        eval_data = eval_results or {}
-        pass_rate = float(eval_data.get("pass_rate") or 1.0)
-        if pass_rate < 0.0:
-            raise ValueError(f"Release gate failed: pass_rate {pass_rate} is invalid")
-
-        report("Packaging model release bundle...", 60.0)
-        await asyncio.sleep(0.01)
-
-        rel_version = version or "v1.0.0"
-        release_id = f"rel_{uuid.uuid4().hex[:8]}"
-
-        version_dir = self.releases_dir / rel_version
-        version_dir.mkdir(parents=True, exist_ok=True)
-
-        manifest = {
-            "release_id": release_id,
-            "version": rel_version,
-            "training_run_id": training_run_id,
-            "created_at": datetime.now(timezone.utc).isoformat(),
-            "eval_results": eval_data,
-            "status": "ready",
-            "artifacts": {
-                "adapter": str(self.project_root / "runs" / training_run_id),
-                "manifest": str(version_dir / "manifest.json"),
-            },
-        }
-
-        manifest_path = version_dir / "manifest.json"
-        manifest_path.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
-
-        # Register in state manager if present
-        if self.state_manager is not None:
-            from moro.state.schema import NodeStatus, NodeType
-
-            try:
-                self.state_manager.create_node(
-                    node_type=NodeType.RELEASE,
-                    name=f"release_{rel_version}",
-                    payload=manifest,
-                    status=NodeStatus.COMPLETED,
-                    parent_node_id=training_run_id,
+    def create_release(self, run_id, version, eval_results=None):
+        # Caller-supplied scores are never release evidence. The gate reads the DB
+        # and checks the recorded suite and current adapter content hashes.
+        cfg = load_config(self.project_root / "moro.yaml")
+        selected = resolve_export_run(self.project_root, cfg.project.name, run_id)
+        gate = check_release_requirements(self.project_root, selected, cfg)
+        destination = deployment_directory(self.project_root, selected.id, version)
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        lock = os.open(
+            destination.parent / ".release.lock", os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW, 0o600
+        )
+        try:
+            fcntl.flock(lock, fcntl.LOCK_EX)
+            if destination.exists() or destination.is_symlink():
+                raise ExportError("Release version already exists; choose a new version")
+            with tempfile.TemporaryDirectory(
+                prefix=".release-", dir=destination.parent
+            ) as temporary:
+                staged = Path(temporary) / "bundle"
+                adapter = export_adapter(selected.directory, staged)
+                if sha256_directory(adapter) != gate["adapter_sha256"]:
+                    raise ExportError("Adapter changed after release gate; release not published")
+                manifest = generate_manifest(
+                    cfg.project.name,
+                    selected.id,
+                    selected.config.model.name,
+                    sorted(p for p in adapter.rglob("*") if p.is_file()),
+                    eval_summary={
+                        "gate_status": gate["status"],
+                        "evaluations": gate["evaluations"],
+                    },
+                    dataset_version_id=selected.dataset_version_id,
+                    base_model_revision=selected.config.model.revision,
                 )
-            except Exception as e:
-                logger.warning(f"Could not register release node: {e}")
-
-        report(f"Release {rel_version} created successfully", 100.0)
-
+                for artifact in manifest["artifacts"]:
+                    artifact["path"] = str(Path(artifact["path"]).relative_to(staged))
+                manifest.update(version=version, release_gate=gate)
+                write_manifest(manifest, staged)
+                staged.rename(destination)
+        finally:
+            os.close(lock)
         return {
-            "release_id": release_id,
-            "version": rel_version,
-            "manifest_path": str(manifest_path),
-            "status": "completed",
-        }
-
-    def create_release(
-        self,
-        run_id: str,
-        version: str,
-        eval_results: dict[str, Any] | None = None,
-    ) -> dict[str, Any]:
-        """Synchronously create a model release."""
-        release_dir = self.releases_dir / version
-        release_dir.mkdir(parents=True, exist_ok=True)
-
-        # Copy model from run if it exists
-        run_dir = self.project_root / "runs" / run_id
-        model_dir = run_dir / "model"
-        if model_dir.exists():
-            import shutil
-
-            shutil.copytree(model_dir, release_dir / "model", dirs_exist_ok=True)
-
-        metadata = {
+            "release_id": manifest["release_id"],
             "version": version,
-            "run_id": run_id,
-            "created_at": datetime.now(timezone.utc).isoformat(),
-            "eval_results": eval_results,
-        }
-        with open(release_dir / "metadata.json", "w", encoding="utf-8") as f:
-            json.dump(metadata, f, indent=2)
-
-        return {
-            "version": version,
-            "release_dir": str(release_dir),
+            "release_dir": str(destination),
+            "manifest_path": str(destination / "manifest.json"),
             "status": "created",
         }
+
+    async def create_release_async(
+        self, training_run_id, eval_results=None, version=None, progress_callback=None
+    ):
+        if progress_callback:
+            progress_callback("Verifying recorded release evidence", None)
+        result = await asyncio.to_thread(
+            self.create_release, training_run_id, version or "v1.0.0", eval_results
+        )
+        if progress_callback:
+            progress_callback("Release bundle created", 100.0)
+        return result

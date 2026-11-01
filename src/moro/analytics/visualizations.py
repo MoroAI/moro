@@ -121,16 +121,21 @@ class VisualAnalyticsEngine:
         metric: str = "eval_delta",
     ) -> dict[str, Any]:
         """Generate data for a 2D hyperparameter heatmap."""
+        from moro.analytics.columns import resolve_hyperparam, resolve_metric
+
+        x_col = resolve_hyperparam(x_param)
+        y_col = resolve_hyperparam(y_param)
+        metric_col = resolve_metric(metric)
         conn = self.tracker._get_conn()
         try:
             rows = conn.execute(
                 f"""
-                SELECT h.{x_param} as x_val, h.{y_param} as y_val, e.{metric} as metric_val
+                SELECT h.{x_col} as x_val, h.{y_col} as y_val, e.{metric_col} as metric_val
                 FROM experiments e
                 JOIN hyperparameters h ON e.experiment_id = h.experiment_id
-                WHERE e.{metric} IS NOT NULL
-                  AND h.{x_param} IS NOT NULL
-                  AND h.{y_param} IS NOT NULL
+                WHERE e.{metric_col} IS NOT NULL
+                  AND h.{x_col} IS NOT NULL
+                  AND h.{y_col} IS NOT NULL
                 """
             ).fetchall()
 

@@ -109,19 +109,18 @@ def test_state_manager_model_registry_and_promotion(tmp_path: Path):
     models = manager.list_models()
     assert len(models) == 2
 
-    # Promote model_1 to production
-    manager.promote_model_to_production(model_1)
-    prod = manager.list_models(production_only=True)
-    assert len(prod) == 1
-    assert prod[0]["model_id"] == model_1
+    # Registration alone is not evidence that a model is safe to promote.
+    import pytest
 
-    # Promote model_2 to production (should demote model_1)
-    manager.promote_model_to_production(model_2)
-    prod = manager.list_models(production_only=True)
-    assert len(prod) == 1
-    assert prod[0]["model_id"] == model_2
-    assert manager.get_model("qwen-chat", "1.0.0")["is_production"] == 0
-
-    # Operation logs
-    logs = manager.get_operation_log()
-    assert len(logs) >= 4
+    with pytest.raises(ValueError, match="recorded completed training run"):
+        manager.promote_model_to_production(model_1)
+    assert manager.list_models(production_only=True) == []
+    assert manager.promote_model_to_production("missing") is False
+    # A legacy production selection must survive a rejected replacement.
+    connection = manager._get_conn()
+    connection.execute("UPDATE model_registry SET is_production=1 WHERE model_id=?", (model_1,))
+    connection.commit()
+    connection.close()
+    with pytest.raises(ValueError):
+        manager.promote_model_to_production(model_2)
+    assert manager.list_models(production_only=True)[0]["model_id"] == model_1

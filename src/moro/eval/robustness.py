@@ -4,17 +4,10 @@ MoroAI Robustness Scorer.
 Computes robustness metrics by comparing a model's base (pristine) performance
 against its performance on adversarially perturbed inputs.
 
-A Robustness Score of 1.0 means the model's answers were completely unchanged
-by all perturbations — the model genuinely understands the domain.
-A Robustness Score of 0.0 means every perturbation caused the model to fail.
-
-Two robustness metrics:
-  - raw_robustness: % of perturbed cases that passed (regardless of base outcome)
-  - strict_robustness: % of perturbed cases that matched the base outcome exactly
-    (correctly passed if base passed, correctly failed if base failed)
-
-Vulnerabilities count cases where the base passed but a perturbation caused failure
-— these are the regressions that matter most in production.
+Raw robustness measures perturbed accuracy. Strict robustness measures joint
+correctness: a passing original and passing perturbation. Stable wrong answers
+receive no credit. These assertion scores do not establish domain understanding.
+Empty perturbation sets have no evidence and cannot earn a grade.
 """
 
 from __future__ import annotations
@@ -39,13 +32,13 @@ class CaseRobustnessResult:
 
     def __post_init__(self) -> None:
         if not self.perturbed_results:
-            self.raw_robustness = 1.0
-            self.strict_robustness = 1.0
+            self.raw_robustness = 0.0
+            self.strict_robustness = 0.0
             return
 
         total = len(self.perturbed_results)
         passed_count = sum(1 for p in self.perturbed_results.values() if p)
-        strict_count = sum(1 for p in self.perturbed_results.values() if p == self.base_passed)
+        strict_count = sum(1 for p in self.perturbed_results.values() if p and self.base_passed)
         vulns = [ptype for ptype, p in self.perturbed_results.items() if self.base_passed and not p]
 
         self.raw_robustness = round(passed_count / total, 4)
@@ -96,6 +89,8 @@ class RobustnessReport:
     @property
     def robustness_grade(self) -> str:
         """Letter grade for the robustness score."""
+        if not self.case_results or not any(r.perturbed_results for r in self.case_results):
+            return "N/A (No perturbation evidence)"
         s = self.avg_strict_robustness
         if s >= 0.95:
             return "A (Excellent)"
@@ -219,6 +214,9 @@ def create_perturbed_suite(
                 case_dict = case.model_dump(mode="json")
                 case_dict["id"] = f"{case.id}_{ptype}"
                 case_dict["messages"][user_msg_idx]["content"] = p_text
+                if ptype in {"negation_constraint", "entity_swap"}:
+                    case_dict["expect"] = None
+                    case_dict["tags"] = [*case_dict.get("tags", []), "requires_label_review"]
                 new_cases.append(case_dict)
 
     data = {
@@ -283,8 +281,6 @@ def evaluate_robustness(
             for ptype in [
                 "distractor_injection",
                 "typo_noise",
-                "negation_constraint",
-                "entity_swap",
             ]:
                 p_text = perturbed_texts[ptype]
                 # Clone case
@@ -308,15 +304,6 @@ def evaluate_robustness(
 
                 p_score = score_case(p_case, p_resp)
                 perturbed_results[ptype] = p_score.passed
-        else:
-            # Fallback if no user message found
-            for ptype in [
-                "distractor_injection",
-                "typo_noise",
-                "negation_constraint",
-                "entity_swap",
-            ]:
-                perturbed_results[ptype] = base_score.passed
 
         results.append(
             CaseRobustnessResult(

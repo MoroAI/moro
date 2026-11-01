@@ -17,6 +17,7 @@ from rich.console import Console
 from rich.panel import Panel
 
 from moro.core.errors import ProjectError
+from moro.core.net import NonLoopbackBindError, check_bind_host
 from moro.core.project import require_project_root
 
 console = Console()
@@ -39,6 +40,11 @@ def dashboard_default(
     open_browser: bool = typer.Option(
         False, "--open/--no-open", help="Open browser automatically."
     ),
+    allow_non_loopback: bool = typer.Option(
+        False,
+        "--allow-non-loopback",
+        help="Allow binding to a non-loopback address (exposes the dashboard to the network).",
+    ),
 ) -> None:
     """Start the Mission Control Dashboard when invoked without subcommand."""
     if ctx.invoked_subcommand is None:
@@ -48,6 +54,7 @@ def dashboard_default(
             gateway=gateway,
             gateway_port=gateway_port,
             open_browser=open_browser,
+            allow_non_loopback=allow_non_loopback,
         )
 
 
@@ -62,6 +69,11 @@ def dashboard_serve(
     open_browser: bool = typer.Option(
         False, "--open/--no-open", help="Open browser automatically."
     ),
+    allow_non_loopback: bool = typer.Option(
+        False,
+        "--allow-non-loopback",
+        help="Allow binding to a non-loopback address (exposes the dashboard to the network).",
+    ),
 ) -> None:
     """
     Start the MoroAI Mission Control Dashboard.
@@ -72,8 +84,15 @@ def dashboard_serve(
     - Compare models and promote to production
     - Deploy to Ollama and test with sample prompts
     - Inspect continuous learning DPO preference pairs
-    - Execute CLI commands from an embedded terminal
+    - Monitor service health and background jobs
     """
+    try:
+        warning = check_bind_host(host, allow_non_loopback=allow_non_loopback)
+    except NonLoopbackBindError as exc:
+        console.print(f"[bold red]Refused:[/bold red] {exc}")
+        raise typer.Exit(code=2)
+    if warning:
+        console.print(f"[bold yellow]Warning:[/bold yellow] {warning}")
     try:
         root = require_project_root()
 

@@ -18,44 +18,26 @@ app = typer.Typer(name="train", help="Training operations.")
 console = Console()
 
 
-def train_command(
-    config_path: Path | None = typer.Option(
-        None,
-        "--config",
-        help="Path to moro.yaml.",
-    ),
-    run_name: str | None = typer.Option(
-        None,
-        "--run-name",
-        help="Human-readable name for this run.",
-    ),
-    dry_run: bool = typer.Option(
-        False,
-        "--dry-run",
-        help="Validate and estimate memory without training.",
-    ),
-    resume: str | None = typer.Option(
-        None,
-        "--resume",
-        help="Run ID to resume from checkpoint.",
-    ),
-) -> None:
-    """Run fine-tuning with the current project config."""
+def execute_training(root, cfg, run_name=None, dry_run=False, dataset_id=None):
+    from moro.training.locking import training_lock
+
+    with training_lock(root):
+        return _execute_training(root, cfg, run_name, dry_run, dataset_id)
+
+
+def _execute_training(root, cfg, run_name=None, dry_run=False, dataset_id=None):
+    """Execute the canonical training lifecycle. Failures propagate to every caller."""
     conn = None
     run_id = None
     exp_id = None
     tracker = None
     try:
-        if resume:
-            raise ConfigError("Checkpoint resume is not implemented; --resume cannot be used yet.")
-        root = require_project_root()
-        cfg_file = config_path or (root / CONFIG_FILE)
-        cfg = load_config(cfg_file)
-
         snapshot = select_snapshot(root, cfg)
         if snapshot is None:
             raise DatasetError("No immutable dataset matches current inputs. Run moro data build.")
         dataset_row, dataset_manifest = snapshot
+        if dataset_id is not None and dataset_row["version_id"] != dataset_id:
+            raise DatasetError("Requested dataset version does not match current inputs")
         dataset_directory = (root / dataset_row["manifest_path"]).parent
         train_path = dataset_directory / "train.jsonl"
 
@@ -75,14 +57,17 @@ def train_command(
 
         # Estimate memory
         est_vram = backend.estimate_memory(cfg)
-        console.print(f"[cyan]→[/cyan]  Estimated VRAM: [bold]{est_vram:.1f} GB[/bold]")
+        estimate_label = (
+            f"{est_vram:.1f} GiB (uncalibrated)" if est_vram is not None else "unknown model size"
+        )
+        console.print(f"[cyan]→[/cyan]  Estimated memory: [bold]{estimate_label}[/bold]")
 
         if dry_run:
             console.print("\n[bold green]✓[/bold green] Dry-run complete — no training performed.")
             console.print(f"  Model:         {cfg.model.name}")
             console.print(f"  Quantization:  {cfg.model.quantization}")
-            console.print(f"  Est. VRAM:     {est_vram:.1f} GB")
-            return
+            console.print(f"  Est. VRAM:     {estimate_label}")
+            return {"status": "validated", "estimated_vram_gb": est_vram}
 
         # Prepare run record in DB
         conn = storage_db.get_connection(root)
@@ -141,16 +126,16 @@ def train_command(
                     "epochs": getattr(cfg.training, "epochs", None),
                     "warmup_ratio": getattr(cfg.training, "warmup_ratio", None),
                     "weight_decay": getattr(cfg.training, "weight_decay", None),
-                    "lora_r": getattr(cfg.training, "lora_r", None),
-                    "lora_alpha": getattr(cfg.training, "lora_alpha", None),
-                    "lora_dropout": getattr(cfg.training, "lora_dropout", None),
-                    "target_modules": getattr(cfg.training, "target_modules", []),
+                    "lora_r": cfg.adapter.r,
+                    "lora_alpha": cfg.adapter.alpha,
+                    "lora_dropout": cfg.adapter.dropout,
+                    "target_modules": cfg.adapter.target_modules,
                     "optimizer": getattr(cfg.training, "optimizer", "adamw"),
-                    "max_seq_length": getattr(cfg.training, "max_seq_length", 2048),
-                    "seed": getattr(cfg.training, "seed", 42),
+                    "max_seq_length": cfg.dataset.max_seq_length,
+                    "seed": cfg.project.seed,
                 },
                 gpu_name=None,
-                gpu_vram_gb=est_vram,
+                gpu_vram_gb=None,
             )
         except Exception:
             pass
@@ -193,7 +178,7 @@ def train_command(
                 except Exception:
                     pass
             if isinstance(exc, KeyboardInterrupt):
-                raise typer.Exit(code=130) from exc
+                raise
             raise
 
         try:
@@ -212,6 +197,16 @@ def train_command(
                 except Exception:
                     pass
             raise
+        if result.get("effective_config"):
+            from moro.config.models import MoroConfig
+
+            cfg = MoroConfig.model_validate(result["effective_config"])
+            (output_dir / "config.json").write_text(cfg.model_dump_json(indent=2), encoding="utf-8")
+            conn.execute(
+                "UPDATE runs SET config_hash=? WHERE id=?",
+                (config_snapshot_hash(cfg.model_dump_json()), run_id),
+            )
+            conn.commit()
         (output_dir / "training_report.json").write_text(json.dumps(result, indent=2, default=str))
 
         # Update run record
@@ -241,9 +236,9 @@ def train_command(
         )
         if exp_id:
             console.print(f"  [cyan]📊 Experiment tracked:[/cyan] [bold]{exp_id}[/bold]")
-        if result.get("train_loss"):
+        if result.get("train_loss") is not None:
             console.print(f"  Train loss:     {result['train_loss']}")
-        if result.get("validation_loss"):
+        if result.get("validation_loss") is not None:
             console.print(f"  Val loss:       {result['validation_loss']}")
         if result.get("peak_vram_gb"):
             console.print(f"  Peak VRAM:      {result['peak_vram_gb']:.2f} GB")
@@ -252,6 +247,60 @@ def train_command(
             "\n[bold]Next steps:[/bold] Run [bold]moro eval run[/bold] or [bold]moro export[/bold]"
         )
 
+        return {
+            **result,
+            "run_id": run_id,
+            "experiment_id": exp_id,
+            "status": "completed",
+            "output_dir": str(output_dir),
+            "final_loss": result.get("train_loss"),
+        }
+
+    except Exception as exc:
+        if conn is not None and run_id is not None:
+            conn.execute(
+                "UPDATE runs SET status='failed', error=? WHERE id=? AND status IN ('pending','running')",
+                (str(exc), run_id),
+            )
+            conn.commit()
+        raise
+    finally:
+        if conn is not None:
+            conn.close()
+
+
+def train_command(
+    config_path: Path | None = typer.Option(
+        None,
+        "--config",
+        help="Path to moro.yaml.",
+    ),
+    run_name: str | None = typer.Option(
+        None,
+        "--run-name",
+        help="Human-readable name for this run.",
+    ),
+    dry_run: bool = typer.Option(
+        False,
+        "--dry-run",
+        help="Validate and estimate memory without training.",
+    ),
+    resume: str | None = typer.Option(
+        None,
+        "--resume",
+        help="Run ID to resume from checkpoint (not implemented).",
+    ),
+) -> None:
+    """Run fine-tuning with the current project config."""
+    try:
+        if resume:
+            raise ConfigError("Checkpoint resume is not implemented; --resume cannot be used yet.")
+        root = require_project_root()
+        cfg = load_config(config_path or (root / CONFIG_FILE))
+        execute_training(root, cfg, run_name=run_name, dry_run=dry_run)
+
+    except KeyboardInterrupt:
+        raise typer.Exit(code=130)
     except typer.Exit:
         raise
     except DependencyError as exc:
@@ -269,7 +318,3 @@ def train_command(
     except Exception as exc:
         console.print(f"[bold red]Unexpected error:[/bold red] {exc}")
         raise typer.Exit(code=1)
-
-    finally:
-        if conn is not None:
-            conn.close()

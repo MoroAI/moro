@@ -68,7 +68,11 @@ def score_case(case: EvalCase, response: str) -> CaseScore:
 
         try:
             parsed = json.loads(response)
-            jsonschema.validate(parsed, case.expect.json_schema)
+            from referencing import Registry
+
+            validator_type = jsonschema.validators.validator_for(case.expect.json_schema)
+            validator_type.check_schema(case.expect.json_schema)
+            validator_type(case.expect.json_schema, registry=Registry()).validate(parsed)
             details["json_schema"] = "passed"
             checks.append(True)
         except (json.JSONDecodeError, jsonschema.ValidationError) as exc:

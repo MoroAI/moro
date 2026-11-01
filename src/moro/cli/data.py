@@ -7,11 +7,150 @@ from rich.table import Table
 from moro.core.errors import ConfigError, DatasetError, ProjectError
 from moro.core.project import load_project_config, require_project_root
 from moro.data import clean, ingest, normalize, privacy, report, splitter
-from moro.data.versions import publish_snapshot, select_snapshot, source_fingerprint
+from moro.data.versions import build_key, publish_snapshot, select_snapshot, source_fingerprint
 from moro.storage import db as storage_db
 
 app = typer.Typer(name="data", help="Dataset operations.")
 console = Console()
+
+
+def compile_project(root: Path, cfg, *, force: bool = False, limit: int | None = None) -> str:
+    """Shared real compilation service used by CLI and SDK/API adapters."""
+    # Resolve source
+    source = cfg.dataset.source
+    if not source.is_absolute():
+        source = root / source
+
+    if not source.exists():
+        raise DatasetError(
+            f"Dataset source not found: {source}\n"
+            "Run `moro import` first or update dataset.source in moro.yaml."
+        )
+
+    console.print(f"[cyan]→[/cyan]  Reading from: [bold]{source}[/bold]")
+
+    if not force:
+        cached = select_snapshot(root, cfg, limit)
+        if cached:
+            console.print(
+                f"Dataset unchanged; using {cached[0]['version_id']}. Use --force to rebuild."
+            )
+            return cached[0]["version_id"]
+    fingerprint = source_fingerprint(source)
+    initial_build_key = build_key(cfg, source, fingerprint, limit, root)
+
+    # 1. Ingest
+    with console.status("[cyan]Ingesting raw data…[/cyan]"):
+        raw_rows = ingest.read_raw_rows(source, cfg.dataset.format, limit)
+
+    console.print(f"[cyan]→[/cyan]  Ingested [bold]{len(raw_rows)}[/bold] raw rows")
+
+    # 2. Normalize
+    with console.status("[cyan]Normalizing rows…[/cyan]"):
+        valid_rows, invalid_rows = normalize.normalize_rows(raw_rows, str(source))
+
+    console.print(
+        f"[cyan]→[/cyan]  Normalized: [green]{len(valid_rows)} valid[/green], "
+        f"[red]{len(invalid_rows)} invalid[/red]"
+    )
+
+    # 3. Clean + deduplicate (with epistemic scoring & MI Guard)
+    from moro.data.versions import glossary_path as resolve_glossary
+
+    glossary_path = resolve_glossary(cfg, root)
+
+    with console.status("[cyan]Cleaning, scoring epistemically, and deduplicating…[/cyan]"):
+        clean_valid, clean_invalid, exact_dups, near_dups = clean.clean_rows(
+            valid_rows,
+            max_seq_length=cfg.dataset.max_seq_length,
+            min_quality_score=cfg.dataset.min_quality_score,
+            deduplicate=cfg.dataset.deduplicate,
+            domain_glossary_path=glossary_path if glossary_path.exists() else None,
+        )
+        all_invalid = invalid_rows + clean_invalid
+
+    console.print(
+        f"[cyan]→[/cyan]  After cleaning: [bold]{len(clean_valid)}[/bold] rows "
+        f"({exact_dups} exact dups, {near_dups} near-dups removed)"
+    )
+
+    if not clean_valid:
+        raise DatasetError("No valid rows remain after cleaning. Check your dataset format.")
+
+    # 4. Privacy scan
+    if cfg.dataset.pii_scan or cfg.dataset.privacy_action != "flag":
+        with console.status("[cyan]Scanning for PII…[/cyan]"):
+            privacy.scan_rows(clean_valid)
+        flagged = sum(1 for r in clean_valid if r.privacy_flags)
+        if flagged > 0:
+            console.print(f"[yellow]⚠[/yellow]  {flagged} rows flagged for possible PII")
+
+    if cfg.dataset.privacy_action == "redact":
+        privacy.redact_rows(clean_valid)
+    elif cfg.dataset.privacy_action == "reject" and any(row.privacy_flags for row in clean_valid):
+        raise DatasetError("Privacy policy rejected flagged rows; no snapshot published")
+    elif cfg.dataset.privacy_action == "quarantine":
+        from moro.data.models import InvalidRow
+
+        flagged_rows = [row for row in clean_valid if row.privacy_flags]
+        all_invalid.extend(
+            InvalidRow(
+                source=row.source, line_number=row.metadata.line_number, reason="privacy_quarantine"
+            )
+            for row in flagged_rows
+        )
+        clean_valid = [row for row in clean_valid if not row.privacy_flags]
+        if not clean_valid:
+            raise DatasetError("No rows remain after privacy quarantine")
+
+    # 5. Split
+    with console.status("[cyan]Splitting dataset…[/cyan]"):
+        train_rows, val_rows, eval_rows = splitter.split_rows(
+            clean_valid,
+            validation_ratio=cfg.dataset.validation_ratio,
+            eval_ratio=cfg.dataset.eval_ratio,
+            seed=cfg.project.seed,
+            group_by=cfg.dataset.split_group_by,
+        )
+
+    # 7. Compute stats
+    stats = report.compute_stats(
+        rows=clean_valid,
+        invalid_count=len(all_invalid),
+        exact_dup_count=exact_dups,
+        near_dup_count=near_dups,
+        train_rows=len(train_rows),
+        validation_rows=len(val_rows),
+        eval_rows=len(eval_rows),
+        pii_scan=cfg.dataset.pii_scan or cfg.dataset.privacy_action != "flag",
+    )
+
+    destination, manifest = publish_snapshot(
+        root,
+        cfg,
+        source,
+        fingerprint,
+        limit,
+        clean_valid,
+        (train_rows, val_rows, eval_rows),
+        stats,
+        all_invalid,
+        expected_build_key=initial_build_key,
+    )
+    report_path = destination / "report.json"
+    console.print(f"Dataset version: {manifest['dataset_version_id']}")
+
+    console.print(
+        f"\n[bold green]✓[/bold green] Dataset built successfully! "
+        f"[bold]{len(clean_valid)}[/bold] rows across "
+        f"train={len(train_rows)} / val={len(val_rows)} / eval={len(eval_rows)}"
+    )
+    console.print(f"  Report saved to: [dim]{report_path}[/dim]")
+    console.print(
+        "\n[bold]Next steps:[/bold] Run [bold]moro data report[/bold] "
+        "or [bold]moro recipe suggest[/bold]"
+    )
+    return manifest["dataset_version_id"]
 
 
 @app.command("build")
@@ -40,123 +179,7 @@ def build_command(
 
         cfg = load_config(config_path) if config_path else load_project_config()
 
-        # Resolve source
-        source = cfg.dataset.source
-        if not source.is_absolute():
-            source = root / source
-
-        if not source.exists():
-            raise DatasetError(
-                f"Dataset source not found: {source}\n"
-                "Run `moro import` first or update dataset.source in moro.yaml."
-            )
-
-        console.print(f"[cyan]→[/cyan]  Reading from: [bold]{source}[/bold]")
-
-        if not force:
-            cached = select_snapshot(root, cfg, limit)
-            if cached:
-                console.print(
-                    f"Dataset unchanged; using {cached[0]['version_id']}. Use --force to rebuild."
-                )
-                return
-        fingerprint = source_fingerprint(source)
-
-        # 1. Ingest
-        with console.status("[cyan]Ingesting raw data…[/cyan]"):
-            raw_rows = ingest.read_raw_rows(source, cfg.dataset.format, limit)
-
-        console.print(f"[cyan]→[/cyan]  Ingested [bold]{len(raw_rows)}[/bold] raw rows")
-
-        # 2. Normalize
-        with console.status("[cyan]Normalizing rows…[/cyan]"):
-            valid_rows, invalid_rows = normalize.normalize_rows(raw_rows, str(source))
-
-        console.print(
-            f"[cyan]→[/cyan]  Normalized: [green]{len(valid_rows)} valid[/green], "
-            f"[red]{len(invalid_rows)} invalid[/red]"
-        )
-
-        # 3. Clean + deduplicate (with epistemic scoring & MI Guard)
-        glossary_path = root / "domain_glossary.txt"
-        if (
-            not glossary_path.exists()
-            and hasattr(cfg.dataset, "domain_glossary")
-            and cfg.dataset.domain_glossary
-        ):
-            glossary_path = root / cfg.dataset.domain_glossary
-
-        with console.status("[cyan]Cleaning, scoring epistemically, and deduplicating…[/cyan]"):
-            clean_valid, clean_invalid, exact_dups, near_dups = clean.clean_rows(
-                valid_rows,
-                max_seq_length=cfg.dataset.max_seq_length,
-                min_quality_score=cfg.dataset.min_quality_score,
-                deduplicate=cfg.dataset.deduplicate,
-                domain_glossary_path=glossary_path if glossary_path.exists() else None,
-            )
-            all_invalid = invalid_rows + clean_invalid
-
-        console.print(
-            f"[cyan]→[/cyan]  After cleaning: [bold]{len(clean_valid)}[/bold] rows "
-            f"({exact_dups} exact dups, {near_dups} near-dups removed)"
-        )
-
-        if not clean_valid:
-            raise DatasetError("No valid rows remain after cleaning. Check your dataset format.")
-
-        # 4. Privacy scan
-        if cfg.dataset.pii_scan:
-            with console.status("[cyan]Scanning for PII…[/cyan]"):
-                privacy.scan_rows(clean_valid)
-            flagged = sum(1 for r in clean_valid if r.privacy_flags)
-            if flagged > 0:
-                console.print(f"[yellow]⚠[/yellow]  {flagged} rows flagged for possible PII")
-
-        # 5. Split
-        with console.status("[cyan]Splitting dataset…[/cyan]"):
-            train_rows, val_rows, eval_rows = splitter.split_rows(
-                clean_valid,
-                validation_ratio=cfg.dataset.validation_ratio,
-                eval_ratio=cfg.dataset.eval_ratio,
-                seed=cfg.project.seed,
-            )
-
-        # 7. Compute stats
-        stats = report.compute_stats(
-            rows=clean_valid,
-            invalid_count=len(all_invalid),
-            exact_dup_count=exact_dups,
-            near_dup_count=near_dups,
-            train_rows=len(train_rows),
-            validation_rows=len(val_rows),
-            eval_rows=len(eval_rows),
-            pii_scan=cfg.dataset.pii_scan,
-        )
-
-        destination, manifest = publish_snapshot(
-            root,
-            cfg,
-            source,
-            fingerprint,
-            limit,
-            clean_valid,
-            (train_rows, val_rows, eval_rows),
-            stats,
-            all_invalid,
-        )
-        report_path = destination / "report.json"
-        console.print(f"Dataset version: {manifest['dataset_version_id']}")
-
-        console.print(
-            f"\n[bold green]✓[/bold green] Dataset built successfully! "
-            f"[bold]{len(clean_valid)}[/bold] rows across "
-            f"train={len(train_rows)} / val={len(val_rows)} / eval={len(eval_rows)}"
-        )
-        console.print(f"  Report saved to: [dim]{report_path}[/dim]")
-        console.print(
-            "\n[bold]Next steps:[/bold] Run [bold]moro data report[/bold] "
-            "or [bold]moro recipe suggest[/bold]"
-        )
+        compile_project(root, cfg, force=force, limit=limit)
 
     except (ProjectError, ConfigError, DatasetError) as exc:
         console.print(f"[bold red]Error:[/bold red] {exc}")

@@ -1,0 +1,5 @@
+{
+  "literal_shell_true_calls": [],
+  "scope": "src/**/*.py",
+  "limit": "AST check is not a complete data-flow or shell-injection proof"
+}

@@ -10,6 +10,7 @@ def split_rows(
     validation_ratio: float = 0.1,
     eval_ratio: float = 0.1,
     seed: int = 42,
+    group_by: str = "content",
 ) -> tuple[list[DatasetRow], list[DatasetRow], list[DatasetRow]]:
     """
     Split rows into (train, validation, eval) subsets.
@@ -29,23 +30,37 @@ def split_rows(
     if not rows:
         return [], [], []
 
-    rng = random.Random(seed)
-    shuffled = list(rows)
-    rng.shuffle(shuffled)
+    from moro.data.clean import _near_hash
 
-    n = len(shuffled)
-    n_eval = max(1, int(n * eval_ratio)) if eval_ratio > 0 else 0
-    n_val = max(1, int(n * validation_ratio)) if validation_ratio > 0 else 0
+    groups = {}
+    for row in rows:
+        if group_by == "group_id":
+            key = row.metadata.group_id
+            if not key:
+                raise DatasetError("Every row needs metadata.group_id for grouped splitting")
+        elif group_by == "content":
+            key = _near_hash(row)
+        else:
+            raise DatasetError("Unsupported split group key")
+        groups.setdefault(key, []).append(row)
+    if len(groups) < required:
+        raise DatasetError(f"Need at least {required} independent groups for requested splits")
+    # Source order cannot change group assignment. Whole groups stay together;
+    # configured ratios apply to group counts, so row proportions can differ.
+    shuffled = sorted(groups)
+    random.Random(seed).shuffle(shuffled)
+    count = len(shuffled)
+    n_eval = max(1, int(count * eval_ratio)) if eval_ratio > 0 else 0
+    n_val = max(1, int(count * validation_ratio)) if validation_ratio > 0 else 0
 
-    # Ensure we don't exceed total
-    n_eval = min(n_eval, n)
-    n_val = min(n_val, n - n_eval)
+    def flatten(keys):
+        return [row for key in keys for row in sorted(groups[key], key=lambda row: row.id)]
 
-    eval_rows = shuffled[:n_eval]
-    validation_rows = shuffled[n_eval : n_eval + n_val]
-    train_rows = shuffled[n_eval + n_val :]
-
-    return train_rows, validation_rows, eval_rows
+    return (
+        flatten(shuffled[n_eval + n_val :]),
+        flatten(shuffled[n_eval : n_eval + n_val]),
+        flatten(shuffled[:n_eval]),
+    )
 
 
 def write_split(rows: list[DatasetRow], path: Path) -> None:

@@ -5,6 +5,23 @@ on:
 permissions:
   contents: read
 jobs:
+  lockfile:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install pinned uv
+        run: python -m pip install 'uv==0.7.13'
+      - name: Check lock files match pyproject.toml
+        run: |
+          cp requirements/eval.lock /tmp/eval.check.lock
+          uv pip compile pyproject.toml --extra eval --python-version 3.10 --python-platform x86_64-manylinux_2_28 --custom-compile-command "uv pip compile pyproject.toml --extra eval --python-version 3.10 --python-platform x86_64-manylinux_2_28 -o requirements/eval.lock" -o /tmp/eval.check.lock
+          diff -u requirements/eval.lock /tmp/eval.check.lock
+          cp requirements/train.lock /tmp/train.check.lock
+          uv pip compile pyproject.toml --extra eval --extra train --python-version 3.11 --python-platform x86_64-manylinux_2_28 --custom-compile-command "uv pip compile pyproject.toml --extra eval --extra train --python-version 3.11 --python-platform x86_64-manylinux_2_28 -o requirements/train.lock" -o /tmp/train.check.lock
+          diff -u requirements/train.lock /tmp/train.check.lock
   core:
     runs-on: ubuntu-latest
     strategy:
@@ -15,12 +32,19 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
-      - run: python -m pip install -e '.[dev]' build
+      - run: python -m pip install -c requirements/eval.lock -e '.[dev,eval]' build
       - run: ruff check .
       - run: ruff format --check .
       - run: python -m pytest -q
       - run: python -m build
       - run: moro --help
+      - name: Verify wheel assets in a clean environment
+        run: |
+          python -m venv /tmp/moro-wheel
+          /tmp/moro-wheel/bin/pip install dist/*.whl
+          cd /tmp
+          /tmp/moro-wheel/bin/moro --help
+          /tmp/moro-wheel/bin/python -c "from importlib.resources import files; assert (files('moro.dashboard') / 'templates/mission_control.html').is_file(); assert (files('moro.dashboard') / 'static/vendor/alpine.min.js').is_file(); import moro.security.hook"
   training-cpu:
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -34,7 +58,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      - run: python -m pip install torch==2.8.0 --index-url https://download.pytorch.org/whl/cpu
-      - run: python -m pip install -e '.[dev,train]'
+      - run: python -m pip install torch==2.14.1 --index-url https://download.pytorch.org/whl/cpu
+      - run: python -m pip install -c requirements/train.lock -e '.[dev,eval,train]'
       - run: python -m pip check
       - run: python -m pytest tests/integration -v
